@@ -491,3 +491,105 @@ golf_score/
 │       └── logo.png
 └── scripts/                       # 初期化やメンテ用スクリプトを配置
     └── init_db.py                # DB初期化・テストデータ投入用スクリプト
+
+
+以下は、Streamlit + SQLite でゴルフスコアアプリ（golf_app.db）を構築するうえで想定されるテーブル構成の一例です。
+ここでは、ログイン情報を管理する users テーブル、プレイヤー情報を管理する members テーブル、ラウンド設定やマッチ形式のハンデ情報、各プレイヤーのスコアを保存するためのテーブルを提示しています。
+実際のプロジェクト要件に合わせてカラム名や型を調整してください。
+
+1. users (ログイン管理)
+カラム名	型	説明
+user_id	INTEGER (PK)	主キー (AUTOINCREMENT)
+username	TEXT (UNIQUE)	ログインID、ユニーク制約
+password_hash	TEXT	パスワードのハッシュ値
+created_at	DATETIME	ユーザー登録日時
+is_admin	BOOLEAN	管理者権限を持つユーザーかどうか
+用途: アプリへログインする代表者や管理者を管理
+必要に応じて、メールアドレス・権限区分など追加
+2. members (プレイヤー管理)
+カラム名	型	説明
+member_id	INTEGER (PK)	主キー (AUTOINCREMENT)
+name	TEXT	プレイヤーの名前
+base_handicap	INTEGER	(任意) 通常時の基本ハンデなどがあれば記録
+is_active	BOOLEAN	現在アクティブかどうか
+created_at	DATETIME	登録日時
+用途: アプリで扱うプレイヤー(メンバー)を一元管理
+当日のラウンドでは、このテーブルの中から参加者を選択する
+3. rounds (ラウンド情報)
+カラム名	型	説明
+round_id	INTEGER (PK)	主キー (AUTOINCREMENT)
+date_played	DATE	ラウンド日
+course_name	TEXT	ゴルフ場名
+num_players	INTEGER	今回のラウンドの参加人数 (3 or 4など)
+has_extra	BOOLEAN	エキストラ9ホールの有無
+created_at	DATETIME	ラウンド設定の作成日時
+finalized	BOOLEAN	ラウンド結果が最終確定済みかどうか (True/False)
+用途: 1ラウンド(ゴルフプレー1回分)を管理するテーブル
+num_players や has_extra でスコア入力画面を切り替える
+finalized が True になったら結果を変更できない等の運用ルールを設定可能
+4. match_handicap (マッチ形式のハンデ設定)
+カラム名	型	説明
+match_handicap_id	INTEGER (PK)	主キー (AUTOINCREMENT)
+round_id	INTEGER	rounds.round_id への外部キー
+giver_id	INTEGER	members.member_id (ハンデを渡す側のプレイヤー)
+receiver_id	INTEGER	members.member_id (ハンデを受け取る側のプレイヤー)
+half_hcp	INTEGER	渡すハーフハンデ（例：5打、3打…）
+用途: 「A→Bに5打、A→Cに3打…」など、ペア単位でハンデを管理する
+1対1のペアごとにレコードを作り、giver_id と receiver_id で誰が誰にハンデを渡すかを定義
+例:
+round_id = 10（10回目のラウンド）
+giver_id = 1 (member_id=1 のプレイヤー)
+receiver_id = 2 (member_id=2 のプレイヤー)
+half_hcp = 5 → 「プレイヤー1 は プレイヤー2 にハーフ5打のハンデを渡す」
+5. scores (スコア情報)
+カラム名	型	説明
+score_id	INTEGER (PK)	主キー (AUTOINCREMENT)
+round_id	INTEGER	rounds.round_id への外部キー (どのラウンドか)
+member_id	INTEGER	members.member_id への外部キー (どのプレイヤーか)
+front_score	INTEGER	前半9ホールのグロススコア
+back_score	INTEGER	後半9ホールのグロススコア
+extra_score	INTEGER	エキストラ9ホールのグロススコア (無ければ NULL)
+front_putt	INTEGER	前半9ホールのパット数
+back_putt	INTEGER	後半9ホールのパット数
+extra_putt	INTEGER	エキストラ9ホールのパット数 (無ければ NULL)
+front_game_pt	INTEGER	ニヤピン・ドラコン・バーディ等、前半9ホールでのゲームポイント合計
+back_game_pt	INTEGER	後半9ホールでのゲームポイント合計
+extra_game_pt	INTEGER	エキストラ9ホールでのゲームポイント合計
+net_front_score	INTEGER	前半のネットスコア(= front_score - ハンデ合計)
+net_back_score	INTEGER	後半のネットスコア(= back_score - ハンデ合計)
+net_extra_score	INTEGER	エキストラのネットスコア(= extra_score - ハンデ合計)
+score_points	INTEGER	スコア勝敗によるポイント(+10/-10等)を前半・後半・エキストラで合計したもの
+putt_points	INTEGER	パット数によるポイント(+30/-10等)を前半・後半・エキストラで合計したもの
+total_game_pt	INTEGER	front_game_pt + back_game_pt + extra_game_pt (ニヤピン等のゲームポイント合計)
+total_points	INTEGER	最終合計ポイント(= score_points + putt_points + total_game_pt などルールに応じて計算)
+final_calc	INTEGER	自分の得点×(人数-1) - 他プレイヤー合計 など、最終の「精算ポイント」を必要なら保持
+用途: 各ラウンド・各プレイヤーのスコア詳細を記録
+ネットスコアやスコア勝敗ポイント、パット数による加点/減点もここにまとめて計算・更新
+途中経過では一時的に net_front_score などが NULL でもOK。最終確定後にUPDATEする、という運用も可能
+補足
+「誰が誰に +10/-10 を与えるか」をペアごとに計算して反映する場合、テーブルに細分化して持つこともできますが、最終的にプレイヤー個人が得たトータルの加点/減点合計をこのテーブルのフィールドに保存しておくと、後で集計・表示しやすくなります。
+テーブル間のリレーション図 (概念)
+scss
+コピーする
+編集する
+users (1)           members (多)
+                └─> scores (多) --(belongs_to)--> rounds (1)
+                          |           
+                          └-> match_handicap (多) <--(also belongs_to) rounds (1)
+users: ログイン用（admin, general user管理など）
+members: ゴルフプレイヤー個人情報
+rounds: 1つのゴルフラウンド（当日のプレー）
+scores: (round_id, member_id) を持ち、各メンバーのスコア＆ポイントを記録
+match_handicap: (round_id, giver_id, receiver_id, half_hcp) のセットでハーフハンデを管理
+まとめ
+users: ログイン/認証用 (必要に応じて省略可能)
+members: ゴルフプレイヤー管理
+rounds: 1ラウンドあたりの情報 (日付、ゴルフ場、人数など)
+match_handicap: ペアごとのハンデ設定
+scores: 各プレイヤーのスコア・パット数・ポイント計算結果
+この構成により、
+
+ラウンドに紐づく複数のプレイヤー(members)のスコアを scores テーブルで一括管理し、
+ペア対戦のハンデ情報は match_handicap テーブルに格納、
+最終的に勝敗ポイントやパットポイント、ニヤピン等のゲームポイントを scores に合算して「最終ポイント」を算出しやすくなります。
+実際の運用では、アプリの要件(例: 途中経過の保存方法、引き分け時の処理、複数ラウンドの集計など)に応じてカラムや外部キーの設定を細かく調整してください。
