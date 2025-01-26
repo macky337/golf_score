@@ -388,3 +388,77 @@ def admin_page():
 5. **過去データ参照**や管理者用の画面も備え、運用・管理しやすくする  
 
 以上の流れで、携帯（スマートフォン）利用を想定したゴルフスコアアプリを開発できます。
+
+
+以下は、Streamlit + SQLite を使ってゴルフスコアアプリを開発する際の、例示的なディレクトリ構成の一例です。
+開発規模や運用方針に応じて適宜アレンジしてください。
+
+csharp
+コピーする
+編集する
+golf_app/
+├── README.md                   # プロジェクト概要やセットアップ手順などを記載
+├── requirements.txt            # 必要ライブラリをまとめて管理 (例: streamlit, sqlalchemy, pdfkit 等)
+├── data/
+│   └── golf_app.db             # SQLite データベースファイル (初期は空ファイル or 後で自動生成)
+├── main.py                     # Streamlitアプリのエントリポイント (単ページ構成の場合)
+├── pages/                      # Streamlitのマルチページ構成にする場合、各ページを配置
+│   ├── 01_ログイン.py
+│   ├── 02_今日のラウンド設定.py
+│   ├── 03_前半スコア入力.py
+│   ├── 04_後半スコア入力.py
+│   ├── 05_エキストラスコア入力.py
+│   ├── 06_結果確認.py
+│   └── 07_過去データ参照_管理.py
+├── modules/                    # アプリ全体で使用する共通ロジックやDB操作、計算処理などをまとめるフォルダ
+│   ├── __init__.py
+│   ├── db.py                   # DB接続 (SQLAlchemy セッション作成など)
+│   ├── models.py               # SQLAlchemy で定義するテーブル（ORMモデル）クラス群
+│   ├── calculations.py         # スコアやポイントの計算ロジックをまとめる
+│   └── pdf_export.py           # PDFや画像出力に関連する関数を置く (reportlab, pdfkit 等)
+├── static/                     # 静的ファイル (CSS, 画像など)
+│   ├── css/
+│   │   └── style.css
+│   └── images/
+│       └── logo.png
+└── scripts/                    # 初期データ投入スクリプトやメンテナンス用スクリプトを置く
+    └── init_db.py              # DBの初期化やテストデータ投入のためのスクリプト
+各ディレクトリの説明
+golf_app/
+
+プロジェクトのルートディレクトリ。
+README.md にプロジェクトの概要やセットアップ手順を書いておくと、他メンバーや後日参照に便利。
+requirements.txt
+
+このファイルに streamlit, sqlalchemy, pdfkit, reportlab など、必要なPythonライブラリを一覧で記載
+pip install -r requirements.txt でまとめてインストール可能
+data/
+
+データベースファイルや、CSVインポート用ファイルなどを置く
+SQLiteの .db ファイルをここに保存
+main.py
+
+単ページ構成の場合、Streamlitアプリのメインスクリプトとして使用
+マルチページ構成の場合は、pages/ 内の各ページに分割し、main.py はトップレベルの案内やランディングページとして利用
+pages/
+
+Streamlitのマルチページモードを使う場合に、各画面（ログイン／ラウンド設定／前半スコア入力 など）を .py ファイルごとに分ける
+ファイル名の頭に番号を振るとサイドバーでの並び順を制御できる
+modules/
+
+共通処理やビジネスロジックをまとめるフォルダ
+例:
+db.py: SQLiteへの接続やSQLAlchemyのセッションを作成するモジュール
+models.py: SQLAlchemyで定義する Member, Round, Score, MatchHandicap などのORMクラスをまとめる
+calculations.py: スコアやハーフHCPの引き算、最少パット判定 +30/-10 等のロジック実装
+pdf_export.py: PDFや画像ファイルへの出力（pdfkit, reportlab など）を行う関数群
+static/
+
+画像やCSS、JavaScriptなどの静的ファイルを配置する場所
+StreamlitでCSSを読み込む場合は st.markdown や st.write でHTMLを埋め込んで読み込むか、テーマ機能を利用する
+scripts/
+
+本番前の初期データ投入やDBマイグレーションなど、一時的に使うスクリプトを保管
+init_db.py では models.py のメタデータから Base.metadata.create_all(engine) を呼び出し、データベースを初期化したり、サンプルデータを投入したりできる
+このようにディレクトリを整理することで、画面（UI）ロジックとビジネスロジック（計算・DB操作）、静的アセット等が分かりやすく管理でき、チーム開発や保守がスムーズになります。
+
