@@ -462,3 +462,32 @@ scripts/
 init_db.py では models.py のメタデータから Base.metadata.create_all(engine) を呼び出し、データベースを初期化したり、サンプルデータを投入したりできる
 このようにディレクトリを整理することで、画面（UI）ロジックとビジネスロジック（計算・DB操作）、静的アセット等が分かりやすく管理でき、チーム開発や保守がスムーズになります。
 
+
+ディレクトリ構成を修正
+golf_score/
+├── README.md                      # プロジェクトの概要、セットアップ手順、使用方法など
+├── requirements.txt               # 必要なPythonライブラリを列挙 (streamlit, sqlalchemy, pdfkit 等)
+├── main.py                        # Streamlitのエントリーポイント (トップページ、共通処理など)
+├── data/
+│   └── golf_app.db               # SQLiteのDBファイル (初期は空 or 後で作成される)
+├── pages/                         # Streamlitのマルチページ用ディレクトリ
+│   ├── 01_login.py               # ログイン機能
+│   ├── 02_round_setup.py         # 日付・ゴルフ場・メンバー選択、ハンデ設定など
+│   ├── 03_front_score_input.py   # 前半スコア・パット数・ゲームポイント入力
+│   ├── 04_back_score_input.py    # 後半スコア・パット数・ゲームポイント入力
+│   ├── 05_extra_score_input.py   # エキストラホール（追加9H）のスコア入力
+│   ├── 06_result_confirm.py      # 途中経過や最終結果の確認・DB登録
+│   └── 07_history_management.py  # 過去ラウンド結果一覧・詳細表示・修正機能など
+├── modules/                       # 共通モジュール (DB接続, 計算ロジック, PDF生成など)
+│   ├── __init__.py
+│   ├── db.py                     # DB接続設定やSQLAlchemyセッション管理
+│   ├── models.py                 # SQLAlchemyのORMモデル定義 (Member, Score, Round, etc.)
+│   ├── calculations.py           # スコア比較・ハンデ計算・パットポイントなどのロジック
+│   └── pdf_export.py             # PDF/JPG出力機能 (pdfkit, reportlab 等)
+├── static/                        # 静的ファイル (CSS, 画像等) 
+│   ├── css/
+│   │   └── style.css
+│   └── images/
+│       └── logo.png
+└── scripts/                       # 初期化やメンテ用スクリプトを配置
+    └── init_db.py                # DB初期化・テストデータ投入用スクリプト
