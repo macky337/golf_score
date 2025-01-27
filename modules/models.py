@@ -17,14 +17,15 @@ class Member(Base):
 class Round(Base):
     __tablename__ = "rounds"
     round_id = Column(Integer, primary_key=True, autoincrement=True)
-    date_played = Column(Date)
-    course_name = Column(String)
-    num_players = Column(Integer, default=4)
+    date_played = Column(Date, nullable=False)
+    course_name = Column(String, nullable=False)
+    num_players = Column(Integer, nullable=False)
     has_extra = Column(Boolean, default=False)
     finalized = Column(Boolean, default=False)
 
     # scoresとのリレーション
     scores = relationship("Score", back_populates="round")
+    match_handicaps = relationship("MatchHandicap", back_populates="round")
 
 class Score(Base):
     __tablename__ = "scores"
