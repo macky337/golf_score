@@ -1,6 +1,7 @@
 # modules/models.py
 from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey
 from sqlalchemy.orm import declarative_base, relationship
+from modules.db import Base
 
 Base = declarative_base()
 
@@ -13,6 +14,8 @@ class Member(Base):
 
     # scoresとのリレーション
     scores = relationship("Score", back_populates="member")
+    match_handicaps_given = relationship("MatchHandicap", back_populates="giver", foreign_keys='MatchHandicap.giver_id')
+    match_handicaps_received = relationship("MatchHandicap", back_populates="receiver", foreign_keys='MatchHandicap.receiver_id')
 
 class Round(Base):
     __tablename__ = "rounds"
@@ -40,6 +43,8 @@ class Score(Base):
     front_putt = Column(Integer, default=0)
     back_putt = Column(Integer, default=0)
     extra_putt = Column(Integer, default=0)
+    front_game_pt = Column(Integer, default=0)
+    back_game_pt = Column(Integer, default=0)
 
     # ほかにもnet_front_scoreなど追加してもOK
 
@@ -54,5 +59,6 @@ class MatchHandicap(Base):
     receiver_id = Column(Integer, ForeignKey("members.member_id"))
     half_hcp = Column(Integer, default=0)
     
-    # ラウンドとのリレーション(必要なら)
-    # round = relationship("Round", back_populates="match_handicaps")
+    round = relationship("Round", back_populates="match_handicaps")
+    giver = relationship("Member", back_populates="match_handicaps_given", foreign_keys=[giver_id])
+    receiver = relationship("Member", back_populates="match_handicaps_received", foreign_keys=[receiver_id])

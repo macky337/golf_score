@@ -1,8 +1,20 @@
 # modules/db.py
+
 from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "sqlite:///data/golf_app.db"  # 相対パス or 絶対パス
+# データベースのURLを設定（必要に応じて調整してください）
+DATABASE_URL = "sqlite:///data/golf_app.db"
 
-engine = create_engine(DATABASE_URL, echo=False)
-SessionLocal = sessionmaker(bind=engine)
+# エンジンの作成
+engine = create_engine(
+    DATABASE_URL, 
+    connect_args={"check_same_thread": False}  # SQLite特有の設定
+)
+
+# セッションローカルクラスの作成
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# ベースクラスの作成
+Base = declarative_base()
