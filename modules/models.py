@@ -1,9 +1,7 @@
 # modules/models.py
 from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import relationship
 from modules.db import Base
-
-Base = declarative_base()
 
 class Member(Base):
     __tablename__ = "members"
@@ -12,10 +10,17 @@ class Member(Base):
     base_handicap = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
 
-    # scoresとのリレーション
     scores = relationship("Score", back_populates="member")
-    match_handicaps_given = relationship("MatchHandicap", back_populates="giver", foreign_keys='MatchHandicap.giver_id')
-    match_handicaps_received = relationship("MatchHandicap", back_populates="receiver", foreign_keys='MatchHandicap.receiver_id')
+    match_handicaps_given = relationship(
+        "MatchHandicap", 
+        back_populates="giver", 
+        foreign_keys='MatchHandicap.giver_id'
+    )
+    match_handicaps_received = relationship(
+        "MatchHandicap", 
+        back_populates="receiver", 
+        foreign_keys='MatchHandicap.receiver_id'
+    )
 
 class Round(Base):
     __tablename__ = "rounds"
@@ -26,7 +31,6 @@ class Round(Base):
     has_extra = Column(Boolean, default=False)
     finalized = Column(Boolean, default=False)
 
-    # scoresとのリレーション
     scores = relationship("Score", back_populates="round")
     match_handicaps = relationship("MatchHandicap", back_populates="round")
 
@@ -45,8 +49,7 @@ class Score(Base):
     extra_putt = Column(Integer, default=0)
     front_game_pt = Column(Integer, default=0)
     back_game_pt = Column(Integer, default=0)
-
-    # ほかにもnet_front_scoreなど追加してもOK
+    extra_game_pt = Column(Integer, default=0)
 
     round = relationship("Round", back_populates="scores")
     member = relationship("Member", back_populates="scores")
@@ -60,5 +63,13 @@ class MatchHandicap(Base):
     half_hcp = Column(Integer, default=0)
     
     round = relationship("Round", back_populates="match_handicaps")
-    giver = relationship("Member", back_populates="match_handicaps_given", foreign_keys=[giver_id])
-    receiver = relationship("Member", back_populates="match_handicaps_received", foreign_keys=[receiver_id])
+    giver = relationship(
+        "Member", 
+        back_populates="match_handicaps_given", 
+        foreign_keys=[giver_id]
+    )
+    receiver = relationship(
+        "Member", 
+        back_populates="match_handicaps_received", 
+        foreign_keys=[receiver_id]
+    )

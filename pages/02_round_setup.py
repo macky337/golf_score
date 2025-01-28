@@ -3,8 +3,7 @@
 import streamlit as st
 import datetime
 from modules.db import SessionLocal
-from modules.models import Round, Member
-# ↑ ここでは rounds, members テーブル用のORMクラスを想定
+from modules.models import Round, Member, Score  # Scoreをimport
 
 def run():
     """ラウンドの設定ページ"""
@@ -45,13 +44,12 @@ def run():
 
         round_id = new_round.round_id  # 作成されたラウンドのID
 
-        # (オプション) scoresテーブルへ各メンバー分のスコア枠をINSERTする例
-        # from modules.models import Score
-        # for member_name in selected_members:
-        #     member_id = member_dict[member_name]
-        #     new_score = Score(round_id=round_id, member_id=member_id)
-        #     session.add(new_score)
-        # session.commit()
+        # scoresテーブルへ各メンバー分のスコア枠をINSERT
+        for member_name in selected_members:
+            member_id = member_dict[member_name]
+            new_score = Score(round_id=round_id, member_id=member_id)
+            session.add(new_score)
+        session.commit()
 
         session.close()
 
