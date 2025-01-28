@@ -5,15 +5,12 @@ import os
 # プロジェクトのルートディレクトリをパスに追加
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from modules.db import engine, Base
-from modules.models import Member, Round, Score, MatchHandicap
+from modules.db import Base, engine
+from modules.models import Member, Round, Score, HandicapMatch
 
 def init_db():
-    # 既存のテーブルを全て削除（必要に応じてコメントアウト）
-    Base.metadata.drop_all(bind=engine)
-    # テーブルを全て作成
-    Base.metadata.create_all(bind=engine)
+    # Alembic を使用してテーブルを管理するため、直接作成しない
+    print("データベースの初期化は Alembic を通じて行ってください。")
 
 if __name__ == "__main__":
     init_db()
-    print("データベースの初期化が完了しました。")

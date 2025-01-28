@@ -9,7 +9,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from modules.db import Base
-from modules.models import Member, Round, Score, MatchHandicap
+from modules.models import Member, Round, Score, HandicapMatch
 
 # このオブジェクトは、.ini ファイル内の値にアクセスするために使用されます。
 config = context.config
