@@ -10,7 +10,7 @@ def run():
     st.title("Result Confirmation")
 
     session = SessionLocal()
-    match_results = []  # ← ここで初期化
+    match_results = []  # 結果表示用リスト
 
     # 1) 未確定ラウンドの取得
     active_round = session.query(Round).filter_by(finalized=False).order_by(Round.round_id.desc()).first()
@@ -35,13 +35,27 @@ def run():
         return
 
     # 3) ハンディキャップの取得
+    # 同一対戦組み合わせが複数存在する場合、既存の非ゼロ値を優先して登録
     handicaps = {}
     matches = session.query(HandicapMatch).filter(HandicapMatch.round_id == active_round.round_id).all()
     for match in matches:
         p1 = match.player_1_id
         p2 = match.player_2_id
-        handicaps[(p1, p2)] = match.player_1_to_2  # p1 → p2 に渡すハンデ
-        handicaps[(p2, p1)] = match.player_2_to_1  # p2 → p1 に渡すハンデ
+        if (p1, p2) in handicaps:
+            if handicaps[(p1, p2)] == 0 and match.player_1_to_2 != 0:
+                handicaps[(p1, p2)] = match.player_1_to_2
+        else:
+            handicaps[(p1, p2)] = match.player_1_to_2
+
+        if (p2, p1) in handicaps:
+            if handicaps[(p2, p1)] == 0 and match.player_2_to_1 != 0:
+                handicaps[(p2, p1)] = match.player_2_to_1
+        else:
+            handicaps[(p2, p1)] = match.player_2_to_1
+
+    # ※ハンデのデバッグ表示は非表示（以下のコードはコメントアウト）
+    # for key, value in handicaps.items():
+    #     st.write(f"Handicap: {key[0]} -> {key[1]} = {value}")
 
     # 4) スコアデータの作成
     player_data = {}
@@ -59,7 +73,6 @@ def run():
         game_extra = sc.extra_game_pt if sc.extra_game_pt else 0
         game_total = game_front + game_back + game_extra
 
-        # "Member ID" を追加
         player_data[sc.member_id] = {
             "Member ID": sc.member_id,
             "Player": sc.member.name,
@@ -81,6 +94,8 @@ def run():
         }
 
     # ----- マッチ戦ポイントの計算 -----
+    # ゴルフではスコアが低い方が勝ちとなるので、
+    # 各対戦において「相手から受け取るハンデ」を差し引いてネットスコアを計算します。
     players = list(score_rows)
     n_players = len(players)
     for i in range(n_players):
@@ -88,20 +103,29 @@ def run():
             for seg in ["front_score", "back_score", "extra_score"]:
                 score_i = getattr(players[i], seg) or 0
                 score_j = getattr(players[j], seg) or 0
-                handicap_i_to_j = handicaps.get((players[i].member_id, players[j].member_id), 0)
-                handicap_j_to_i = handicaps.get((players[j].member_id, players[i].member_id), 0)
-                net_score_i = score_i - handicap_i_to_j
-                net_score_j = score_j - handicap_j_to_i
 
-                if net_score_i > net_score_j:
+                # Extraホールの場合、両者のグロスが0ならこのセグメントは除外する
+                if seg == "extra_score" and score_i == 0 and score_j == 0:
+                    continue
+
+                # 受け取るハンデを差し引く
+                # 選手iのネットスコア = score_i - (相手から受け取るハンデ) = score_i - handicaps[(players[j].member_id, players[i].member_id)]
+                # 選手jのネットスコア = score_j - (相手から受け取るハンデ) = score_j - handicaps[(players[i].member_id, players[j].member_id)]
+                handicap_for_i = handicaps.get((players[j].member_id, players[i].member_id), 0)
+                handicap_for_j = handicaps.get((players[i].member_id, players[j].member_id), 0)
+                net_score_i = score_i - handicap_for_i
+                net_score_j = score_j - handicap_for_j
+
+                # ネットスコアが低い方が勝ち
+                if net_score_i < net_score_j:
                     player_data[players[i].member_id]["Match Points"] += 10
                     player_data[players[j].member_id]["Match Points"] -= 10
-                elif net_score_i < net_score_j:
+                elif net_score_i > net_score_j:
                     player_data[players[i].member_id]["Match Points"] -= 10
                     player_data[players[j].member_id]["Match Points"] += 10
-                # 同点の場合は変更なし
+                # 同点の場合はポイント変動なし
 
-                # マッチ結果を記録
+                # セグメント名の設定
                 if seg == "front_score":
                     seg_name = "Front"
                 elif seg == "back_score":
@@ -109,12 +133,19 @@ def run():
                 else:
                     seg_name = "Extra"
                 
-                if net_score_i > net_score_j:
-                    match_results.append(f"{players[i].member.name} vs {players[j].member.name} ({seg_name}): {score_i} - {score_j} (Handicap: {handicap_i_to_j} - {handicap_j_to_i}) | {players[i].member.name} wins (Net: {net_score_i} - {net_score_j})")
-                elif net_score_i < net_score_j:
-                    match_results.append(f"{players[i].member.name} vs {players[j].member.name} ({seg_name}): {score_i} - {score_j} (Handicap: {handicap_i_to_j} - {handicap_j_to_i}) | {players[j].member.name} wins (Net: {net_score_i} - {net_score_j})")
+                # 試合結果の記録
+                if net_score_i < net_score_j:
+                    match_results.append(
+                        f"{players[i].member.name} vs {players[j].member.name} ({seg_name}): {score_i} - {score_j} (Handicap: {handicap_for_i} vs {handicap_for_j}) | {players[i].member.name} wins (Net: {net_score_i} - {net_score_j})"
+                    )
+                elif net_score_i > net_score_j:
+                    match_results.append(
+                        f"{players[i].member.name} vs {players[j].member.name} ({seg_name}): {score_i} - {score_j} (Handicap: {handicap_for_i} vs {handicap_for_j}) | {players[j].member.name} wins (Net: {net_score_i} - {net_score_j})"
+                    )
                 else:
-                    match_results.append(f"{players[i].member.name} vs {players[j].member.name} ({seg_name}): {score_i} - {score_j} (Handicap: {handicap_i_to_j} - {handicap_j_to_i}) | Draw (Net: {net_score_i} - {net_score_j})")
+                    match_results.append(
+                        f"{players[i].member.name} vs {players[j].member.name} ({seg_name}): {score_i} - {score_j} (Handicap: {handicap_for_i} vs {handicap_for_j}) | Draw (Net: {net_score_i} - {net_score_j})"
+                    )
 
     # ----- パット戦ポイントの計算 -----
     def calc_putt_points(putt_scores, n):
@@ -188,7 +219,7 @@ def run():
     ])
     st.dataframe(df)
 
-    # Match Results は既存の match_results を利用して表示
+    # Match Results の表示
     st.write("Match Results:")
     for result in match_results:
         st.write(result)
