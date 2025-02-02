@@ -130,31 +130,18 @@ def run():
                 if net_score_i < net_score_j:
                     player_data[players[i].member_id]["Match Points"] += 10
                     player_data[players[j].member_id]["Match Points"] -= 10
+                    match_results.append(
+                        f"{players[i].member.name} vs {players[j].member.name} ({seg}): {score_i} - {score_j} (Handicap: {handicap_for_i} vs {handicap_for_j}) | {players[i].member.name} wins (Net: {net_score_i} - {net_score_j})"
+                    )
                 elif net_score_i > net_score_j:
                     player_data[players[i].member_id]["Match Points"] -= 10
                     player_data[players[j].member_id]["Match Points"] += 10
-                # 同点の場合はポイント変動なし
-
-                # セグメント名の設定
-                if seg == "front_score":
-                    seg_name = "Front"
-                elif seg == "back_score":
-                    seg_name = "Back"
-                else:
-                    seg_name = "Extra"
-                
-                # 試合結果の記録
-                if net_score_i < net_score_j:
                     match_results.append(
-                        f"{players[i].member.name} vs {players[j].member.name} ({seg_name}): {score_i} - {score_j} (Handicap: {handicap_for_i} vs {handicap_for_j}) | {players[i].member.name} wins (Net: {net_score_i} - {net_score_j})"
-                    )
-                elif net_score_i > net_score_j:
-                    match_results.append(
-                        f"{players[i].member.name} vs {players[j].member.name} ({seg_name}): {score_i} - {score_j} (Handicap: {handicap_for_i} vs {handicap_for_j}) | {players[j].member.name} wins (Net: {net_score_i} - {net_score_j})"
+                        f"{players[i].member.name} vs {players[j].member.name} ({seg}): {score_i} - {score_j} (Handicap: {handicap_for_i} vs {handicap_for_j}) | {players[j].member.name} wins (Net: {net_score_i} - {net_score_j})"
                     )
                 else:
                     match_results.append(
-                        f"{players[i].member.name} vs {players[j].member.name} ({seg_name}): {score_i} - {score_j} (Handicap: {handicap_for_i} vs {handicap_for_j}) | Draw (Net: {net_score_i} - {net_score_j})"
+                        f"{players[i].member.name} vs {players[j].member.name} ({seg}): {score_i} - {score_j} (Handicap: {handicap_for_i} vs {handicap_for_j}) | Draw (Net: {net_score_i} - {net_score_j})"
                     )
 
     # ----- パット戦ポイントの計算 -----
