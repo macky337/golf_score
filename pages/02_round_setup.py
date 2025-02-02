@@ -12,7 +12,22 @@ def run():
 
     # 1) ラウンド情報の入力フォーム
     date_played = st.date_input("Date of Round", value=datetime.date.today())
-    course_name = st.text_input("Course Name", value="Sample Golf Club")
+
+    # 過去のラウンドから、使用済みのコース名を取得
+    session = SessionLocal()
+    past_courses = session.query(Round.course_name).distinct().all()
+    session.close()
+    past_course_list = [course for (course,) in past_courses if course]
+
+    # 選択肢に「新規入力」を追加
+    course_options = ["新規入力"] + past_course_list
+
+    selected_option = st.selectbox("Select Course Name", course_options)
+    if selected_option == "新規入力":
+        course_name = st.text_input("Course Name", value="Sample Golf Club")
+    else:
+        course_name = selected_option
+
     num_players = st.selectbox("Number of Players", [3, 4], index=1)
 
     # 2) DBから既存メンバーを取得し、参加者を選択
