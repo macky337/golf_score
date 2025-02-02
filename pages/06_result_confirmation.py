@@ -2,14 +2,45 @@ import streamlit as st
 import pandas as pd
 from modules.db import SessionLocal
 from modules.models import Round, Score, Member, HandicapMatch
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import io
 import itertools
+
+def generate_pdf(df):
+    # PDF生成用のバッファ
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+
+    # タイトルを追加
+    c.setFont("Helvetica", 16)
+    c.drawString(100, height - 40, "Golf Round Results")
+
+    # 表のヘッダーを追加
+    c.setFont("Helvetica", 10)
+    y_position = height - 80
+    for column in df.columns:
+        c.drawString(100, y_position, column)
+        y_position -= 20
+
+    # データ行を追加
+    for index, row in df.iterrows():
+        y_position -= 20
+        for col in df.columns:
+            c.drawString(100, y_position, str(row[col]))
+            y_position -= 20
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
 
 def run():
     st.title("Result Confirmation")
 
     session = SessionLocal()
     match_results = []  # 結果表示用リスト
-    player_points = {}  # プレイヤーごとの累積ポイント
 
     # 1) 未確定ラウンドの取得
     active_round = session.query(Round).filter_by(finalized=False).order_by(Round.round_id.desc()).first()
@@ -87,26 +118,6 @@ def run():
             "Adjusted Points": 0
         }
 
-        # プレイヤーごとの累積ポイントを初期化
-        player_points[sc.member_id] = {
-            "Player": sc.member.name,
-            "Front Score": f_score,
-            "Back Score": b_score,
-            "Extra Score": e_score,
-            "Score Total": f_score + b_score + e_score,
-            "Front Putt": f_putt,
-            "Back Putt": b_putt,
-            "Extra Putt": e_putt,
-            "Putt Total": f_putt + b_putt + e_putt,
-            "Game Front": game_front,
-            "Game Back": game_back,
-            "Game Extra": game_extra,
-            "Game Total": game_total,
-            "Match Points": 0,
-            "Overall Points": 0,
-            "Adjusted Points": 0
-        }
-
     # ----- マッチ戦ポイントの計算 -----
     players = list(score_rows)
     n_players = len(players)
@@ -116,11 +127,11 @@ def run():
                 score_i = getattr(players[i], seg) or 0
                 score_j = getattr(players[j], seg) or 0
 
-                # Extraホールの場合、両者のグロスが0ならこのセグメントは除外する
+                # Extraホールの場合、両者のグロスが0なら除外
                 if seg == "extra_score" and score_i == 0 and score_j == 0:
                     continue
 
-                # 受け取るハンデを差し引く
+                # 受けるハンデを差し引く
                 handicap_for_i = handicaps.get((players[j].member_id, players[i].member_id), 0)
                 handicap_for_j = handicaps.get((players[i].member_id, players[j].member_id), 0)
                 net_score_i = score_i - handicap_for_i
@@ -170,14 +181,10 @@ def run():
                         points[m_id] = -20
         return points
 
-    # パット戦 前後半の集計
     putt_front = {sc.member_id: (sc.front_putt or 0) for sc in score_rows}
     front_putt_points = calc_putt_points(putt_front, n_players)
-
     putt_back = {sc.member_id: (sc.back_putt or 0) for sc in score_rows}
     back_putt_points = calc_putt_points(putt_back, n_players)
-
-    # 各プレイヤーにパット戦ポイントを加算
     for m_id in player_data:
         player_data[m_id]["Putt Front"] = front_putt_points.get(m_id, 0)
         player_data[m_id]["Putt Back"] = back_putt_points.get(m_id, 0)
@@ -185,14 +192,13 @@ def run():
 
     # ----- 各個人の最終総合ポイントの集計 -----
     for m_id in player_data:
-        overall = (player_data[m_id]["Game Total"] + 
-                   player_data[m_id]["Match Points"] + 
+        overall = (player_data[m_id]["Game Total"] +
+                   player_data[m_id]["Match Points"] +
                    player_data[m_id]["Putt Total"])
         player_data[m_id]["Overall Points"] = overall
 
     # ----- Adjusted Points 計算 -----
     for m_id in player_data:
-        # 他人の合計ポイントを計算
         other_players_points = sum(
             player_data[other_id]["Overall Points"] for other_id in player_data if other_id != m_id
         )
@@ -212,10 +218,50 @@ def run():
     ])
     st.dataframe(df)
 
+    # PDF保存用のダウンロードボタン
+    pdf_buffer = generate_pdf(df)
+    st.download_button(
+        label="Download PDF of Results",
+        data=pdf_buffer,
+        file_name="golf_round_results.pdf",
+        mime="application/pdf"
+    )
+
     # Match Results の表示
     st.write("Match Results:")
     for result in match_results:
         st.write(result)
+
+    # ----- マッチ戦結果の星取表に変換 -----
+    match_matrix = pd.DataFrame(
+        index=[player["Player"] for player in player_data.values()],
+        columns=[player["Player"] for player in player_data.values()]
+    )
+
+    for i, player_i in enumerate(player_data.values()):
+        for j, player_j in enumerate(player_data.values()):
+            if i != j:
+                for seg in ["Front Score", "Back Score"]:
+                    score_i = player_data[player_i["Member ID"]].get(seg, 0)
+                    score_j = player_data[player_j["Member ID"]].get(seg, 0)
+                    handicap_for_i = handicaps.get((player_j["Member ID"], player_i["Member ID"]), 0)
+                    handicap_for_j = handicaps.get((player_i["Member ID"], player_j["Member ID"]), 0)
+                    net_score_i = score_i - handicap_for_i
+                    net_score_j = score_j - handicap_for_j
+                    if net_score_i < net_score_j:
+                        match_matrix.loc[player_i["Player"], player_j["Player"]] = "○"
+                        match_matrix.loc[player_j["Player"], player_i["Player"]] = "×"
+                    elif net_score_i > net_score_j:
+                        match_matrix.loc[player_i["Player"], player_j["Player"]] = "×"
+                        match_matrix.loc[player_j["Player"], player_i["Player"]] = "○"
+                    else:
+                        match_matrix.loc[player_i["Player"], player_j["Player"]] = "△"
+                        match_matrix.loc[player_j["Player"], player_i["Player"]] = "△"
+
+    st.write("### Match Results (Star Table)")
+    st.dataframe(match_matrix.style.applymap(
+        lambda x: 'background-color: green' if x == '○' else ('background-color: red' if x == '×' else 'background-color: gray')
+    ))
 
     # 7) ラウンド結果を最終化
     if st.button("Finalize Results"):
