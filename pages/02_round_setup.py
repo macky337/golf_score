@@ -1,5 +1,3 @@
-# pages/02_round_setup.py
-
 import streamlit as st
 import datetime
 from modules.db import SessionLocal
@@ -65,7 +63,25 @@ def run():
                     "handicap": handicap
                 })
 
-    # 4) 「Start Round」ボタン
+    # 4) 特定のマッチの集計方法の選択
+    st.subheader("Match Calculation Method")
+    
+    # チェックボックスで選択できるように変更
+    match_choices = [
+        "荒巻 vs 吉井", 
+        "荒巻 vs 福澤", 
+        "荒巻 vs 青山", 
+        "吉井 vs 福澤", 
+        "吉井 vs 青山", 
+        "福澤 vs 青山"
+    ]
+    
+    selected_matches = st.multiselect(
+        "Select matches to score only total points (max 10 points):", 
+        options=match_choices
+    )
+
+    # 5) 「Start Round」ボタン
     if st.button("Start Round"):
         if len(selected_members) < 2:
             st.error("少なくとも2人の参加者を選択してください。")
@@ -118,15 +134,17 @@ def run():
                     session.add(new_match)
                 session.commit()
 
+                # 特定マッチを選択した場合
+                if selected_matches:
+                    st.session_state.selected_matches = selected_matches  # 状態保存
+
                 session.close()
 
                 st.success(f"New round created! Round ID = {round_id}")
                 st.info(f"Participants: {', '.join(selected_members)}")
                 st.info("Match handicaps have been set:")
                 for mh in match_handicaps:
-                    st.write(
-                        f"- {mh['player1']} → {mh['player2']}: {mh['handicap']}"
-                    )
+                    st.write(f"- {mh['player1']} → {mh['player2']}: {mh['handicap']}")
 
             except Exception as e:
                 session.rollback()

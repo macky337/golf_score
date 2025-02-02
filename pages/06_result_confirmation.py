@@ -1,5 +1,3 @@
-# pages/06_result_confirmation.py
-
 import streamlit as st
 import pandas as pd
 from modules.db import SessionLocal
@@ -11,6 +9,7 @@ def run():
 
     session = SessionLocal()
     match_results = []  # 結果表示用リスト
+    player_points = {}  # プレイヤーごとの累積ポイント
 
     # 1) 未確定ラウンドの取得
     active_round = session.query(Round).filter_by(finalized=False).order_by(Round.round_id.desc()).first()
@@ -35,7 +34,6 @@ def run():
         return
 
     # 3) ハンディキャップの取得
-    # 同一対戦組み合わせが複数存在する場合、既存の非ゼロ値を優先して登録
     handicaps = {}
     matches = session.query(HandicapMatch).filter(HandicapMatch.round_id == active_round.round_id).all()
     for match in matches:
@@ -52,10 +50,6 @@ def run():
                 handicaps[(p2, p1)] = match.player_2_to_1
         else:
             handicaps[(p2, p1)] = match.player_2_to_1
-
-    # ※ハンデのデバッグ表示は非表示（以下のコードはコメントアウト）
-    # for key, value in handicaps.items():
-    #     st.write(f"Handicap: {key[0]} -> {key[1]} = {value}")
 
     # 4) スコアデータの作成
     player_data = {}
@@ -93,9 +87,27 @@ def run():
             "Adjusted Points": 0
         }
 
+        # プレイヤーごとの累積ポイントを初期化
+        player_points[sc.member_id] = {
+            "Player": sc.member.name,
+            "Front Score": f_score,
+            "Back Score": b_score,
+            "Extra Score": e_score,
+            "Score Total": f_score + b_score + e_score,
+            "Front Putt": f_putt,
+            "Back Putt": b_putt,
+            "Extra Putt": e_putt,
+            "Putt Total": f_putt + b_putt + e_putt,
+            "Game Front": game_front,
+            "Game Back": game_back,
+            "Game Extra": game_extra,
+            "Game Total": game_total,
+            "Match Points": 0,
+            "Overall Points": 0,
+            "Adjusted Points": 0
+        }
+
     # ----- マッチ戦ポイントの計算 -----
-    # ゴルフではスコアが低い方が勝ちとなるので、
-    # 各対戦において「相手から受け取るハンデ」を差し引いてネットスコアを計算します。
     players = list(score_rows)
     n_players = len(players)
     for i in range(n_players):
@@ -109,8 +121,6 @@ def run():
                     continue
 
                 # 受け取るハンデを差し引く
-                # 選手iのネットスコア = score_i - (相手から受け取るハンデ) = score_i - handicaps[(players[j].member_id, players[i].member_id)]
-                # 選手jのネットスコア = score_j - (相手から受け取るハンデ) = score_j - handicaps[(players[i].member_id, players[j].member_id)]
                 handicap_for_i = handicaps.get((players[j].member_id, players[i].member_id), 0)
                 handicap_for_j = handicaps.get((players[i].member_id, players[j].member_id), 0)
                 net_score_i = score_i - handicap_for_i
@@ -164,7 +174,6 @@ def run():
                 for m_id in putt_scores:
                     if m_id not in winners:
                         points[m_id] = -30
-            # 全員同点 → 全員 0
         elif n == 3:
             if len(winners) == 1:
                 points[winners[0]] = 20
@@ -172,7 +181,6 @@ def run():
                 for m_id in putt_scores:
                     if m_id not in winners:
                         points[m_id] = -20
-            # 全員同点 → 0
         return points
 
     # パット戦 前後半の集計
@@ -195,27 +203,25 @@ def run():
                    player_data[m_id]["Putt Total"])
         player_data[m_id]["Overall Points"] = overall
 
-    # ----- 調整総合ポイントの計算 -----
-    all_overall = {m_id: player_data[m_id]["Overall Points"] for m_id in player_data}
+    # ----- Adjusted Points 計算 -----
     for m_id in player_data:
-        others_sum = sum([pt for mid, pt in all_overall.items() if mid != m_id])
+        # 他人の合計ポイントを計算
+        other_players_points = sum(
+            player_data[other_id]["Overall Points"] for other_id in player_data if other_id != m_id
+        )
         if n_players == 4:
-            adj = player_data[m_id]["Overall Points"] * 3 - others_sum
+            adj = player_data[m_id]["Overall Points"] * 3 - other_players_points
         elif n_players == 3:
-            adj = player_data[m_id]["Overall Points"] * 2 - others_sum
-        else:
-            adj = player_data[m_id]["Overall Points"]  # それ以外の場合はそのまま
+            adj = player_data[m_id]["Overall Points"] * 2 - other_players_points
         player_data[m_id]["Adjusted Points"] = adj
 
     # ----- 結果の DataFrame 化と表示 -----
     result_data = list(player_data.values())
     df = pd.DataFrame(result_data, columns=[
-        "Player",
-        "Front Score", "Back Score", "Extra Score", "Score Total",
+        "Player", "Front Score", "Back Score", "Extra Score", "Score Total",
         "Front Putt", "Back Putt", "Extra Putt", "Putt Total",
         "Game Front", "Game Back", "Game Extra", "Game Total",
-        "Match Points",
-        "Overall Points", "Adjusted Points"
+        "Match Points", "Overall Points", "Adjusted Points"
     ])
     st.dataframe(df)
 
