@@ -2,6 +2,7 @@ import streamlit as st
 import datetime
 from modules.db import SessionLocal
 from modules.models import Round, Member, Score, HandicapMatch  # HandicapMatch を import
+import itertools
 
 def run():
     """ラウンドの設定ページ"""
@@ -21,10 +22,22 @@ def run():
     course_options = ["新規入力"] + past_course_list
 
     selected_option = st.selectbox("Select Course Name", course_options)
-    if selected_option == "新規入力":
-        course_name = st.text_input("Course Name", value="Sample Golf Club")
-    else:
+    # 選択肢が「新規入力」以外の場合は、削除ボタンを表示
+    if selected_option != "新規入力":
+        if st.button("Delete Selected Course"):
+            session = SessionLocal()
+            try:
+                session.query(Round).filter(Round.course_name == selected_option).delete()
+                session.commit()
+                st.success(f"Course '{selected_option}' has been deleted from past courses. Please refresh the page.")
+            except Exception as e:
+                session.rollback()
+                st.error(f"削除時にエラーが発生しました: {e}")
+            finally:
+                session.close()
         course_name = selected_option
+    else:
+        course_name = st.text_input("Course Name", value="Sample Golf Club")
 
     num_players = st.selectbox("Number of Players", [3, 4], index=1)
 
@@ -63,24 +76,17 @@ def run():
                     "handicap": handicap
                 })
 
-    # 4) 特定のマッチの集計方法の選択
+    # 4) 特定のマッチの集計方法の選択（例外設定）
     st.subheader("Match Calculation Method")
+    st.write("For the following matches, use the total score (18 holes) for match calculation (instead of front/back separately):")
+    selected_matches = []
+    if selected_members:
+        # 選択された参加者から全組み合わせを生成
+        for pair in itertools.combinations(selected_members, 2):
+            checkbox_label = f"{pair[0]} vs {pair[1]}"
+            if st.checkbox(checkbox_label):
+                selected_matches.append(checkbox_label)
     
-    # チェックボックスで選択できるように変更
-    match_choices = [
-        "荒巻 vs 吉井", 
-        "荒巻 vs 福澤", 
-        "荒巻 vs 青山", 
-        "吉井 vs 福澤", 
-        "吉井 vs 青山", 
-        "福澤 vs 青山"
-    ]
-    
-    selected_matches = st.multiselect(
-        "Select matches to score only total points (max 10 points):", 
-        options=match_choices
-    )
-
     # 5) 「Start Round」ボタン
     if st.button("Start Round"):
         if len(selected_members) < 2:
@@ -134,9 +140,9 @@ def run():
                     session.add(new_match)
                 session.commit()
 
-                # 特定マッチを選択した場合
+                # 例外設定：チェックされたマッチは、totalスコアで判定する
                 if selected_matches:
-                    st.session_state.selected_matches = selected_matches  # 状態保存
+                    st.session_state.total_only_pairs = selected_matches
 
                 session.close()
 
@@ -145,7 +151,6 @@ def run():
                 st.info("Match handicaps have been set:")
                 for mh in match_handicaps:
                     st.write(f"- {mh['player1']} → {mh['player2']}: {mh['handicap']}")
-
             except Exception as e:
                 session.rollback()
                 st.error(f"エラーが発生しました: {e}")
