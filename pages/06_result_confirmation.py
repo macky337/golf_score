@@ -6,59 +6,78 @@ import os
 import pandas as pd
 from modules.db import SessionLocal
 from modules.models import Round, Score, Member, HandicapMatch
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-# 日本語対応フォントの登録（ipaexg.ttf が存在する場合）
+# 日本語対応フォントの登録（ipaexg.ttf が同一ディレクトリに存在する場合）
+FONT_NAME = "Helvetica"
 if os.path.exists("ipaexg.ttf"):
-    pdfmetrics.registerFont(TTFont('IPAexGothic', 'ipaexg.ttf'))
-    FONT_NAME = "IPAexGothic"
+    try:
+        pdfmetrics.registerFont(TTFont('IPAexGothic', 'ipaexg.ttf'))
+        FONT_NAME = "IPAexGothic"
+    except Exception as e:
+        st.warning(f"フォント登録エラー: {e}. デフォルトHelveticaを使用します。")
 else:
-    st.warning("ipaexg.ttf not found. Falling back to default Helvetica (PDF output may not support Japanese).")
-    FONT_NAME = "Helvetica"
+    st.warning("ipaexg.ttf が見つかりません。PDF出力は Helvetica となります（日本語表示に問題が生じる可能性があります）。")
 
-def generate_pdf(df):
+def generate_pdf(final_df, star_df):
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
-    margin = 50
-    y_position = height - margin
+    # 横置きのページ設定
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter),
+                            rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
+    elements = []
+    styles = getSampleStyleSheet()
+    title_style = styles["Heading2"]
 
-    c.setFont(FONT_NAME, 16)
-    c.drawString(margin, y_position, "Golf Round Results")
-    y_position -= 40
+    # タイトル
+    elements.append(Paragraph("Golf Round Results", title_style))
+    elements.append(Spacer(1, 12))
 
-    c.setFont(FONT_NAME, 10)
-    # ヘッダー出力
-    for column in df.columns:
-        # ヘッダー1行あたりの表示領域を確保
-        c.drawString(margin, y_position, str(column))
-        y_position -= 20
-        if y_position < margin:
-            c.showPage()
-            y_position = height - margin
-            c.setFont(FONT_NAME, 10)
+    # 最終結果テーブル
+    elements.append(Paragraph("最終結果（Front & Back & Extra終了時点）", title_style))
+    elements.append(Spacer(1, 12))
+    final_data = [final_df.columns.tolist()] + final_df.values.tolist()
+    available_width = landscape(letter)[0] - 40  # 余白を考慮
+    col_width = available_width / len(final_df.columns)
+    table1 = Table(final_data, colWidths=[col_width]*len(final_df.columns))
+    table1.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), FONT_NAME),
+        ('FONTSIZE', (0,0), (-1,0), 10),
+        ('BACKGROUND', (0,0), (-1,0), colors.grey),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.black),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,0), 12),
+    ]))
+    elements.append(table1)
+    elements.append(Spacer(1, 24))
 
-    # データ行出力
-    for index, row in df.iterrows():
-        # 改ページ判定：下部余白以下になったら新規ページ
-        if y_position < margin + 20:
-            c.showPage()
-            y_position = height - margin
-            c.setFont(FONT_NAME, 10)
-        for col in df.columns:
-            text = str(row[col])
-            c.drawString(margin, y_position, text)
-            y_position -= 20
-            if y_position < margin:
-                c.showPage()
-                y_position = height - margin
-                c.setFont(FONT_NAME, 10)
-        y_position -= 10  # 行間スペース
-    c.showPage()
-    c.save()
+    # 星取表（対戦結果）テーブル
+    elements.append(Paragraph("対戦結果（獲得ポイント） 星取表（Total判定含む）", title_style))
+    elements.append(Spacer(1, 12))
+    # ヘッダーをParagraphでラップして改行可能に
+    star_header = [Paragraph(f"<para align='center'>{col}</para>", styles["BodyText"]) for col in star_df.columns]
+    star_data = [star_header] + star_df.values.tolist()
+    col_width2 = available_width / len(star_df.columns)
+    table2 = Table(star_data, colWidths=[col_width2]*len(star_df.columns))
+    table2.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), FONT_NAME),
+        ('FONTSIZE', (0,0), (-1,0), 8),
+        ('BACKGROUND', (0,0), (-1,0), colors.grey),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.black),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,0), 12),
+    ]))
+    elements.append(table2)
+    
+    doc.build(elements)
     buffer.seek(0)
     return buffer
 
@@ -142,28 +161,23 @@ def run():
             "Back Score": b,
             "Total Score": f + b,
             "Extra Score": e,
-            # 各セグメントでのマッチ戦勝敗ポイント（初期値0）
             "Match Front": 0,
             "Match Back": 0,
             "Match Total": 0,
             "Match Extra": 0,
-            # パット戦得点（後で計算）
             "Putt Front": 0,
             "Putt Back": 0,
-            # ゲームポイント（各セグメントの合算）
             "Game Front": 0,
             "Game Back": 0,
             "Game Extra": 0,
             "Game Total": 0,
-            # 集計ポイント
             "Aggregate Points": 0
         }
     
-    # 例外ルール：総合判定（totalスコア）で判定する対戦ペア
+    # 例外ルール：総合判定（totalスコア）で判定する対戦ペア（st.session_state.total_only_pairs に設定される前提）
     total_only_pairs = st.session_state.get("total_only_pairs", [])
     total_only_set = {frozenset(pair) for pair in total_only_pairs}
     
-    # 5) マッチ戦ポイントの計算
     # 5.1 Front判定
     player_ids = list(player_data.keys())
     for i in range(len(player_ids)):
@@ -283,7 +297,7 @@ def run():
     total_agg = sum(player_data[pid]["Aggregate Points"] for pid in player_data)
     st.write(f"**検算：全体の集計ポイント合計 = {total_agg} (0であるべき)**")
     
-    # 9) 結果を表形式にまとめて表示（項目名は指定通り）
+    # 9) 結果を表形式にまとめて表示
     result_data = []
     for pid, data in player_data.items():
         result_data.append({
@@ -305,12 +319,12 @@ def run():
             "合計ポイント": data["Game Total"],
             "集計ポイント": data["Aggregate Points"]
         })
-    df = pd.DataFrame(result_data)
+    final_df = pd.DataFrame(result_data)
     st.write("### 最終結果（Front & Back & Extra終了時点）")
-    st.dataframe(df)
+    st.dataframe(final_df)
     
-    # 10) 対戦結果（獲得ポイント） 星取表の作成
-    # Backスコアが入力されていればTotal＋Extra判定、そうでなければFrontのみを用いる
+    # 10) 対戦結果 星取表の作成
+    # Backスコアが入力されていればTotal＋Extra判定、そうでなければFrontのみ
     match_matrix = pd.DataFrame(
         index=[data["Player"] for data in player_data.values()],
         columns=[data["Player"] for data in player_data.values()]
@@ -358,8 +372,9 @@ def run():
                         score = 0
                 match_matrix.loc[player_data[pid_i]["Player"], player_data[pid_j]["Player"]] = f"{score:+d}"
                 total_points[player_data[pid_i]["Player"]] += score
+    star_df = pd.DataFrame(match_matrix)
     st.write("### 対戦結果（獲得ポイント） 星取表（Total判定含む）")
-    st.dataframe(match_matrix)
+    st.dataframe(star_df)
     
     st.write("### 各プレイヤーの総獲得ポイント（Total判定含む）")
     total_points_df = pd.DataFrame(list(total_points.items()), columns=["Player", "Total Points"])
@@ -370,17 +385,8 @@ def run():
     for log in detailed_match_log:
         st.write(log)
     
-    # 12) CSVダウンロードボタン（cp932エンコードで出力）
-    csv_data = df.to_csv(index=False, encoding="cp932")
-    st.download_button(
-        label="Download CSV of Results",
-        data=csv_data,
-        file_name="golf_round_results.csv",
-        mime="text/csv"
-    )
-    
-    # 13) PDFダウンロードボタン
-    pdf_buffer = generate_pdf(df)
+    # 12) PDFダウンロードボタン（最終結果と星取表の両方を含む）
+    pdf_buffer = generate_pdf(final_df, star_df)
     st.download_button(
         label="Download PDF of Results",
         data=pdf_buffer,
@@ -388,7 +394,7 @@ def run():
         mime="application/pdf"
     )
     
-    # 14) ラウンド結果最終化ボタン
+    # 13) ラウンド結果最終化ボタン
     if st.button("Finalize Results"):
         session.query(Round).filter(Round.finalized == False).update({Round.finalized: True})
         session.commit()
