@@ -9,9 +9,7 @@ def run():
 
     session = SessionLocal()
     
-    # 1) 未確定( finalzed=False )ラウンドを取得
-    #   - ここでは例として "最後に作成された1件" を選択
-    #   - 必要に応じて selectbox でユーザーに選ばせてもOK
+    # 1) 未確定( finalized=False )のラウンドを取得
     active_round = session.query(Round).filter_by(finalized=False).order_by(Round.round_id.desc()).first()
     if not active_round:
         st.warning("No active round found. Please set up a round first.")
@@ -33,37 +31,49 @@ def run():
         session.close()
         return
 
-    # 3) ユーザー入力フォーム (各メンバーの前半スコア・パット・ゲームPT)
+    # 3) 入力フォーム: 各メンバーの前半スコア(front_score)、パット(front_putt)、ゲームポイント(front_game_pt)
     updates = {}
     for sc in score_rows:
         st.subheader(f"Member: {sc.member.name}")
+        
+        # Front Score: 0～200 の範囲で整数
         front_score_val = st.number_input(
             f"Front Score ({sc.member.name})",
-            value=sc.front_score or 0,  # DBに既存値があれば初期値にする
-            min_value=0, max_value=200,
+            value=sc.front_score or 0,
+            min_value=0,
+            max_value=200,
+            step=1,
             key=f"front_score_{sc.score_id}"
         )
+        
+        # Front Putt: 0～50 の範囲で整数
         front_putt_val = st.number_input(
             f"Front Putt ({sc.member.name})",
             value=sc.front_putt or 0,
-            min_value=0, max_value=50,
+            min_value=0,
+            max_value=50,
+            step=1,
             key=f"front_putt_{sc.score_id}"
         )
+        
+        # Front Game Points: 小数やマイナスもOK、範囲制限なし
         front_game_pt_val = st.number_input(
             f"Front Game Points ({sc.member.name})",
-            value=sc.front_game_pt or 0,
-            min_value=0, max_value=999,
+            value=float(sc.front_game_pt or 0.0),
+            step=0.1,          # 小数ステップ
+            format="%.1f",     # 小数点以下1桁表示など、必要に応じて調整
             key=f"front_gamept_{sc.score_id}"
         )
+        
         updates[sc.score_id] = (front_score_val, front_putt_val, front_game_pt_val)
 
     # 4) "Save Front Scores" ボタン
     if st.button("Save Front Scores"):
         for sc in score_rows:
             fs, fp, fgp = updates[sc.score_id]
-            sc.front_score = fs
-            sc.front_putt = fp
-            sc.front_game_pt = fgp
+            sc.front_score = int(fs)            # front_scoreは整数カラムに保存想定
+            sc.front_putt = int(fp)            # front_puttも整数カラム
+            sc.front_game_pt = float(fgp)      # game_pt は小数OKにする
         session.commit()
         st.success("Front 9 scores saved successfully!")
 

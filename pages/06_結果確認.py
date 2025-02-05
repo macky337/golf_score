@@ -110,11 +110,11 @@ def calc_putt_points(putt_scores, n):
     return points
 
 def run():
-    st.title("集計結果確認 (Total Only + パット戦なしの星取表)")
+    st.title("集計結果確認（Aggregate Points なし）")
     session = SessionLocal()
-    detailed_match_log = []  # 対戦詳細ログ
+    detailed_match_log = []
 
-    # 1) 未確定ラウンドの取得
+    # 1) 未確定ラウンド
     active_round = session.query(Round).filter_by(finalized=False).order_by(Round.round_id.desc()).first()
     if not active_round:
         st.warning("No active round found. Please set up a round first.")
@@ -122,7 +122,7 @@ def run():
         return
     st.write(f"**Round ID**: {active_round.round_id}, **Course**: {active_round.course_name}")
 
-    # 2) スコアとプレイヤー情報の取得
+    # 2) スコアの取得
     score_rows = (
         session.query(Score)
         .join(Member, Score.member_id == Member.member_id)
@@ -134,7 +134,7 @@ def run():
         session.close()
         return
 
-    # 3) ハンディキャップの取得
+    # 3) ハンデ
     handicaps = {}
     handicap_matches = session.query(HandicapMatch).filter(HandicapMatch.round_id == active_round.round_id).all()
     for match in handicap_matches:
@@ -145,7 +145,7 @@ def run():
         if (p2, p1) not in handicaps:
             handicaps[(p2, p1)] = match.player_2_to_1
 
-    # 4) スコアデータ作成
+    # 4) player_data を準備
     player_data = {}
     for sc in score_rows:
         f = sc.front_score or 0
@@ -153,9 +153,9 @@ def run():
         e = sc.extra_score or 0
         putt_f = sc.front_putt or 0
         putt_b = sc.back_putt or 0
-        input_game_front = sc.front_game_pt or 0
-        input_game_back  = sc.back_game_pt or 0
-        input_game_extra = sc.extra_game_pt if sc.extra_game_pt is not None else 0
+        igf = sc.front_game_pt or 0
+        igb = sc.back_game_pt or 0
+        ige = sc.extra_game_pt if sc.extra_game_pt is not None else 0
         player_data[sc.member_id] = {
             "Member ID": sc.member_id,
             "Player": sc.member.name,
@@ -163,26 +163,30 @@ def run():
             "Back Score": b,
             "Extra Score": e,
             "Total Score": f + b,
-            "Input Game Front": input_game_front,
-            "Input Game Back": input_game_back,
-            "Input Game Extra": input_game_extra,
-            # マッチ戦の得点
+            # ゲームポイント入力合計
+            "Input Game Front": igf,
+            "Input Game Back": igb,
+            "Input Game Extra": ige,
+            "Input Game Total": 0, 
+            # マッチポイント
             "Match Front": 0,
             "Match Back": 0,
             "Match Total": 0,
             "Match Extra": 0,
-            # パット戦の得点
+            "Match Points Total": 0,
+            # パット戦
             "Putt Front": 0,
-            "Putt Back": 0
+            "Putt Back": 0,
+            "Putt Points Total": 0,
+            # 個人トータル（Aggregateは計算しない）
+            "Individual Total": 0
         }
 
-    # total_only_pairs の取得 （例：st.session_state.total_only_pairs）
+    # total_only_pairs
     total_only_pairs = st.session_state.get("total_only_pairs", [])
     total_only_set = {frozenset(pair) for pair in total_only_pairs}
 
     # 5) 1対1のマッチ戦
-    # front / back / total / extra の比較を行うが、
-    # total_only_set に含まれるペアは front/back をスキップし total + extra のみ判定
     player_ids = list(player_data.keys())
     for i in range(len(player_ids)):
         for j in range(i+1, len(player_ids)):
@@ -190,14 +194,7 @@ def run():
             data_i, data_j = player_data[pid_i], player_data[pid_j]
             pair_key = frozenset([pid_i, pid_j])
 
-            # ハンデ
-            # (相手, 自分) キーに応じてスコアから差し引く
-            # net_front_i = frontスコア - handicaps.get((pid_j, pid_i), 0)
-            # net_front_j = frontスコア - handicaps.get((pid_i, pid_j), 0)
-
             if pair_key in total_only_set:
-                # total only （Front & Back 比較はスキップ）
-                # net_total
                 net_total_i = (data_i["Front Score"] + data_i["Back Score"]) - handicaps.get((pid_j, pid_i), 0)
                 net_total_j = (data_j["Front Score"] + data_j["Back Score"]) - handicaps.get((pid_i, pid_j), 0)
                 if net_total_i < net_total_j:
@@ -207,7 +204,6 @@ def run():
                     data_i["Match Total"] -= 10
                     data_j["Match Total"] += 10
 
-                # extra（エキストラ）
                 if data_i["Extra Score"] > 0 or data_j["Extra Score"] > 0:
                     net_extra_i = data_i["Extra Score"] - handicaps.get((pid_j, pid_i), 0)
                     net_extra_j = data_j["Extra Score"] - handicaps.get((pid_i, pid_j), 0)
@@ -218,7 +214,6 @@ def run():
                         data_i["Match Extra"] -= 10
                         data_j["Match Extra"] += 10
             else:
-                # 通常：front / back / total / extra の全比較
                 # front
                 net_front_i = data_i["Front Score"] - handicaps.get((pid_j, pid_i), 0)
                 net_front_j = data_j["Front Score"] - handicaps.get((pid_i, pid_j), 0)
@@ -260,43 +255,31 @@ def run():
                         data_i["Match Extra"] -= 10
                         data_j["Match Extra"] += 10
 
-    # 6) パット戦の得点計算（Front＆Back） - 最終結果でのみ使用、星取表には加算しない
+    # 6) パット戦の得点（星取表には加えない）
     front_putt = {sc.member_id: (sc.front_putt or 0) for sc in score_rows}
-    back_putt  = {sc.member_id: (sc.back_putt or 0) for sc in score_rows}
+    back_putt = {sc.member_id: (sc.back_putt or 0) for sc in score_rows}
     n_players = len(score_rows)
     putt_front_points = calc_putt_points(front_putt, n_players)
-    putt_back_points  = calc_putt_points(back_putt, n_players)
+    putt_back_points = calc_putt_points(back_putt, n_players)
 
-    # 7) 各プレイヤーの個人ポイント集計
+    # 7) 個人ポイントの集計
     for pid, data in player_data.items():
-        # パット戦
         data["Putt Front"] = putt_front_points.get(pid, 0)
-        data["Putt Back"]  = putt_back_points.get(pid, 0)
-        # 入力ゲームポイントの合計
-        input_game_total = data["Input Game Front"] + data["Input Game Back"] + data["Input Game Extra"]
-        match_points_total = data["Match Front"] + data["Match Back"] + data["Match Total"] + data["Match Extra"]
-        putt_points_total = data["Putt Front"] + data["Putt Back"]
-        data["Input Game Total"] = input_game_total
-        data["Match Points Total"] = match_points_total
-        data["Putt Points Total"] = putt_points_total
-        # 個人の総ゲームポイント = 入力ゲームポイント + マッチ戦得点 + パット戦得点
-        individual_total = input_game_total + match_points_total + putt_points_total
+        data["Putt Back"] = putt_back_points.get(pid, 0)
+        # ゲームポイント合計
+        input_gp_total = data["Input Game Front"] + data["Input Game Back"] + data["Input Game Extra"]
+        data["Input Game Total"] = input_gp_total
+        # マッチポイント合計
+        match_pt_total = data["Match Front"] + data["Match Back"] + data["Match Total"] + data["Match Extra"]
+        data["Match Points Total"] = match_pt_total
+        # パットポイント合計
+        putt_pt_total = data["Putt Front"] + data["Putt Back"]
+        data["Putt Points Total"] = putt_pt_total
+        # 個人トータル
+        individual_total = input_gp_total + match_pt_total + putt_pt_total
         data["Individual Total"] = individual_total
 
-    # 8) 集計ポイント計算（4人⇒自分のIndividual Total×3 - 他3人、3人⇒×2 - 他2人）
-    overall_points = {pid: player_data[pid]["Individual Total"] for pid in player_data}
-    for pid in player_data:
-        others_sum = sum(overall_points[other] for other in overall_points if other != pid)
-        if n_players == 4:
-            agg = player_data[pid]["Individual Total"] * 3 - others_sum
-        elif n_players == 3:
-            agg = player_data[pid]["Individual Total"] * 2 - others_sum
-        else:
-            agg = player_data[pid]["Individual Total"]
-        player_data[pid]["Aggregate Points"] = agg
-
-    total_agg = sum(player_data[pid]["Aggregate Points"] for pid in player_data)
-    st.write(f"**検算：全体の集計ポイント合計 = {total_agg} (理論的に0になるはず)**")
+    # 8) Aggregate Points の計算を削除 → 不要
 
     # 9) 結果を表形式にまとめて表示
     result_data = []
@@ -319,15 +302,14 @@ def run():
             "Putt Front": data["Putt Front"],
             "Putt Back": data["Putt Back"],
             "Putt Points Total": data["Putt Points Total"],
-            "Individual Total": data["Individual Total"],
-            "Aggregate Points": data["Aggregate Points"]
+            "Individual Total": data["Individual Total"]
+            # Aggregate Points 行を削除
         })
     final_df = pd.DataFrame(result_data)
-    st.write("### 最終結果（Front & Back & Extra終了時点）")
+    st.write("### 最終結果（Front & Back & Extra終了時点, Aggregateなし）")
     st.dataframe(final_df)
 
     # 10) 対戦結果 星取表の作成
-    #  => 「total_only_pairs」 を加味し、パット戦は加算しない
     match_matrix = pd.DataFrame(
         index=[data["Player"] for data in player_data.values()],
         columns=[data["Player"] for data in player_data.values()]
@@ -342,19 +324,15 @@ def run():
             if i == j:
                 match_matrix.loc[player_name_i, player_data[pid_j]["Player"]] = ""
             else:
-                # pair
                 pair_key = frozenset([pid_i, pid_j])
                 score = 0
-                # total only ペアかどうか
                 if pair_key in total_only_set:
-                    # total only (Front,Backをスキップし、Total+Extraのみ)
                     net_total_i = (player_data[pid_i]["Front Score"] + player_data[pid_i]["Back Score"]) - handicaps.get((pid_j, pid_i), 0)
                     net_total_j = (player_data[pid_j]["Front Score"] + player_data[pid_j]["Back Score"]) - handicaps.get((pid_i, pid_j), 0)
                     if net_total_i < net_total_j:
                         score += 10
                     elif net_total_i > net_total_j:
                         score -= 10
-                    # extra
                     if player_data[pid_i]["Extra Score"] > 0 or player_data[pid_j]["Extra Score"] > 0:
                         net_extra_i = player_data[pid_i]["Extra Score"] - handicaps.get((pid_j, pid_i), 0)
                         net_extra_j = player_data[pid_j]["Extra Score"] - handicaps.get((pid_i, pid_j), 0)
@@ -363,14 +341,12 @@ def run():
                         elif net_extra_i > net_extra_j:
                             score -= 10
                 else:
-                    # フロント比較
                     net_front_i = player_data[pid_i]["Front Score"] - handicaps.get((pid_j, pid_i), 0)
                     net_front_j = player_data[pid_j]["Front Score"] - handicaps.get((pid_i, pid_j), 0)
                     if net_front_i < net_front_j:
                         score += 10
                     elif net_front_i > net_front_j:
                         score -= 10
-                    # バック（両者にBack Scoreがあれば）
                     if player_data[pid_i]["Back Score"] > 0 and player_data[pid_j]["Back Score"] > 0:
                         net_back_i = player_data[pid_i]["Back Score"] - handicaps.get((pid_j, pid_i), 0)
                         net_back_j = player_data[pid_j]["Back Score"] - handicaps.get((pid_i, pid_j), 0)
@@ -378,14 +354,12 @@ def run():
                             score += 10
                         elif net_back_i > net_back_j:
                             score -= 10
-                        # total
                         net_total_i = (player_data[pid_i]["Front Score"] + player_data[pid_i]["Back Score"]) - handicaps.get((pid_j, pid_i), 0)
                         net_total_j = (player_data[pid_j]["Front Score"] + player_data[pid_j]["Back Score"]) - handicaps.get((pid_i, pid_j), 0)
                         if net_total_i < net_total_j:
                             score += 10
                         elif net_total_i > net_total_j:
                             score -= 10
-                    # extra
                     if player_data[pid_i]["Extra Score"] > 0 or player_data[pid_j]["Extra Score"] > 0:
                         net_extra_i = player_data[pid_i]["Extra Score"] - handicaps.get((pid_j, pid_i), 0)
                         net_extra_j = player_data[pid_j]["Extra Score"] - handicaps.get((pid_i, pid_j), 0)
@@ -398,16 +372,14 @@ def run():
                 total_points[player_name_i] += score
 
     star_df = pd.DataFrame(match_matrix)
-    st.write("### 対戦結果（獲得ポイント） 星取表（Total判定含む, パット戦除外）")
+    st.write("### 対戦結果（獲得ポイント） 星取表（Total判定含む, パット戦除外, Aggregateなし）")
     st.dataframe(star_df)
 
-    # 合計列（プレイヤーごとの対戦総合）
     st.write("### 各プレイヤーの総対戦獲得ポイント")
     total_points_df = pd.DataFrame(list(total_points.items()), columns=["Player", "Match Matrix Points"])
     st.dataframe(total_points_df)
 
-    # 11) 対戦詳細ログの表示
-    # （本コードでは省略または従来通り detailed_match_log で保存しているならここで表示）
+    # 11) 対戦詳細ログの表示(任意)
     # for log in detailed_match_log:
     #     st.write(log)
 
