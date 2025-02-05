@@ -61,7 +61,7 @@ def run():
                 min_value=0, max_value=50, step=1, value=0,
                 key=f"h_{pair[1]}_{pair[0]}"
             )
-            total_only = st.checkbox("Use total score for match calculation", key=f"total_only_{pair[0]}_{pair[1]}")
+            total_only = st.checkbox("total scoreのみで戦う", key=f"total_only_{pair[0]}_{pair[1]}")
             match_handicaps.append({
                 "player1": pair[0],
                 "player2": pair[1],
