@@ -110,7 +110,7 @@ def calc_putt_points(putt_scores, n):
     return points
 
 def run():
-    st.title("Result Confirmation")
+    st.title("集計結果確認")
     session = SessionLocal()
     detailed_match_log = []  # 対戦詳細ログ
 

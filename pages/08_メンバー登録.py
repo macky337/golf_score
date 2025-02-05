@@ -6,7 +6,7 @@ from modules.models import Member, HandicapMatch, Score  # Score を追加
 
 def member_registration_page():
     """メンバー登録ページ"""
-    st.title("Member Registration")
+    st.title("メンバー登録ページ")
 
     # 入力フォーム
     name_input = st.text_input("New Member Name", value="")

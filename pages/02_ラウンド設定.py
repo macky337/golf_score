@@ -5,7 +5,7 @@ from modules.db import SessionLocal
 from modules.models import Round, Member, Score, HandicapMatch
 
 def run():
-    st.title("Round Setup")
+    st.title("ラウンド設定")
     st.write("Set up a new round with date, course, and players.")
 
     # 1) ラウンド情報の入力フォーム
