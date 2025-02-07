@@ -309,6 +309,31 @@ def create_detailed_match_results(player_data, handicaps, total_only_set):
     
     return pd.DataFrame(detailed_results)
 
+def highlight_total_only(row):
+    """Total Onlyモードの行の背景色とテキストカラーを設定"""
+    if row["Total Only Mode"] == "Yes":
+        # Total Only の場合：濃い黄色背景で黒テキスト
+        return ['background-color: #FFD700; color: black'] * len(row)
+    # 通常の場合：薄い青背景で黒テキスト
+    return ['background-color: #E6F3FF; color: black'] * len(row)
+
+def color_points(val):
+    """点数表示のスタイリング"""
+    try:
+        if val == "":
+            return "background-color: transparent; color: black"
+        points = int(val)
+        if points > 0:
+            # プラスポイント：緑背景で黒テキスト
+            return 'background-color: #90EE90; color: black'
+        elif points < 0:
+            # マイナスポイント：ピンク背景で黒テキスト
+            return 'background-color: #FFB6C6; color: black'
+        # ゼロ：グレー背景で黒テキスト
+        return 'background-color: #F0F0F0; color: black'
+    except:
+        return "background-color: transparent; color: black"
+
 def run():
     st.title("集計結果確認 (Game Pt + Match Pt + Put Pt)")
     session = SessionLocal()
@@ -494,7 +519,7 @@ def run():
         data = player_data[mid]
         data["Match Pt"] = data["Match Front"] + data["Match Back"] + data["Match Total"] + data["Match Extra"]
 
-    # ========== (C) パット戦 Put Pt 計算 ==========
+    # ========== (C) パット戦 Put Pt 計算 ============
     front_putt = {mid: player_data[mid]["Putt Front"] for mid in player_data}
     back_putt = {mid: player_data[mid]["Putt Back"] for mid in player_data}
 
@@ -541,31 +566,12 @@ def run():
     detailed_df = create_detailed_match_results(player_data, handicaps, total_only_set)
     
     # 詳細表のスタイル設定
-    def highlight_total_only(row):
-        if row["Total Only Mode"] == "Yes":
-            return ['background-color: lightyellow'] * len(row)
-        return [''] * len(row)
-    
     st.dataframe(detailed_df.style.apply(highlight_total_only, axis=1))
 
     star_df = create_match_matrix(player_data, handicaps, total_only_set)
     st.write("### 対戦結果（Much Pt 集計）")
     
     # スタイル適用部分を修正
-    def color_points(val):
-        try:
-            if val == "":
-                return ""
-            points = int(val)
-            if points > 0:
-                return 'background-color: lightgreen'
-            elif points < 0:
-                return 'background-color: lightpink'
-            return 'background-color: lightgray'
-        except:
-            return ""
-    
-    # applymap から map に変更
     st.dataframe(star_df.style.map(color_points))
 
     pdf_buffer = generate_pdf(final_df, star_df)
@@ -583,6 +589,8 @@ def run():
         sess.close()
         st.success("Results have been finalized.")
         st.experimental_rerun()
+
+
 
 
 if __name__ == "__main__":
