@@ -137,85 +137,78 @@ def calc_putt_points(putt_scores, n):
 
 
 def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=False):
-    """1対1のマッチポイント計算"""
-    points_i = 0
-    points_j = 0
+    """1対1のマッチポイント計算（各セクション±10pt）"""
+    front_pt = back_pt = total_pt = extra_pt = 0
     
     if is_total_only:
-        # Total Score のみで判定 (Max 10pt)
+        # Total Score のみで判定 (±10pt)
         total_i = data_i["Front Score"] + data_i["Back Score"] - handicap_ij
         total_j = data_j["Front Score"] + data_j["Back Score"] - handicap_ji
         if total_i < total_j:
-            points_i += 10  # 勝者 +10pt
-            points_j -= 10  # 敗者 -10pt
+            total_pt = 10
         elif total_i > total_j:
-            points_i -= 10
-            points_j += 10
+            total_pt = -10
             
-        # Extra がある場合は追加判定 (さらに Max 10pt)
+        # Extra がある場合は追加判定 (±10pt)
         if data_i["Extra Score"] > 0 or data_j["Extra Score"] > 0:
             extra_i = data_i["Extra Score"] - handicap_ij
             extra_j = data_j["Extra Score"] - handicap_ji
             if extra_i < extra_j:
-                points_i += 10  # Extra勝者 +10pt
-                points_j -= 10  # Extra敗者 -10pt
+                extra_pt = 10
             elif extra_i > extra_j:
-                points_i -= 10
-                points_j += 10
+                extra_pt = -10
         
-        # Total Onlyの場合、Match Front/Back は使用しない
-        data_i["Match Front"] = 0
-        data_i["Match Back"] = 0
-        data_j["Match Front"] = 0
-        data_j["Match Back"] = 0
-        
-        # Total と Extra のみ反映
-        data_i["Match Total"] = points_i
-        data_j["Match Total"] = points_j
+        # Total Only の場合は Front/Back は0
+        front_pt = 0
+        back_pt = 0
         
     else:
-        # Front/Back/Total それぞれで判定
+        # Front Score の判定 (±10pt)
         front_i = data_i["Front Score"] - handicap_ij
         front_j = data_j["Front Score"] - handicap_ji
         if front_i < front_j:
-            points_i += 10
-            points_j -= 10
+            front_pt = 10
         elif front_i > front_j:
-            points_i -= 10
-            points_j += 10
+            front_pt = -10
 
+        # Back Score の判定 (±10pt)
         if data_i["Back Score"] > 0 and data_j["Back Score"] > 0:
             back_i = data_i["Back Score"] - handicap_ij
             back_j = data_j["Back Score"] - handicap_ji
             if back_i < back_j:
-                points_i += 10
-                points_j -= 10
+                back_pt = 10
             elif back_i > back_j:
-                points_i -= 10
-                points_j += 10
+                back_pt = -10
 
-            # Total も計算
-            total_i = data_i["Front Score"] + data_i["Back Score"] - handicap_ij
-            total_j = data_j["Front Score"] + data_j["Back Score"] - handicap_ji
+            # Total の判定 (±10pt)
+            total_i = (data_i["Front Score"] + data_i["Back Score"]) - handicap_ij
+            total_j = (data_j["Front Score"] + data_j["Back Score"]) - handicap_ji
             if total_i < total_j:
-                points_i += 10
-                points_j -= 10
+                total_pt = 10
             elif total_i > total_j:
-                points_i -= 10
-                points_j += 10
+                total_pt = -10
 
-        # Extra がある場合
+        # Extra の判定 (±10pt)
         if data_i["Extra Score"] > 0 or data_j["Extra Score"] > 0:
             extra_i = data_i["Extra Score"] - handicap_ij
             extra_j = data_j["Extra Score"] - handicap_ji
             if extra_i < extra_j:
-                points_i += 10
-                points_j -= 10
+                extra_pt = 10
             elif extra_i > extra_j:
-                points_i -= 10
-                points_j += 10
-                
-    return points_i, points_j
+                extra_pt = -10
+
+    # Player 1 の視点でのポイントを返す
+    data_i["Match Front"] = front_pt
+    data_i["Match Back"] = back_pt
+    data_i["Match Total"] = total_pt
+    data_i["Match Extra"] = extra_pt
+    data_j["Match Front"] = -front_pt
+    data_j["Match Back"] = -back_pt
+    data_j["Match Total"] = -total_pt
+    data_j["Match Extra"] = -extra_pt
+
+    # 合計ポイントを返す（通常：-30～+30、Extra有：-40～+40）
+    return front_pt + back_pt + total_pt + extra_pt, -(front_pt + back_pt + total_pt + extra_pt)
 
 def create_match_matrix(player_data, handicaps, total_only_set):
     """マッチ対戦表（星取表）の作成"""
@@ -283,28 +276,44 @@ def create_detailed_match_results(player_data, handicaps, total_only_set):
             handicap_ij = handicaps.get((pid_j, pid_i), 0)
             handicap_ji = handicaps.get((pid_i, pid_j), 0)
             
+            # 基本情報
             match_detail = {
                 "Player 1": data_i["Player"],
                 "Player 2": data_j["Player"],
                 "Total Only Mode": "Yes" if is_total_only else "No",
-                "Total (Net)": f"{data_i['Front Score']+data_i['Back Score']-handicap_ij} vs {data_j['Front Score']+data_j['Back Score']-handicap_ji}",
-                "Total Points": f"{data_i['Match Total']:+d} vs {data_j['Match Total']:+d}"
+                f"Handicap (Player1 to Player2)": f"{handicap_ij:+d}",
+                f"Handicap (Player2 to Player1)": f"{handicap_ji:+d}",
             }
             
-            # Total Only でない場合のみ Front/Back の詳細を表示
-            if not is_total_only:
-                match_detail.update({
-                    "Front (Net)": f"{data_i['Front Score']-handicap_ij} vs {data_j['Front Score']-handicap_ji}",
-                    "Front Points": f"{data_i['Match Front']:+d} vs {data_j['Match Front']:+d}",
-                    "Back (Net)": f"{data_i['Back Score']-handicap_ij} vs {data_j['Back Score']-handicap_ji}",
-                    "Back Points": f"{data_i['Match Back']:+d} vs {data_j['Match Back']:+d}",
-                })
+            # Front/Back/Total のスコア表示
+            front_i = data_i["Front Score"] - handicap_ij
+            front_j = data_j["Front Score"] - handicap_ji
+            match_detail["Front (Net)"] = f"{front_i} vs {front_j}"
             
-            # Extraスコアがある場合のみ追加
+            if data_i["Back Score"] > 0 and data_j["Back Score"] > 0:
+                back_i = data_i["Back Score"] - handicap_ij
+                back_j = data_j["Back Score"] - handicap_ji
+            else:
+                back_i = back_j = 0
+            match_detail["Back (Net)"] = f"{back_i} vs {back_j}"
+            
+            total_i = (data_i["Front Score"] + data_i["Back Score"]) - handicap_ij
+            total_j = (data_j["Front Score"] + data_j["Back Score"]) - handicap_ji
+            match_detail["Total (Net)"] = f"{total_i} vs {total_j}"
+            
+            # ポイント表示（Player 1の視点での獲得ポイント）
+            if not is_total_only:
+                match_detail["Front Points"] = f"{data_i['Match Front']:+d}"  # Player 1の獲得ポイント
+                match_detail["Back Points"] = f"{data_i['Match Back']:+d}"    # Player 1の獲得ポイント
+            
+            match_detail["Total Points"] = f"{data_i['Match Total']:+d}"      # Player 1の獲得ポイント
+            
             if data_i["Extra Score"] > 0 or data_j["Extra Score"] > 0:
-                match_detail["Extra (Net)"] = f"{data_i['Extra Score']-handicap_ij} vs {data_j['Extra Score']-handicap_ji}"
-                match_detail["Extra Points"] = f"{data_i['Match Extra']:+d} vs {data_j['Match Extra']:+d}"
-                
+                extra_i = data_i["Extra Score"] - handicap_ij
+                extra_j = data_j["Extra Score"] - handicap_ji
+                match_detail["Extra (Net)"] = f"{extra_i} vs {extra_j}"
+                match_detail["Extra Points"] = f"{data_i['Match Extra']:+d}"  # Player 1の獲得ポイント
+            
             detailed_results.append(match_detail)
     
     return pd.DataFrame(detailed_results)

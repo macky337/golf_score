@@ -35,28 +35,42 @@ def run():
         session.close()
         return
 
-    # 3) ユーザー入力フォーム (各メンバーの後半スコア・パット・ゲームPT)
+    # 3) ユーザー入力フォーム (各メンバーのエキストラスコア・パット・ゲームPT)
     updates = {}
     for sc in score_rows:
         st.subheader(f"Member: {sc.member.name}")
+        
+        # エキストラスコア: 0～200の範囲で整数入力
         extra_score_val = st.number_input(
             f"Extra Score ({sc.member.name})",
             value=sc.extra_score or 0,
-            min_value=0, max_value=200,
+            min_value=0,
+            max_value=200,
+            step=1,
             key=f"extra_score_{sc.score_id}"
         )
+        
+        # エキストラパット: 0～50の範囲で整数入力
         extra_putt_val = st.number_input(
             f"Extra Putt ({sc.member.name})",
             value=sc.extra_putt or 0,
-            min_value=0, max_value=50,
+            min_value=0,
+            max_value=50,
+            step=1,
             key=f"extra_putt_{sc.score_id}"
         )
+        
+        # エキストラゲームポイント: 小数やマイナスも受け付ける
         extra_game_pt_val = st.number_input(
             f"Extra Game Points ({sc.member.name})",
-            value=sc.extra_game_pt or 0,
-            min_value=0, max_value=999,
+            value=float(sc.extra_game_pt or 0.0),
+            min_value=-999.0,  # マイナス値を許可
+            max_value=999.0,
+            step=0.1,      # 小数ステップ
+            format="%.1f",  # 表示書式: 小数第1位まで
             key=f"extra_gamept_{sc.score_id}"
         )
+        
         updates[sc.score_id] = (extra_score_val, extra_putt_val, extra_game_pt_val)
 
     # 4) "Save Back Scores" ボタン
