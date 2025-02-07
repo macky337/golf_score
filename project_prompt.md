@@ -593,3 +593,56 @@ scores: 各プレイヤーのスコア・パット数・ポイント計算結果
 ペア対戦のハンデ情報は match_handicap テーブルに格納、
 最終的に勝敗ポイントやパットポイント、ニヤピン等のゲームポイントを scores に合算して「最終ポイント」を算出しやすくなります。
 実際の運用では、アプリの要件(例: 途中経過の保存方法、引き分け時の処理、複数ラウンドの集計など)に応じてカラムや外部キーの設定を細かく調整してください。
+
+
+# 計算ロジック
+
+  ## game pt
+    -front game pt合計
+    -back game pt合計
+    -extra game pt合計
+    -total game pt = front game pt + back game pt + extra game pt
+    
+    ### game ptの計算
+      各自のtotal game ptで自分の取り分を計算する。
+　　    -4人の場合
+　　　　  自分の獲得total game pt
+　　    -3人の場合
+　　　　  自分の獲得total game pt * 2 - (他のplayerのtotal game pt）
+
+
+  ## much pt
+    ###　勝利の判定
+　　  -scoreが小さいほうが勝利
+
+    ### ロジック
+　　  -ペアごとに違うハンデを渡すため、1対1のmuch結果をすべて集計する方法を採用してください。
+      -front score/back score/total scoreで判定する。ペアごとに勝利した結果、→ 勝者は+10pt, 同点は、両者±0pt、敗者は‐10pt獲得する。  
+      -それぞれfront score/back score/total scoreそれぞれのポイント10点とする。Max30点
+      -extra scoreがある場合は、extra scoreの勝者にさらに+10ptを加えmax+40とする。
+
+      #### total scoreのみで戦うにチェックが入っている（true)の場合のロジック
+　　    -total scoreでのみ判定する。→ 勝者+10pt, 同点は両者±0pt敗者は‐10ptでMax10ptを獲得する。
+        -extra scoreがある場合はextra scoreの勝敗で10pt判定する、勝者+10pt, 同点は両者±0pt敗者は‐10ptを加え、
+        -Max10pt,total score+10pt extra score+10pt 合計max+20ptとする。
+
+  ## put pt
+    ### 4人の場合  
+     - 1名のみが最少 → +30pt  
+     - 2名同点最少 → それ以外の2名は -10pt  
+     - 3名同点最少 → 残り1名は -30pt  
+     - 全員同点 → 0pt    
+  
+    ### 3人の場合)
+     - 1名のみが最少 → +20pt  
+     - 2名同点最少 → それ以外の1名は -20pt  
+     - 全員同点 → 0pt    
+
+    ### 各個人ポイントを計算する
+     - put pt総合計
+     - playerのput ptのtotalを計算する
+
+
+  ## 総ポイント
+    ### 各playerのgame pt + much pt＋put ptを合計したものが総合計ptとして計算する。
+    ### 表形式にまとめる
