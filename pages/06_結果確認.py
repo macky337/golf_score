@@ -26,7 +26,43 @@ if os.path.exists("ipaexg.ttf"):
 else:
     st.warning("ipaexg.ttf が見つかりません。PDF出力は Helvetica となります（日本語表示に問題が生じる可能性があります）。")
 
+# ===== 共通ヘルパー関数 =====
+def safe_get_score(data, key):
+    """スコア取得時、Noneや例外発生時は 0 を返す"""
+    try:
+        value = data.get(key, 0)
+        if value is None:
+            return 0
+        return value
+    except Exception:
+        return 0
 
+def calc_net_score(data, key, handicap, multiplier=1):
+    """
+    指定されたセクションのスコアから、ハンディキャップ（multiplier 倍）を差し引いた値を返す
+    """
+    score = safe_get_score(data, key)
+    try:
+        return score - (handicap * multiplier)
+    except Exception:
+        return 0
+
+def calc_net_total(data, handicap, multiplier=2):
+    """
+    FrontとBackのスコアの合計から、ハンディキャップ（multiplier 倍）を差し引いた値を返す
+    """
+    front = safe_get_score(data, "Front Score")
+    back = safe_get_score(data, "Back Score")
+    return front + back - (handicap * multiplier)
+
+def calc_net_extra(data, handicap, multiplier=1):
+    """
+    Extraスコアから、ハンディキャップ（multiplier 倍）を差し引いた値を返す
+    """
+    extra = safe_get_score(data, "Extra Score")
+    return extra - (handicap * multiplier)
+
+# ===== PDF出力等の関数 =====
 def generate_pdf(final_df, star_df):
     """最終結果と星取表をPDFで出力する"""
     buffer = io.BytesIO()
@@ -85,7 +121,6 @@ def generate_pdf(final_df, star_df):
     buffer.seek(0)
     return buffer
 
-
 def calc_putt_points(putt_scores, n):
     """パット戦の得点計算（4人 or 3人の場合）"""
     scores = list(putt_scores.values())
@@ -135,76 +170,77 @@ def calc_putt_points(putt_scores, n):
             pass
     return points
 
-
 def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=False):
     """1対1のマッチポイント計算（各セクション±10pt）"""
     front_pt = back_pt = total_pt = extra_pt = 0
 
-    # ハンディキャップの方向を修正
-    # handicap_ij: player_j が player_i に与えるハンディ
-    # handicap_ji: player_i が player_j に与えるハンディ
-    
     if is_total_only:
-        # Total Score のみ判定（ハンディ2倍）
-        net_total_i = (data_i["Front Score"] + data_i["Back Score"]) - (handicap_ij * 2)
-        net_total_j = (data_j["Front Score"] + data_j["Back Score"]) - (handicap_ji * 2)
-        if net_total_i < net_total_j:
+        # Total Score の判定時はハンデを2倍にして計算
+        total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
+        total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
+        if total_i < total_j:
             total_pt = 10
-        elif net_total_i > net_total_j:
+        elif total_i > total_j:
             total_pt = -10
-
-        # Extra はハーフハンディで判定
-        if data_i["Extra Score"] > 0 or data_j["Extra Score"] > 0:
-            extra_i = data_i["Extra Score"] - handicap_ij  # ハーフハンディ
-            extra_j = data_j["Extra Score"] - handicap_ji  # ハーフハンディ
+            
+        # Extra は通常のハンデで判定
+        if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
+            extra_i = calc_net_extra(data_i, handicap_ij)
+            extra_j = calc_net_extra(data_j, handicap_ji)
             if extra_i < extra_j:
                 extra_pt = 10
             elif extra_i > extra_j:
                 extra_pt = -10
         
         # Total Only の場合は Front/Back は0
-        front_pt = back_pt = 0
+        front_pt = 0
+        back_pt = 0
         
     else:
-        # Front はハーフハンディで判定
-        net_front_i = data_i["Front Score"] - handicap_ij  # ハーフハンディ
-        net_front_j = data_j["Front Score"] - handicap_ji  # ハーフハンディ
-        if net_front_i < net_front_j:
+        # Front/Back はそれぞれハーフのハンディで判定
+        front_i = calc_net_score(data_i, "Front Score", handicap_ij, multiplier=1)
+        front_j = calc_net_score(data_j, "Front Score", handicap_ji, multiplier=1)
+        if front_i < front_j:
             front_pt = 10
-        elif net_front_i > net_front_j:
+        elif front_i > front_j:
             front_pt = -10
 
-        # Back もハーフハンディで判定
-        if data_i["Back Score"] > 0 and data_j["Back Score"] > 0:
-            net_back_i = data_i["Back Score"] - handicap_ij  # ハーフハンディ
-            net_back_j = data_j["Back Score"] - handicap_ji  # ハーフハンディ
-            if net_back_i < net_back_j:
+        if safe_get_score(data_i, "Back Score") > 0 and safe_get_score(data_j, "Back Score") > 0:
+            back_i = calc_net_score(data_i, "Back Score", handicap_ij, multiplier=1)
+            back_j = calc_net_score(data_j, "Back Score", handicap_ji, multiplier=1)
+            if back_i < back_j:
                 back_pt = 10
-            elif net_back_i > net_back_j:
+            elif back_i > back_j:
                 back_pt = -10
 
-            # Total はハンディ2倍で判定
-            net_total_i = (data_i["Front Score"] + data_i["Back Score"]) - (handicap_ij * 2)  # ハンディ2倍
-            net_total_j = (data_j["Front Score"] + data_j["Back Score"]) - (handicap_ji * 2)  # ハンディ2倍
-            if net_total_i < net_total_j:
+            # Total はハンデを2倍にして判定
+            total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
+            total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
+            if total_i < total_j:
                 total_pt = 10
-            elif net_total_i > net_total_j:
+            elif total_i > total_j:
                 total_pt = -10
 
-            # Extra はハーフハンディで判定
-            if data_i["Extra Score"] > 0 or data_j["Extra Score"] > 0:
-                extra_i = data_i["Extra Score"] - handicap_ij  # ハーフハンディ
-                extra_j = data_j["Extra Score"] - handicap_ji  # ハーフハンディ
-                if extra_i < extra_j:
-                    extra_pt = 10
-                elif extra_i > extra_j:
-                    extra_pt = -10
+        # Extra は通常のハンディで判定
+        if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
+            extra_i = calc_net_extra(data_i, handicap_ij)
+            extra_j = calc_net_extra(data_j, handicap_ji)
+            if extra_i < extra_j:
+                extra_pt = 10
+            elif extra_i > extra_j:
+                extra_pt = -10
 
-    # ポイント設定とリターン
-    if is_total_only:
-        return total_pt + extra_pt, -(total_pt + extra_pt)  # 最大±20pt
-    else:
-        return front_pt + back_pt + total_pt + extra_pt, -(front_pt + back_pt + total_pt + extra_pt)  # 最大±40pt
+    # Player 1の視点でのポイントを設定
+    data_i["Match Front"] = front_pt
+    data_i["Match Back"] = back_pt
+    data_i["Match Total"] = total_pt
+    data_i["Match Extra"] = extra_pt
+    data_j["Match Front"] = -front_pt
+    data_j["Match Back"] = -back_pt
+    data_j["Match Total"] = -total_pt
+    data_j["Match Extra"] = -extra_pt
+
+    return front_pt + back_pt + total_pt + extra_pt, -(front_pt + back_pt + total_pt + extra_pt)
 
 def create_match_matrix(player_data, handicaps, total_only_set):
     """マッチ対戦表（星取表）の作成"""
@@ -226,35 +262,32 @@ def create_match_matrix(player_data, handicaps, total_only_set):
     
     # 対戦結果を記入
     for i in range(len(player_ids)):
-        pid_i = player_ids[i]
-        name_i = player_data[pid_i]["Player"]
+        pid_i = player_data[player_ids[i]]["Player"]
         for j in range(i + 1, len(player_ids)):
-            pid_j = player_ids[j]
-            name_j = player_data[pid_j]["Player"]
+            pid_j = player_data[player_ids[j]]["Player"]
             
             # ハンディキャップの取得
-            handicap_ij = handicaps.get((pid_j, pid_i), 0)
-            handicap_ji = handicaps.get((pid_i, pid_j), 0)
+            handicap_ij = handicaps.get((player_ids[j], player_ids[i]), 0)
+            handicap_ji = handicaps.get((player_ids[i], player_ids[j]), 0)
             
             # Total Only かどうかの判定
-            is_total_only = frozenset([pid_i, pid_j]) in total_only_set
+            is_total_only = frozenset([player_ids[i], player_ids[j]]) in total_only_set
             
             # マッチポイントの計算
             points_i, points_j = calc_match_points(
-                player_data[pid_i], 
-                player_data[pid_j],
+                player_data[player_ids[i]], 
+                player_data[player_ids[j]],
                 handicap_ij,
                 handicap_ji,
                 is_total_only
             )
             
             # 星取表に記入
-            match_matrix.loc[name_i, name_j] = f"{points_i:+d}"
-            match_matrix.loc[name_j, name_i] = f"{points_j:+d}"
+            match_matrix.loc[pid_i, pid_j] = f"{points_i:+d}"
+            match_matrix.loc[pid_j, pid_i] = f"{points_j:+d}"
             
     return match_matrix
 
-# マッチ戦詳細結果の表示部分を修正
 def create_detailed_match_results(player_data, handicaps, total_only_set):
     """マッチ戦の詳細結果を作成（横：対戦カード、縦：プレイヤーのポイント）"""
     player_ids = list(player_data.keys())
@@ -377,8 +410,7 @@ def run():
     player_data = {}
     for sc in score_rows:
         mid = sc.member_id
-        if mid not in player_data:
-            player_data[mid] = {}
+        # 各スコアは None なら 0 をフォールバック
         fscore = sc.front_score or 0
         bscore = sc.back_score or 0
         escore = sc.extra_score or 0
@@ -415,17 +447,13 @@ def run():
     n_players = len(player_ids)
 
     # ========== (A) Game Pt 計算 ==========
-    # 各プレイヤーのトータルGame Ptを計算
     for mid in player_data:
         fgp = player_data[mid]["Front GP"]
         bgp = player_data[mid]["Back GP"]
         egp = player_data[mid]["Extra GP"]
-        # Game Ptはそのまま合計値を使用
         player_data[mid]["Game Pt"] = fgp + bgp + egp
 
-    # プレイヤー数に応じた補正
     if n_players == 3:
-        # 3人の場合：自分の合計×2から他プレイヤーの合計を引く
         for mid in player_data:
             my_total = player_data[mid]["Game Pt"]
             others_total = sum(
@@ -434,10 +462,8 @@ def run():
                 if oid != mid
             )
             player_data[mid]["Game Pt"] = my_total * 2 - others_total
-    # 4人の場合は合計値をそのまま使用（補正なし）
 
     # ========== (B) Match Pt 計算 ==========
-
     for i in range(len(player_ids)):
         for j in range(i+1, len(player_ids)):
             pid_i = player_ids[i]
@@ -447,8 +473,8 @@ def run():
             pair_key = frozenset([pid_i, pid_j])
 
             if pair_key in total_only_set:
-                net_total_i = (data_i["Front Score"] + data_i["Back Score"]) - (handicaps.get((pid_j, pid_i), 0) * 2)
-                net_total_j = (data_j["Front Score"] + data_j["Back Score"]) - (handicaps.get((pid_i, pid_j), 0) * 2)
+                net_total_i = calc_net_total(data_i, handicaps.get((pid_j, pid_i), 0), multiplier=2)
+                net_total_j = calc_net_total(data_j, handicaps.get((pid_i, pid_j), 0), multiplier=2)
                 if net_total_i < net_total_j:
                     data_i["Match Total"] += 10
                     data_j["Match Total"] -= 10
@@ -456,9 +482,9 @@ def run():
                     data_i["Match Total"] -= 10
                     data_j["Match Total"] += 10
 
-                if data_i["Extra Score"] > 0 or data_j["Extra Score"] > 0:
-                    net_extra_i = data_i["Extra Score"] - handicaps.get((pid_j, pid_i), 0)
-                    net_extra_j = data_j["Extra Score"] - handicaps.get((pid_i, pid_j), 0)
+                if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
+                    net_extra_i = calc_net_extra(data_i, handicaps.get((pid_j, pid_i), 0))
+                    net_extra_j = calc_net_extra(data_j, handicaps.get((pid_i, pid_j), 0))
                     if net_extra_i < net_extra_j:
                         data_i["Match Extra"] += 10
                         data_j["Match Extra"] -= 10
@@ -466,8 +492,8 @@ def run():
                         data_i["Match Extra"] -= 10
                         data_j["Match Extra"] += 10
             else:
-                net_front_i = data_i["Front Score"] - handicaps.get((pid_j, pid_i), 0)
-                net_front_j = data_j["Front Score"] - handicaps.get((pid_i, pid_j), 0)
+                net_front_i = calc_net_score(data_i, "Front Score", handicaps.get((pid_j, pid_i), 0))
+                net_front_j = calc_net_score(data_j, "Front Score", handicaps.get((pid_i, pid_j), 0))
                 if net_front_i < net_front_j:
                     data_i["Match Front"] += 10
                     data_j["Match Front"] -= 10
@@ -475,9 +501,9 @@ def run():
                     data_i["Match Front"] -= 10
                     data_j["Match Front"] += 10
 
-                if data_i["Back Score"] > 0 and data_j["Back Score"] > 0:
-                    net_back_i = data_i["Back Score"] - handicaps.get((pid_j, pid_i), 0)
-                    net_back_j = data_j["Back Score"] - handicaps.get((pid_i, pid_j), 0)
+                if safe_get_score(data_i, "Back Score") > 0 and safe_get_score(data_j, "Back Score") > 0:
+                    net_back_i = calc_net_score(data_i, "Back Score", handicaps.get((pid_j, pid_i), 0))
+                    net_back_j = calc_net_score(data_j, "Back Score", handicaps.get((pid_i, pid_j), 0))
                     if net_back_i < net_back_j:
                         data_i["Match Back"] += 10
                         data_j["Match Back"] -= 10
@@ -485,8 +511,8 @@ def run():
                         data_i["Match Back"] -= 10
                         data_j["Match Back"] += 10
 
-                    net_total_i = (data_i["Front Score"] + data_i["Back Score"]) - (handicaps.get((pid_j, pid_i), 0) * 2)
-                    net_total_j = (data_j["Front Score"] + data_j["Back Score"]) - (handicaps.get((pid_i, pid_j), 0) * 2)
+                    net_total_i = calc_net_total(data_i, handicaps.get((pid_j, pid_i), 0), multiplier=2)
+                    net_total_j = calc_net_total(data_j, handicaps.get((pid_i, pid_j), 0), multiplier=2)
                     if net_total_i < net_total_j:
                         data_i["Match Total"] += 10
                         data_j["Match Total"] -= 10
@@ -494,9 +520,9 @@ def run():
                         data_i["Match Total"] -= 10
                         data_j["Match Total"] += 10
 
-                if data_i["Extra Score"] > 0 or data_j["Extra Score"] > 0:
-                    net_extra_i = data_i["Extra Score"] - handicaps.get((pid_j, pid_i), 0)
-                    net_extra_j = data_j["Extra Score"] - handicaps.get((pid_i, pid_j), 0)
+                if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
+                    net_extra_i = calc_net_extra(data_i, handicaps.get((pid_j, pid_i), 0))
+                    net_extra_j = calc_net_extra(data_j, handicaps.get((pid_i, pid_j), 0))
                     if net_extra_i < net_extra_j:
                         data_i["Match Extra"] += 10
                         data_j["Match Extra"] -= 10
@@ -548,22 +574,16 @@ def run():
         })
     final_df = pd.DataFrame(result_data)
     
-    # 最終結果の表示部分を修正
     st.write("### 最終結果（Game Pt + Match Pt + Put Pt ＝ Total Pt）")
-    
-    # カスタムCSSを適用
     st.markdown("""
         <style>
             .dataframe-container {
                 width: 100%;
                 overflow-x: auto !important;
             }
-            
             .dataframe {
                 margin: 0 !重要;
             }
-            
-            /* Player列の固定表示 */
             .dataframe th:first-child,
             .dataframe td:first-child {
                 position: sticky !important;
@@ -572,15 +592,11 @@ def run():
                 z-index: 1 !重要;
                 border-right: 2px solid #ccc !重要;
             }
-            
-            /* インデックス列の非表示 */
             .index_col {
                 display: none !重要;
             }
         </style>
     """, unsafe_allow_html=True)
-
-    # データフレームをHTMLとして表示
     st.markdown(
         f"""
         <div class="dataframe-container">
@@ -590,23 +606,17 @@ def run():
         unsafe_allow_html=True
     )
 
-    # マッチ戦の詳細結果を表示
     st.write("### マッチ戦詳細結果")
     detailed_df = create_detailed_match_results(player_data, handicaps, total_only_set)
-    
-    # プレーヤー列を固定表示するためのカスタムCSS
     st.markdown("""
         <style>
             .match-details-container {
                 width: 100%;
                 overflow-x: auto !important;
             }
-            
             .match-details {
                 margin: 0 !important;
             }
-            
-            /* Player列の固定表示 */
             .match-details th:first-child,
             .match-details td:first-child {
                 position: sticky !important;
@@ -617,8 +627,6 @@ def run():
             }
         </style>
     """, unsafe_allow_html=True)
-
-    # マッチ戦詳細結果の表示（color_pointsのみ適用）
     st.markdown(
         f"""
         <div class="match-details-container">
@@ -630,8 +638,6 @@ def run():
 
     star_df = create_match_matrix(player_data, handicaps, total_only_set)
     st.write("### 対戦結果（Much Pt 集計）")
-    
-    # スタイル適用部分を修正
     st.dataframe(star_df.style.map(color_points))
 
     pdf_buffer = generate_pdf(final_df, star_df)
@@ -649,9 +655,6 @@ def run():
         sess.close()
         st.success("Results have been finalized.")
         st.experimental_rerun()
-
-
-
 
 if __name__ == "__main__":
     run()
