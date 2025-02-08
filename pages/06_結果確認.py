@@ -139,74 +139,72 @@ def calc_putt_points(putt_scores, n):
 def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=False):
     """1対1のマッチポイント計算（各セクション±10pt）"""
     front_pt = back_pt = total_pt = extra_pt = 0
+
+    # ハンディキャップの方向を修正
+    # handicap_ij: player_j が player_i に与えるハンディ
+    # handicap_ji: player_i が player_j に与えるハンディ
     
     if is_total_only:
-        # Total Score の判定時はハンディを2倍にする
-        total_i = (data_i["Front Score"] + data_i["Back Score"]) - (handicap_ij * 2)
-        total_j = (data_j["Front Score"] + data_j["Back Score"]) - (handicap_ji * 2)
-        if total_i < total_j:
+        # Total Score のみ判定（ハンディ2倍）
+        net_total_i = (data_i["Front Score"] + data_i["Back Score"]) - (handicap_ij * 2)
+        net_total_j = (data_j["Front Score"] + data_j["Back Score"]) - (handicap_ji * 2)
+        if net_total_i < net_total_j:
             total_pt = 10
-        elif total_i > total_j:
+        elif net_total_i > net_total_j:
             total_pt = -10
-            
-        # Extra は通常のハンディで判定
+
+        # Extra はハーフハンディで判定
         if data_i["Extra Score"] > 0 or data_j["Extra Score"] > 0:
-            extra_i = data_i["Extra Score"] - handicap_ij
-            extra_j = data_j["Extra Score"] - handicap_ji
+            extra_i = data_i["Extra Score"] - handicap_ij  # ハーフハンディ
+            extra_j = data_j["Extra Score"] - handicap_ji  # ハーフハンディ
             if extra_i < extra_j:
                 extra_pt = 10
             elif extra_i > extra_j:
                 extra_pt = -10
         
         # Total Only の場合は Front/Back は0
-        front_pt = 0
-        back_pt = 0
+        front_pt = back_pt = 0
         
     else:
-        # Front/Back はそれぞれハーフのハンディで判定
-        front_i = data_i["Front Score"] - handicap_ij
-        front_j = data_j["Front Score"] - handicap_ji
-        if front_i < front_j:
+        # Front はハーフハンディで判定
+        net_front_i = data_i["Front Score"] - handicap_ij  # ハーフハンディ
+        net_front_j = data_j["Front Score"] - handicap_ji  # ハーフハンディ
+        if net_front_i < net_front_j:
             front_pt = 10
-        elif front_i > front_j:
+        elif net_front_i > net_front_j:
             front_pt = -10
 
+        # Back もハーフハンディで判定
         if data_i["Back Score"] > 0 and data_j["Back Score"] > 0:
-            back_i = data_i["Back Score"] - handicap_ij
-            back_j = data_j["Back Score"] - handicap_ji
-            if back_i < back_j:
+            net_back_i = data_i["Back Score"] - handicap_ij  # ハーフハンディ
+            net_back_j = data_j["Back Score"] - handicap_ji  # ハーフハンディ
+            if net_back_i < net_back_j:
                 back_pt = 10
-            elif back_i > back_j:
+            elif net_back_i > net_back_j:
                 back_pt = -10
 
-            # Total はハンディを2倍にして判定
-            total_i = (data_i["Front Score"] + data_i["Back Score"]) - (handicap_ij * 2)
-            total_j = (data_j["Front Score"] + data_j["Back Score"]) - (handicap_ji * 2)
-            if total_i < total_j:
+            # Total はハンディ2倍で判定
+            net_total_i = (data_i["Front Score"] + data_i["Back Score"]) - (handicap_ij * 2)  # ハンディ2倍
+            net_total_j = (data_j["Front Score"] + data_j["Back Score"]) - (handicap_ji * 2)  # ハンディ2倍
+            if net_total_i < net_total_j:
                 total_pt = 10
-            elif total_i > total_j:
+            elif net_total_i > net_total_j:
                 total_pt = -10
 
-        # Extra は通常のハンディで判定
-        if data_i["Extra Score"] > 0 or data_j["Extra Score"] > 0:
-            extra_i = data_i["Extra Score"] - handicap_ij
-            extra_j = data_j["Extra Score"] - handicap_ji
-            if extra_i < extra_j:
-                extra_pt = 10
-            elif extra_i > extra_j:
-                extra_pt = -10
+            # Extra はハーフハンディで判定
+            if data_i["Extra Score"] > 0 or data_j["Extra Score"] > 0:
+                extra_i = data_i["Extra Score"] - handicap_ij  # ハーフハンディ
+                extra_j = data_j["Extra Score"] - handicap_ji  # ハーフハンディ
+                if extra_i < extra_j:
+                    extra_pt = 10
+                elif extra_i > extra_j:
+                    extra_pt = -10
 
-    # Player 1の視点でのポイントを設定
-    data_i["Match Front"] = front_pt
-    data_i["Match Back"] = back_pt
-    data_i["Match Total"] = total_pt
-    data_i["Match Extra"] = extra_pt
-    data_j["Match Front"] = -front_pt
-    data_j["Match Back"] = -back_pt
-    data_j["Match Total"] = -total_pt
-    data_j["Match Extra"] = -extra_pt
-
-    return front_pt + back_pt + total_pt + extra_pt, -(front_pt + back_pt + total_pt + extra_pt)
+    # ポイント設定とリターン
+    if is_total_only:
+        return total_pt + extra_pt, -(total_pt + extra_pt)  # 最大±20pt
+    else:
+        return front_pt + back_pt + total_pt + extra_pt, -(front_pt + back_pt + total_pt + extra_pt)  # 最大±40pt
 
 def create_match_matrix(player_data, handicaps, total_only_set):
     """マッチ対戦表（星取表）の作成"""
