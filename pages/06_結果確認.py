@@ -256,65 +256,49 @@ def create_match_matrix(player_data, handicaps, total_only_set):
             
     return match_matrix
 
+# マッチ戦詳細結果の表示部分を修正
 def create_detailed_match_results(player_data, handicaps, total_only_set):
-    """マッチ戦の詳細結果を作成"""
+    """マッチ戦の詳細結果を作成（横：対戦カード、縦：プレイヤーのポイント）"""
     player_ids = list(player_data.keys())
-    detailed_results = []
+    n_players = len(player_ids)
+    match_results = {}
     
-    for i in range(len(player_ids)):
-        for j in range(i+1, len(player_ids)):
+    # 対戦カード（列）の作成
+    matches = []
+    for i in range(n_players-1):
+        for j in range(i+1, n_players):
+            matches.append(f"{player_data[player_ids[i]]['Player']} vs {player_data[player_ids[j]]['Player']}")
+    
+    # プレイヤーごとの対戦結果を格納
+    for pid in player_ids:
+        match_results[player_data[pid]["Player"]] = {match: "-" for match in matches}
+    
+    # 対戦結果の計算と格納
+    for i in range(n_players-1):
+        for j in range(i+1, n_players):
             pid_i = player_ids[i]
             pid_j = player_ids[j]
             data_i = player_data[pid_i]
             data_j = player_data[pid_j]
-            pair_key = frozenset([pid_i, pid_j])
-            is_total_only = pair_key in total_only_set
+            match_name = f"{data_i['Player']} vs {data_j['Player']}"
             
             # ハンディキャップの取得
             handicap_ij = handicaps.get((pid_j, pid_i), 0)
             handicap_ji = handicaps.get((pid_i, pid_j), 0)
+            is_total_only = frozenset([pid_i, pid_j]) in total_only_set
             
-            # 基本情報
-            match_detail = {
-                "Player 1": data_i["Player"],
-                "Player 2": data_j["Player"],
-                "Total Only Mode": "Yes" if is_total_only else "No",
-                f"Handicap (Player1 to Player2)": f"{handicap_ij:+d}",
-                f"Handicap (Player2 to Player1)": f"{handicap_ji:+d}",
-            }
+            # マッチポイントの計算
+            points_i, points_j = calc_match_points(
+                data_i, data_j,
+                handicap_ij, handicap_ji,
+                is_total_only
+            )
             
-            # Front/Back/Total のスコア表示
-            front_i = data_i["Front Score"] - handicap_ij
-            front_j = data_j["Front Score"] - handicap_ji
-            match_detail["Front (Net)"] = f"{front_i} vs {front_j}"
-            
-            if data_i["Back Score"] > 0 and data_j["Back Score"] > 0:
-                back_i = data_i["Back Score"] - handicap_ij
-                back_j = data_j["Back Score"] - handicap_ji
-            else:
-                back_i = back_j = 0
-            match_detail["Back (Net)"] = f"{back_i} vs {back_j}"
-            
-            total_i = (data_i["Front Score"] + data_i["Back Score"]) - handicap_ij
-            total_j = (data_j["Front Score"] + data_j["Back Score"]) - handicap_ji
-            match_detail["Total (Net)"] = f"{total_i} vs {total_j}"
-            
-            # ポイント表示（Player 1の視点での獲得ポイント）
-            if not is_total_only:
-                match_detail["Front Points"] = f"{data_i['Match Front']:+d}"  # Player 1の獲得ポイント
-                match_detail["Back Points"] = f"{data_i['Match Back']:+d}"    # Player 1の獲得ポイント
-            
-            match_detail["Total Points"] = f"{data_i['Match Total']:+d}"      # Player 1の獲得ポイント
-            
-            if data_i["Extra Score"] > 0 or data_j["Extra Score"] > 0:
-                extra_i = data_i["Extra Score"] - handicap_ij
-                extra_j = data_j["Extra Score"] - handicap_ji
-                match_detail["Extra (Net)"] = f"{extra_i} vs {extra_j}"
-                match_detail["Extra Points"] = f"{data_i['Match Extra']:+d}"  # Player 1の獲得ポイント
-            
-            detailed_results.append(match_detail)
+            # 結果を格納
+            match_results[data_i["Player"]][match_name] = f"{points_i:+d}" if points_i != 0 else "0"
+            match_results[data_j["Player"]][match_name] = f"{points_j:+d}" if points_j != 0 else "0"
     
-    return pd.DataFrame(detailed_results)
+    return pd.DataFrame.from_dict(match_results, orient='index')
 
 def highlight_total_only(row):
     """Total Onlyモードの行の背景色とテキストカラーを設定"""
@@ -565,15 +549,86 @@ def run():
             "Total Pt": d["Total Pt"],
         })
     final_df = pd.DataFrame(result_data)
+    
+    # 最終結果の表示部分を修正
     st.write("### 最終結果（Game Pt + Match Pt + Put Pt ＝ Total Pt）")
-    st.dataframe(final_df)
+    
+    # カスタムCSSを適用
+    st.markdown("""
+        <style>
+            .dataframe-container {
+                width: 100%;
+                overflow-x: auto !important;
+            }
+            
+            .dataframe {
+                margin: 0 !重要;
+            }
+            
+            /* Player列の固定表示 */
+            .dataframe th:first-child,
+            .dataframe td:first-child {
+                position: sticky !important;
+                left: 0 !important;
+                background-color: white !重要;
+                z-index: 1 !重要;
+                border-right: 2px solid #ccc !重要;
+            }
+            
+            /* インデックス列の非表示 */
+            .index_col {
+                display: none !重要;
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
-    # マッチ戦の詳細結果を表示（星取表の前に追加）
+    # データフレームをHTMLとして表示
+    st.markdown(
+        f"""
+        <div class="dataframe-container">
+            {final_df.to_html(classes='dataframe', index=False)}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # マッチ戦の詳細結果を表示
     st.write("### マッチ戦詳細結果")
     detailed_df = create_detailed_match_results(player_data, handicaps, total_only_set)
     
-    # 詳細表のスタイル設定
-    st.dataframe(detailed_df.style.apply(highlight_total_only, axis=1))
+    # プレーヤー列を固定表示するためのカスタムCSS
+    st.markdown("""
+        <style>
+            .match-details-container {
+                width: 100%;
+                overflow-x: auto !important;
+            }
+            
+            .match-details {
+                margin: 0 !important;
+            }
+            
+            /* Player列の固定表示 */
+            .match-details th:first-child,
+            .match-details td:first-child {
+                position: sticky !important;
+                left: 0 !important;
+                background-color: white !important;
+                z-index: 1 !important;
+                border-right: 2px solid #ccc !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # マッチ戦詳細結果の表示（color_pointsのみ適用）
+    st.markdown(
+        f"""
+        <div class="match-details-container">
+            {detailed_df.style.map(color_points).to_html(classes='match-details', index=False)}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     star_df = create_match_matrix(player_data, handicaps, total_only_set)
     st.write("### 対戦結果（Much Pt 集計）")
