@@ -141,15 +141,15 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
     front_pt = back_pt = total_pt = extra_pt = 0
     
     if is_total_only:
-        # Total Score のみで判定 (±10pt)
-        total_i = data_i["Front Score"] + data_i["Back Score"] - handicap_ij
-        total_j = data_j["Front Score"] + data_j["Back Score"] - handicap_ji
+        # Total Score の判定時はハンディを2倍にする
+        total_i = (data_i["Front Score"] + data_i["Back Score"]) - (handicap_ij * 2)
+        total_j = (data_j["Front Score"] + data_j["Back Score"]) - (handicap_ji * 2)
         if total_i < total_j:
             total_pt = 10
         elif total_i > total_j:
             total_pt = -10
             
-        # Extra がある場合は追加判定 (±10pt)
+        # Extra は通常のハンディで判定
         if data_i["Extra Score"] > 0 or data_j["Extra Score"] > 0:
             extra_i = data_i["Extra Score"] - handicap_ij
             extra_j = data_j["Extra Score"] - handicap_ji
@@ -163,7 +163,7 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
         back_pt = 0
         
     else:
-        # Front Score の判定 (±10pt)
+        # Front/Back はそれぞれハーフのハンディで判定
         front_i = data_i["Front Score"] - handicap_ij
         front_j = data_j["Front Score"] - handicap_ji
         if front_i < front_j:
@@ -171,7 +171,6 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
         elif front_i > front_j:
             front_pt = -10
 
-        # Back Score の判定 (±10pt)
         if data_i["Back Score"] > 0 and data_j["Back Score"] > 0:
             back_i = data_i["Back Score"] - handicap_ij
             back_j = data_j["Back Score"] - handicap_ji
@@ -180,15 +179,15 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
             elif back_i > back_j:
                 back_pt = -10
 
-            # Total の判定 (±10pt)
-            total_i = (data_i["Front Score"] + data_i["Back Score"]) - handicap_ij
-            total_j = (data_j["Front Score"] + data_j["Back Score"]) - handicap_ji
+            # Total はハンディを2倍にして判定
+            total_i = (data_i["Front Score"] + data_i["Back Score"]) - (handicap_ij * 2)
+            total_j = (data_j["Front Score"] + data_j["Back Score"]) - (handicap_ji * 2)
             if total_i < total_j:
                 total_pt = 10
             elif total_i > total_j:
                 total_pt = -10
 
-        # Extra の判定 (±10pt)
+        # Extra は通常のハンディで判定
         if data_i["Extra Score"] > 0 or data_j["Extra Score"] > 0:
             extra_i = data_i["Extra Score"] - handicap_ij
             extra_j = data_j["Extra Score"] - handicap_ji
@@ -197,7 +196,7 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
             elif extra_i > extra_j:
                 extra_pt = -10
 
-    # Player 1 の視点でのポイントを返す
+    # Player 1の視点でのポイントを設定
     data_i["Match Front"] = front_pt
     data_i["Match Back"] = back_pt
     data_i["Match Total"] = total_pt
@@ -207,7 +206,6 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
     data_j["Match Total"] = -total_pt
     data_j["Match Extra"] = -extra_pt
 
-    # 合計ポイントを返す（通常：-30～+30、Extra有：-40～+40）
     return front_pt + back_pt + total_pt + extra_pt, -(front_pt + back_pt + total_pt + extra_pt)
 
 def create_match_matrix(player_data, handicaps, total_only_set):
@@ -467,8 +465,8 @@ def run():
             pair_key = frozenset([pid_i, pid_j])
 
             if pair_key in total_only_set:
-                net_total_i = (data_i["Front Score"] + data_i["Back Score"]) - handicaps.get((pid_j, pid_i), 0)
-                net_total_j = (data_j["Front Score"] + data_j["Back Score"]) - handicaps.get((pid_i, pid_j), 0)
+                net_total_i = (data_i["Front Score"] + data_i["Back Score"]) - (handicaps.get((pid_j, pid_i), 0) * 2)
+                net_total_j = (data_j["Front Score"] + data_j["Back Score"]) - (handicaps.get((pid_i, pid_j), 0) * 2)
                 if net_total_i < net_total_j:
                     data_i["Match Total"] += 10
                     data_j["Match Total"] -= 10
@@ -505,8 +503,8 @@ def run():
                         data_i["Match Back"] -= 10
                         data_j["Match Back"] += 10
 
-                    net_total_i = (data_i["Front Score"] + data_i["Back Score"]) - handicaps.get((pid_j, pid_i), 0)
-                    net_total_j = (data_j["Front Score"] + data_j["Back Score"]) - handicaps.get((pid_i, pid_j), 0)
+                    net_total_i = (data_i["Front Score"] + data_i["Back Score"]) - (handicaps.get((pid_j, pid_i), 0) * 2)
+                    net_total_j = (data_j["Front Score"] + data_j["Back Score"]) - (handicaps.get((pid_i, pid_j), 0) * 2)
                     if net_total_i < net_total_j:
                         data_i["Match Total"] += 10
                         data_j["Match Total"] -= 10
