@@ -199,7 +199,7 @@ def calc_putt_points(putt_scores, n):
             points[winners[0]] = 20
             for m_id in putt_scores:
                 if m_id not in winners:
-                    points[m_id] = -20
+                    points[m_id] = -10
         elif len(winners) == 2:
             for m_id in putt_scores:
                 if m_id in winners:
@@ -423,16 +423,24 @@ def run():
         }
     player_ids = list(player_data.keys())
     n_players = len(player_ids)
+
+    # Game Ptの計算部分を修正
+    # まず、各プレイヤーのGame Ptを算出（Front GP + Back GP + Extra GP）
     for mid in player_data:
         fgp = player_data[mid]["Front GP"]
         bgp = player_data[mid]["Back GP"]
         egp = player_data[mid]["Extra GP"]
         player_data[mid]["Game Pt"] = fgp + bgp + egp
+
+    # 3人の場合、各プレイヤーの最終Game Ptを再計算
     if n_players == 3:
+        # 元のGame Ptを退避
+        original_game_pts = {mid: player_data[mid]["Game Pt"] for mid in player_data}
         for mid in player_data:
-            my_total = player_data[mid]["Game Pt"]
-            others_total = sum(player_data[oid]["Game Pt"] for oid in player_data if oid != mid)
+            my_total = original_game_pts[mid]
+            others_total = sum(original_game_pts[oid] for oid in original_game_pts if oid != mid)
             player_data[mid]["Game Pt"] = my_total * 2 - others_total
+
     for i in range(len(player_ids)):
         for j in range(i+1, len(player_ids)):
             pid_i = player_ids[i]
