@@ -351,6 +351,8 @@ def color_points(val):
 def run():
     st.title("集計結果確認 (Game Pt + Match Pt + Put Pt)")
     session = SessionLocal()
+    
+    # アクティブラウンドの取得と検証
     active_round = (
         session.query(Round)
         .filter_by(finalized=False)
@@ -361,7 +363,10 @@ def run():
         st.warning("No active round found. Please set up a round first.")
         session.close()
         return
+    
     st.write(f"**Round ID**: {active_round.round_id}, **Course**: {active_round.course_name}")
+    
+    # スコアデータの取得
     score_rows = (
         session.query(Score)
         .join(Member, Score.member_id == Member.member_id)
@@ -373,6 +378,8 @@ def run():
         st.warning("No participants found for this round.")
         session.close()
         return
+
+    # ハンディキャップデータの取得と設定
     handicap_matches = session.query(HandicapMatch).filter_by(round_id=active_round.round_id).all()
     handicaps = {}
     total_only_pairs = []
@@ -384,7 +391,7 @@ def run():
         if match.total_only:
             total_only_pairs.append((p1, p2))
     total_only_set = {frozenset(pair) for pair in total_only_pairs}
-    session.close()
+
     player_data = {}
     for sc in score_rows:
         mid = sc.member_id
@@ -566,7 +573,7 @@ def run():
             }
             .match-details th:first-child,
             .match-details td:first-child {
-                position: sticky !important;
+                position: sticky !重要;
                 left: 0 !重要;
                 background-color: white !重要;
                 z-index: 1 !重要;
@@ -592,16 +599,27 @@ def run():
         file_name="golf_round_results.pdf",
         mime="application/pdf"
     )
+
+    # ★ DB に計算結果を保存する処理 ★
+    for sc in score_rows:
+        mid = sc.member_id
+        if mid in player_data:
+            sc.match_front = player_data[mid]["Match Front"]
+            sc.match_back = player_data[mid]["Match Back"]
+            sc.match_total = player_data[mid]["Match Total"]
+            sc.match_extra = player_data[mid]["Match Extra"]
+            sc.match_pt = player_data[mid]["Match Pt"]
+            sc.put_pt = player_data[mid]["Put Pt"]
+            sc.total_pt = player_data[mid]["Total Pt"]
+    session.commit()
+    session.expire_all()  # キャッシュをクリアして再取得できるようにする
+
     if st.button("Finalize Results"):
-        sess = SessionLocal()
-        sess.query(Round).filter(Round.round_id == active_round.round_id).update({Round.finalized: True})
-        sess.commit()
-        sess.close()
+        active_round.finalized = True
+        session.commit()
+        session.close()
         st.success("Results have been finalized.")
-        if hasattr(st, "experimental_rerun"):
-            st.experimental_rerun()
-        else:
-            st.info("Page rerun is not supported in this Streamlit version. Please refresh the page manually.")
+        st.rerun()  # experimental_rerun から rerun に変更
 
 if __name__ == "__main__":
     run()
