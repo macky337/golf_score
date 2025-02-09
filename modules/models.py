@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date
+from sqlalchemy import Column, Integer, Float, String, ForeignKey, Date, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -36,6 +36,14 @@ class Score(Base):
     front_game_pt = Column(Integer, default=0)
     back_game_pt = Column(Integer, default=0)
     extra_game_pt = Column(Integer, default=0)
+      # 以下、追加するマッチ関連のカラム
+    match_front = Column(Integer, default=0)   # ← この行を追加
+    match_back = Column(Integer, default=0)
+    match_total = Column(Integer, default=0)
+    match_extra = Column(Integer, default=0)
+    match_pt = Column(Float, default=0)
+    put_pt = Column(Float, default=0)
+    total_pt = Column(Float, default=0)
     # Round と Member とのリレーションシップを定義
     round = relationship("Round", back_populates="scores")
     member = relationship("Member", back_populates="scores")

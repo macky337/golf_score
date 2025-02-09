@@ -69,8 +69,52 @@ def df_to_table_data_with_index(df, index_header="項目名"):
     return [header] + data
 
 # ===== PDF出力等の関数 =====
-def generate_pdf(final_df, detailed_df, star_df):
-    """最終結果、マッチ戦詳細結果、対戦結果（Much Pt 集計）をすべてPDFで出力する"""
+def convert_to_paragraphs(data, style):
+    """テーブルデータの文字列をParagraphオブジェクトに変換"""
+    if isinstance(data, list):
+        return [[Paragraph(str(cell), style) if isinstance(cell, (str, int, float)) else cell 
+                for cell in row] for row in data]
+    return data
+
+def create_df_for_pdf(df):
+    """DataFrameをPDF用に整形する"""
+    style = ParagraphStyle(
+        'Normal',
+        fontName=FONT_NAME,
+        fontSize=10,
+        leading=12,
+        alignment=1
+    )
+    
+    formatted_data = []
+    
+    # インデックス（プレイヤー名）を含むヘッダー行の作成
+    headers = [Paragraph('Player', style)] + [Paragraph(str(col), style) for col in df.columns]
+    formatted_data.append(headers)
+    
+    # データ行の作成（プレイヤー名を含む）
+    for idx, row in df.iterrows():
+        formatted_row = [Paragraph(str(idx), style)]  # プレイヤー名
+        for val in row:
+            if pd.isna(val):
+                val = ""
+            if isinstance(val, (int, float)):
+                val = f"{val:+d}" if val != 0 else "0"
+            formatted_row.append(Paragraph(str(val), style))
+        formatted_data.append(formatted_row)
+    
+    return formatted_data
+
+def get_play_date(active_round):
+    """active_roundからプレイ日を取得する"""
+    if hasattr(active_round, 'date') and active_round.date is not None:
+        return active_round.date
+    else:
+        # フォールバックとして現在の日付を返す
+        return datetime.date.today()
+
+def generate_pdf(final_df, detailed_df, star_df, active_round):
+    """PDFレポートを生成する"""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -80,132 +124,158 @@ def generate_pdf(final_df, detailed_df, star_df):
         topMargin=20,
         bottomMargin=20
     )
+    
     elements = []
-    base_styles = getSampleStyleSheet()
-    # 新たに日本語用のスタイルを定義
+    
+    # メインタイトルのスタイル定義
+    main_title_style = ParagraphStyle(
+        'MainTitle',
+        fontName=FONT_NAME,
+        fontSize=16,
+        leading=20,
+        alignment=1,
+        spaceAfter=10
+    )
+
+    # サブタイトルのスタイル
     title_style = ParagraphStyle(
-        'titleStyle',
-        parent=base_styles['Heading2'],
+        'Title',
         fontName=FONT_NAME,
         fontSize=14,
         leading=16,
-        alignment=1  # 中央揃え
-    )
-    header_style = ParagraphStyle(
-        'headerStyle',
-        parent=base_styles['BodyText'],
-        fontName=FONT_NAME,
-        fontSize=10,
-        leading=12,
         alignment=1
     )
-    body_style = ParagraphStyle(
-        'bodyStyle',
-        parent=base_styles['BodyText'],
-        fontName=FONT_NAME,
-        fontSize=10,
-        leading=12
-    )
 
-    # 利用可能な横幅の算出
-    available_width = landscape(letter)[0] - 40
+    # プレイ日を取得
+    play_date = get_play_date(active_round).strftime('%Y年%m月%d日')
+    course_name = active_round.course_name if hasattr(active_round, 'course_name') else ''
+    
+    # タイトル行を追加
+    elements.append(Paragraph(f"{play_date} {course_name} スコア集計結果", main_title_style))
+    elements.append(Spacer(1, 20))
 
-    # --- セクション1: 最終結果 ---
+    # セクション1: 最終結果
     elements.append(Paragraph("最終結果（Game Pt + Match Pt + Put Pt ＝ Total Pt）", title_style))
     elements.append(Spacer(1, 12))
-    final_data = df_to_table_data_with_index(final_df)
-    col_width_final = available_width / len(final_data[0])
-    table_final = Table(final_data, colWidths=[col_width_final]*len(final_data[0]))
-    table_final.setStyle(TableStyle([
-        ('FONTNAME', (0,0), (-1,-1), FONT_NAME),
-        ('FONTSIZE', (0,0), (-1,0), 10),
-        ('BACKGROUND', (0,0), (-1,0), colors.grey),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,0), 12),
+    
+    final_data = create_df_for_pdf(final_df.set_index('Player'))
+    col_widths = [landscape(letter)[0] / len(final_data[0])] * len(final_data[0])
+    t1 = Table(final_data, colWidths=col_widths)
+    t1.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (-1, -1), FONT_NAME),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
     ]))
-    elements.append(table_final)
-    elements.append(Spacer(1, 24))
+    elements.append(t1)
+    elements.append(Spacer(1, 20))
 
-    # --- セクション2: マッチ戦詳細結果 ---
+    # セクション2: マッチ戦詳細結果
     elements.append(Paragraph("マッチ戦詳細結果", title_style))
     elements.append(Spacer(1, 12))
-    detailed_data = df_to_table_data_with_index(detailed_df)
-    col_width_detailed = available_width / len(detailed_data[0])
-    table_detailed = Table(detailed_data, colWidths=[col_width_detailed]*len(detailed_data[0]))
-    table_detailed.setStyle(TableStyle([
-        ('FONTNAME', (0,0), (-1,-1), FONT_NAME),
-        ('FONTSIZE', (0,0), (-1,0), 10),
-        ('BACKGROUND', (0,0), (-1,0), colors.grey),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,0), 12),
+    
+    detailed_data = create_df_for_pdf(detailed_df)  # インデックスを保持
+    col_widths = [landscape(letter)[0] / len(detailed_data[0])] * len(detailed_data[0])
+    t2 = Table(detailed_data, colWidths=col_widths)
+    t2.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (-1, -1), FONT_NAME),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
     ]))
-    elements.append(table_detailed)
-    elements.append(Spacer(1, 24))
+    elements.append(t2)
+    elements.append(Spacer(1, 20))
 
-    # --- セクション3: 対戦結果（Much Pt 集計） ---
+    # セクション3: 対戦表
     elements.append(Paragraph("対戦結果（Much Pt 集計）", title_style))
     elements.append(Spacer(1, 12))
-    star_data = df_to_table_data_with_index(star_df)
-    col_width_star = available_width / len(star_data[0])
-    table_star = Table(star_data, colWidths=[col_width_star]*len(star_data[0]))
-    table_star.setStyle(TableStyle([
-        ('FONTNAME', (0,0), (-1,-1), FONT_NAME),
-        ('FONTSIZE', (0,0), (-1,0), 10),
-        ('BACKGROUND', (0,0), (-1,0), colors.grey),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,0), 12),
-    ]))
-    elements.append(table_star)
     
+    star_data = create_df_for_pdf(star_df)  # インデックスを保持
+    col_widths = [landscape(letter)[0] / len(star_data[0])] * len(star_data[0])
+    t3 = Table(star_data, colWidths=col_widths)
+    t3.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (-1, -1), FONT_NAME),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    elements.append(t3)
+
     doc.build(elements)
     buffer.seek(0)
     return buffer
 
 def calc_putt_points(putt_scores, n):
-    """パット戦の得点計算（4人 or 3人の場合）"""
+    """パット戦の得点計算（4人 or 3人の場合）
+    
+    4人の場合:
+      - 1名のみが最少 → 最少者+30pt、残り3名-10pt
+      - 2名同点最少 → 最少2名+10pt、残り2名-10pt
+      - 3名同点最少 → 最少3名+10pt、残り1名-30pt
+      - 全員同点 → 0pt
+      
+    3人の場合:
+      - 1名のみが最少 → 最少者+20pt、残り2名-10pt
+      - 2名同点最少 → 最少2名+5pt、残り1名-10pt
+      - 全員同点 → 0pt
+    """
+    if not putt_scores:  # スコアが空の場合
+        return {}
+        
     scores = list(putt_scores.values())
     min_score = min(scores)
     winners = [m_id for m_id, score in putt_scores.items() if score == min_score]
     points = {m_id: 0 for m_id in putt_scores}
-    if n == 4:
+    
+    if n == 3:
         if len(winners) == 1:
-            points[winners[0]] = 30
+            points[winners[0]] = 20  # 最少が1名の場合は+20pt
             for m_id in putt_scores:
                 if m_id not in winners:
-                    points[m_id] = -10
+                    points[m_id] = -10  # 残り2名は-10pt
         elif len(winners) == 2:
             for m_id in putt_scores:
                 if m_id in winners:
-                    points[m_id] = 10
+                    points[m_id] = 5  # 最少が2名の場合は+5pt
                 else:
-                    points[m_id] = -10
+                    points[m_id] = -10  # 残り1名は-10pt
+        # 全員同点の場合は初期値の0のまま
+    
+    elif n == 4:
+        if len(winners) == 1:
+            points[winners[0]] = 30  # 最少が1名の場合は+30pt
+            for m_id in putt_scores:
+                if m_id not in winners:
+                    points[m_id] = -10  # 残り3名は-10pt
+        elif len(winners) == 2:
+            for m_id in putt_scores:
+                if m_id in winners:
+                    points[m_id] = 10  # 最少が2名の場合は+10pt
+                else:
+                    points[m_id] = -10  # 残り2名は-10pt
         elif len(winners) == 3:
             for m_id in putt_scores:
                 if m_id in winners:
-                    points[m_id] = 10
+                    points[m_id] = 10  # 最少が3名の場合は+10pt
                 else:
-                    points[m_id] = -30
-    elif n == 3:
-        if len(winners) == 1:
-            points[winners[0]] = 20
-            for m_id in putt_scores:
-                if m_id not in winners:
-                    points[m_id] = -20
-        elif len(winners) == 2:
-            for m_id in putt_scores:
-                if m_id in winners:
-                    points[m_id] = 10
-                else:
-                    points[m_id] = -20
+                    points[m_id] = -30  # 残り1名は-30pt
+        # 全員同点の場合は初期値の0のまま
+    
     return points
 
 def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=False):
@@ -306,11 +376,23 @@ def create_detailed_match_results(player_data, handicaps, total_only_set):
     n_players = len(player_ids)
     match_results = {}
     matches = []
+    multi_columns = []  # マルチインデックス用のリスト
+
+    # 対戦カードとハンディキャップ情報を収集
     for i in range(n_players-1):
         for j in range(i+1, n_players):
-            matches.append(f"{player_data[player_ids[i]]['Player']} vs {player_data[player_ids[j]]['Player']}")
+            match_name = f"{player_data[player_ids[i]]['Player']} vs {player_data[player_ids[j]]['Player']}"
+            matches.append(match_name)
+            handicap_ij = handicaps.get((player_ids[j], player_ids[i]), 0)
+            handicap_ji = handicaps.get((player_ids[i], player_ids[j]), 0)
+            handicap_str = f"{handicap_ij} vs {handicap_ji}"
+            multi_columns.append((match_name, handicap_str))
+
+    # プレイヤーごとの結果を初期化
     for pid in player_ids:
         match_results[player_data[pid]["Player"]] = {match: "-" for match in matches}
+
+    # 対戦結果を計算して格納
     for i in range(n_players-1):
         for j in range(i+1, n_players):
             pid_i = player_ids[i]
@@ -328,7 +410,12 @@ def create_detailed_match_results(player_data, handicaps, total_only_set):
             )
             match_results[data_i["Player"]][match_name] = f"{points_i:+d}" if points_i != 0 else "0"
             match_results[data_j["Player"]][match_name] = f"{points_j:+d}" if points_j != 0 else "0"
-    return pd.DataFrame.from_dict(match_results, orient='index')
+
+    # DataFrameを作成し、マルチインデックスを設定
+    df = pd.DataFrame.from_dict(match_results, orient='index')
+    df.columns = pd.MultiIndex.from_tuples(multi_columns, names=['Match', 'Handicap'])
+    
+    return df
 
 def highlight_total_only(row):
     if row["Total Only Mode"] == "Yes":
@@ -348,9 +435,19 @@ def color_points(val):
     except:
         return "background-color: transparent; color: black"
 
+def get_pdf_filename(active_round):
+    """PDFファイル名を生成する
+    
+    Format: YYYYMMDD_golf_results.pdf
+    例: 20250209_golf_results.pdf
+    """
+    return f"{get_play_date(active_round).strftime('%Y%m%d')}_golf_results.pdf"
+
 def run():
     st.title("集計結果確認 (Game Pt + Match Pt + Put Pt)")
     session = SessionLocal()
+    
+    # アクティブラウンドの取得と検証
     active_round = (
         session.query(Round)
         .filter_by(finalized=False)
@@ -361,7 +458,10 @@ def run():
         st.warning("No active round found. Please set up a round first.")
         session.close()
         return
+    
     st.write(f"**Round ID**: {active_round.round_id}, **Course**: {active_round.course_name}")
+    
+    # スコアデータの取得
     score_rows = (
         session.query(Score)
         .join(Member, Score.member_id == Member.member_id)
@@ -373,6 +473,8 @@ def run():
         st.warning("No participants found for this round.")
         session.close()
         return
+
+    # ハンディキャップデータの取得と設定
     handicap_matches = session.query(HandicapMatch).filter_by(round_id=active_round.round_id).all()
     handicaps = {}
     total_only_pairs = []
@@ -384,7 +486,7 @@ def run():
         if match.total_only:
             total_only_pairs.append((p1, p2))
     total_only_set = {frozenset(pair) for pair in total_only_pairs}
-    session.close()
+
     player_data = {}
     for sc in score_rows:
         mid = sc.member_id
@@ -416,16 +518,24 @@ def run():
         }
     player_ids = list(player_data.keys())
     n_players = len(player_ids)
+
+    # Game Ptの計算部分を修正
+    # まず、各プレイヤーのGame Ptを算出（Front GP + Back GP + Extra GP）
     for mid in player_data:
         fgp = player_data[mid]["Front GP"]
         bgp = player_data[mid]["Back GP"]
         egp = player_data[mid]["Extra GP"]
         player_data[mid]["Game Pt"] = fgp + bgp + egp
+
+    # 3人の場合、各プレイヤーの最終Game Ptを再計算
     if n_players == 3:
+        # 元のGame Ptを退避
+        original_game_pts = {mid: player_data[mid]["Game Pt"] for mid in player_data}
         for mid in player_data:
-            my_total = player_data[mid]["Game Pt"]
-            others_total = sum(player_data[oid]["Game Pt"] for oid in player_data if oid != mid)
+            my_total = original_game_pts[mid]
+            others_total = sum(original_game_pts[oid] for oid in original_game_pts if oid != mid)
             player_data[mid]["Game Pt"] = my_total * 2 - others_total
+
     for i in range(len(player_ids)):
         for j in range(i+1, len(player_ids)):
             pid_i = player_ids[i]
@@ -489,15 +599,26 @@ def run():
     for mid in player_data:
         data = player_data[mid]
         data["Match Pt"] = data["Match Front"] + data["Match Back"] + data["Match Total"] + data["Match Extra"]
+    # パットポイントの計算部分を修正
     front_putt = {mid: player_data[mid]["Putt Front"] for mid in player_data}
     back_putt = {mid: player_data[mid]["Putt Back"] for mid in player_data}
+    extra_putt = {mid: safe_get_score(player_data[mid], "Putt Extra") 
+                  for mid in player_data 
+                  if safe_get_score(player_data[mid], "Extra Score") > 0}
+
+    # Front, Back, Extraそれぞれのパットポイントを計算
     putt_front_points = calc_putt_points(front_putt, n_players)
     putt_back_points = calc_putt_points(back_putt, n_players)
+    putt_extra_points = calc_putt_points(extra_putt, n_players) if extra_putt else {mid: 0 for mid in player_data}
+
+    # 各プレイヤーのパットポイント合計を計算
     for mid in player_data:
         data = player_data[mid]
         pf = putt_front_points.get(mid, 0)
         pb = putt_back_points.get(mid, 0)
-        data["Put Pt"] = pf + pb
+        pe = putt_extra_points.get(mid, 0)
+        data["Put Pt"] = pf + pb + pe  # Front + Back + Extra の合計
+
     for mid in player_data:
         d = player_data[mid]
         total_pt = d["Game Pt"] + d["Match Pt"] + d["Put Pt"]
@@ -535,7 +656,7 @@ def run():
             .dataframe th:first-child,
             .dataframe td:first-child {
                 position: sticky !important;
-                left: 0 !important;
+                left: 0 !重要;
                 background-color: white !重要;
                 z-index: 1 !重要;
                 border-right: 2px solid #ccc !重要;
@@ -559,14 +680,14 @@ def run():
         <style>
             .match-details-container {
                 width: 100%;
-                overflow-x: auto !important;
+                overflow-x: auto !重要;
             }
             .match-details {
                 margin: 0 !重要;
             }
             .match-details th:first-child,
             .match-details td:first-child {
-                position: sticky !important;
+                position: sticky !重要;
                 left: 0 !重要;
                 background-color: white !重要;
                 z-index: 1 !重要;
@@ -585,23 +706,35 @@ def run():
     star_df = create_match_matrix(player_data, handicaps, total_only_set)
     st.write("### 対戦結果（Much Pt 集計）")
     st.dataframe(star_df.style.map(color_points))
-    pdf_buffer = generate_pdf(final_df, detailed_df, star_df)
+    pdf_buffer = generate_pdf(final_df, detailed_df, star_df, active_round)
     st.download_button(
         label="Download PDF of Results",
         data=pdf_buffer,
-        file_name="golf_round_results.pdf",
+        file_name=get_pdf_filename(active_round),  # ここを変更
         mime="application/pdf"
     )
+
+    # ★ DB に計算結果を保存する処理 ★
+    for sc in score_rows:
+        mid = sc.member_id
+        if mid in player_data:
+            sc.match_front = player_data[mid]["Match Front"]
+            sc.match_back = player_data[mid]["Match Back"]
+            sc.match_total = player_data[mid]["Match Total"]
+            sc.match_extra = player_data[mid]["Match Extra"]
+            sc.match_pt = player_data[mid]["Match Pt"]
+            sc.put_pt = player_data[mid]["Put Pt"]
+            sc.total_pt = player_data[mid]["Total Pt"]
+    session.commit()
+    session.expire_all()  # キャッシュをクリアして再取得できるようにする
+
     if st.button("Finalize Results"):
-        sess = SessionLocal()
-        sess.query(Round).filter(Round.round_id == active_round.round_id).update({Round.finalized: True})
-        sess.commit()
-        sess.close()
+        active_round.finalized = True
+        session.commit()
+        session.close()
         st.success("Results have been finalized.")
-        if hasattr(st, "experimental_rerun"):
-            st.experimental_rerun()
-        else:
-            st.info("Page rerun is not supported in this Streamlit version. Please refresh the page manually.")
+        st.rerun()  # experimental_rerun から rerun に変更
 
 if __name__ == "__main__":
     run()
+
