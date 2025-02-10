@@ -4,6 +4,8 @@ import datetime
 from sqlalchemy import func, extract
 from modules.db import SessionLocal
 from modules.models import Round, Score, Member
+import plotly.express as px
+import plotly.graph_objects as go
 
 def main():
     st.title("ポイント集計・過去データ管理")
@@ -105,7 +107,65 @@ def show_all_past_data():
     if agg_results:
         agg_df = pd.DataFrame(agg_results, columns=["Player", "Total Pt"])
         st.markdown(f"### {aggregation_type} 集計結果")
+        
+        # データフレームの表示
         st.dataframe(agg_df)
+        
+        # グラフタイトルの設定
+        title_text = f"{aggregation_type} Total Pt 集計結果"
+        if aggregation_type == "年度別":
+            title_text += f" ({year}年)"
+        elif aggregation_type == "月別":
+            title_text += f" ({year}年{month}月)"
+        
+        # plotly.expressを使用してグラフを作成
+        fig = px.bar(
+            agg_df,
+            x="Player",
+            y="Total Pt",
+            title=title_text,
+            labels={"Player": "プレーヤー", "Total Pt": "Total Pt"},
+            text="Total Pt"  # 棒グラフ上に値を表示
+        )
+        
+        # グラフのレイアウト調整
+        fig.update_traces(
+            texttemplate='%{text:.1f}',  # 小数点1桁まで表示
+            textposition='auto',
+            hovertemplate='プレーヤー: %{x}<br>Total Pt: %{y:.1f}<extra></extra>'
+        )
+        
+        fig.update_layout(
+            title={
+                'x': 0.5,
+                'xanchor': 'center',
+                'yanchor': 'top'
+            },
+            plot_bgcolor='white',
+            height=500,
+            showlegend=False,
+            yaxis=dict(
+                zeroline=True,
+                zerolinewidth=1,
+                zerolinecolor='grey',
+                gridcolor='rgba(0,0,0,0.1)'
+            )
+        )
+        
+        # グラフの表示
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # 集計の補足情報
+        with st.expander("集計の補足情報"):
+            st.write("- 各プレーヤーのTotal Ptの合計を表示しています")
+            st.write("- グラフは棒の上にマウスを置くと詳細な数値を確認できます")
+            if aggregation_type == "月別":
+                st.write(f"- {year}年{month}月の集計結果です")
+            elif aggregation_type == "年度別":
+                st.write(f"- {year}年の集計結果です")
+            else:
+                st.write("- 全期間の通算集計結果です")
+            
     else:
         st.info("集計結果がありません。")
 
