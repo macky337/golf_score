@@ -115,12 +115,11 @@ def get_round_date_attr():
     return None
 
 def get_play_date(active_round):
-    """active_roundからプレイ日を取得する"""
-    for attr in ['play_date', 'date', 'round_date', 'created_at']:
+    """active_roundからプレイ日を取得する（Noneの場合はNoneを返す）"""
+    for attr in ['play_date', 'date', 'round_date']:
         if hasattr(active_round, attr) and getattr(active_round, attr) is not None:
             return getattr(active_round, attr)
-    # すべてなしの場合、現在の日付を返す
-    return datetime.date.today()
+    return None
 
 def generate_pdf(final_df, detailed_df, star_df, active_round):
     """PDFレポートを生成する"""
@@ -455,35 +454,19 @@ def get_pdf_filename(active_round):
 def run():
     st.title("集計結果確認 (Game Pt + Match Pt + Put Pt)")
     session = SessionLocal()
-    
-    date_attr = get_round_date_attr()
-    if date_attr is None:
-        st.error("Roundモデルに日付属性が定義されていません。")
-        session.close()
-        return
 
-    # Roundモデルの日付属性を利用して全ラウンドデータを取得
+    # Roundモデルの全ラウンドデータを取得（date_playedで降順ソート）
     all_rounds = (
         session.query(Round)
-        .order_by(date_attr.desc())  # 日付の新しい順
+        .order_by(Round.date_played.desc())
         .all()
     )
     
-    # ラウンド選択の際、各Roundオブジェクトから表示用日付を取得
-    round_options = []
-    for rnd in all_rounds:
-        # 優先順位: play_date > date > round_date
-        for attr in ['play_date', 'date', 'round_date']:
-            if hasattr(rnd, attr) and getattr(rnd, attr) is not None:
-                round_date = getattr(rnd, attr)
-                break
-        else:
-            round_date = None
-        if round_date:
-            option = f"{round_date.strftime('%Y-%m-%d')} - {rnd.course_name} (ID: {rnd.round_id})"
-        else:
-            option = f"未設定日付 - {rnd.course_name} (ID: {rnd.round_id})"
-        round_options.append(option)
+    # ラウンド選択の選択肢を作成（date_playedを使用）
+    round_options = [
+        f"{rnd.date_played.strftime('%Y-%m-%d')} - {rnd.course_name} (ID: {rnd.round_id})"
+        for rnd in all_rounds
+    ]
     
     selected_round_str = st.selectbox(
         "ラウンドを選択してください",
@@ -506,9 +489,10 @@ def run():
             session.close()
             return
         
-        # 表示用日付を取得（先ほどの優先順位を使用）
+        # 表示用日付を取得（Noneの場合は「未設定」と表示）
         play_date = get_play_date(active_round)
-        st.write(f"**Round ID**: {active_round.round_id}, **Course**: {active_round.course_name}, **Date**: {play_date.strftime('%Y-%m-%d')}")
+        play_date_str = play_date.strftime('%Y-%m-%d') if play_date else "未設定"
+        st.write(f"**Round ID**: {active_round.round_id}, **Course**: {active_round.course_name}, **Date**: {play_date_str}")
         
         # スコアデータの取得
         score_rows = (
