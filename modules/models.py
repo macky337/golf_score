@@ -60,6 +60,10 @@ class HandicapMatch(Base):
     player_2_to_1 = Column(Integer, default=0)
     total_only = Column(Boolean, default=False)  # total スコアのみで判定するフラグ
 
+    # リレーションシップを追加
+    player_1 = relationship("Member", foreign_keys=[player_1_id])
+    player_2 = relationship("Member", foreign_keys=[player_2_id])
+
 # 例: 新規ラウンド登録時（デバッグ用のサンプルコード）
 if __name__ == "__main__":
     import datetime
