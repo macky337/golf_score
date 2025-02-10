@@ -455,23 +455,45 @@ def run():
     st.title("集計結果確認 (Game Pt + Match Pt + Put Pt)")
     session = SessionLocal()
 
-    # Roundモデルの全ラウンドデータを取得（date_playedで降順ソート）
+    # 未確定ラウンドの存在チェック
+    unfinalized_rounds = (
+        session.query(Round)
+        .filter(Round.finalized == False)
+        .order_by(Round.date_played.desc())
+        .all()
+    )
+
+    # すべてのラウンドを取得（date_playedで降順ソート）
     all_rounds = (
         session.query(Round)
         .order_by(Round.date_played.desc())
         .all()
     )
     
-    # ラウンド選択の選択肢を作成（date_playedを使用）
+    # 未確定ラウンドがある場合は警告表示
+    if unfinalized_rounds:
+        st.warning(f"⚠️ 未確定のラウンドが {len(unfinalized_rounds)} 件あります")
+        # 未確定ラウンドの一覧を表示
+        for r in unfinalized_rounds:
+            st.info(f"📝 {r.date_played.strftime('%Y-%m-%d')} - {r.course_name} (ID: {r.round_id})")
+    
+    # ラウンド選択オプションの作成（すべてのラウンド）
     round_options = [
         f"{rnd.date_played.strftime('%Y-%m-%d')} - {rnd.course_name} (ID: {rnd.round_id})"
         for rnd in all_rounds
     ]
     
+    # 未確定ラウンドがある場合、最新の未確定ラウンドを初期選択に設定
+    default_index = 0
+    if unfinalized_rounds:
+        default_round = unfinalized_rounds[0]
+        default_str = f"{default_round.date_played.strftime('%Y-%m-%d')} - {default_round.course_name} (ID: {default_round.round_id})"
+        default_index = round_options.index(default_str)
+    
     selected_round_str = st.selectbox(
         "ラウンドを選択してください",
         options=round_options,
-        index=0 if round_options else None
+        index=default_index if round_options else None
     )
     
     if selected_round_str:
