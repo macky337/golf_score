@@ -26,12 +26,24 @@ def main():
 #############################################
 def show_all_past_data():
     st.subheader("過去ラウンドデータ一覧（プレーヤー別詳細）")
+    
+    # 集計期間の選択（デフォルトは通算成績）
+    aggregation_type = st.radio("集計期間", options=["通算成績", "年度別", "月別"], index=0)
+    year = None
+    month = None
+    if aggregation_type == "年度別":
+        year = st.number_input("集計する年度を入力", min_value=2000, max_value=datetime.datetime.now().year, value=datetime.datetime.now().year)
+    elif aggregation_type == "月別":
+        year = st.number_input("集計する年度を入力", min_value=2000, max_value=datetime.datetime.now().year, value=datetime.datetime.now().year)
+        month = st.number_input("集計する月を入力", min_value=1, max_value=12, value=datetime.datetime.now().month)
+    
+    # 通常の詳細表示（フィルタ：Round ID）
+    round_id_filter = st.number_input("詳細表示：Round ID（0なら全件表示）", min_value=0, step=1, value=0)
+    
     session = SessionLocal()
     
-    # Round IDでフィルタするための入力フィールド（0の場合は全件表示）
-    round_id_filter = st.number_input("フィルタ：Round ID（0なら全件表示）", min_value=0, step=1, value=0)
-    
-    query = session.query(
+    # Detail部分：各ラウンドの各プレーヤー詳細
+    detail_query = session.query(
         Round.round_id,
         Round.date_played,
         Round.course_name,
@@ -53,27 +65,49 @@ def show_all_past_data():
     ).join(Member, Score.member_id == Member.member_id)\
      .join(Round, Round.round_id == Score.round_id)\
      .filter(Round.finalized == True)
-     
-    # round_id_filterが0以外なら追加フィルタを適用
-    if round_id_filter != 0:
-        query = query.filter(Round.round_id == round_id_filter)
-        
-    results = query.order_by(Round.date_played.desc(), Round.round_id.desc(), Member.name).all()
     
+    if round_id_filter != 0:
+        detail_query = detail_query.filter(Round.round_id == round_id_filter)
+        
+    detail_results = detail_query.order_by(Round.date_played.desc(), Round.round_id.desc(), Member.name).all()
+    
+    if not detail_results:
+        st.info("該当する過去ラウンドデータは存在しません。")
+    else:
+        detail_columns = ["Round ID", "日付", "ゴルフ場名", "Player", 
+                          "Front Score", "Back Score", "Extra Score", 
+                          "Front GP", "Back GP", "Extra GP", "Game Pt", 
+                          "Match Front", "Match Back", "Match Total", "Match Extra", 
+                          "Match Pt", "Put Pt", "Total Pt"]
+        detail_df = pd.DataFrame(detail_results, columns=detail_columns)
+        st.markdown("### 各ラウンド・各プレーヤー詳細")
+        st.dataframe(detail_df)
+    
+    # 集計部分：Member別にTotal Ptを集計
+    from sqlalchemy import extract  # SQLAlchemyのextract関数で日付の年・月抽出
+    agg_query = session.query(
+        Member.name.label("Player"),
+        func.sum(Score.total_pt).label("Total Pt")
+    ).join(Score, Score.member_id == Member.member_id)\
+     .join(Round, Round.round_id == Score.round_id)\
+     .filter(Round.finalized == True)
+    
+    if aggregation_type == "年度別":
+        agg_query = agg_query.filter(extract('year', Round.date_played) == year)
+    elif aggregation_type == "月別":
+        agg_query = agg_query.filter(extract('year', Round.date_played) == year)\
+                           .filter(extract('month', Round.date_played) == month)
+    
+    agg_query = agg_query.group_by(Member.name)
+    agg_results = agg_query.order_by(Member.name).all()
     session.close()
     
-    if not results:
-        st.info("該当する過去ラウンドデータは存在しません。")
-        return
-
-    # 結果をDataFrameに変換
-    columns = ["Round ID", "日付", "ゴルフ場名", "Player", 
-               "Front Score", "Back Score", "Extra Score", 
-               "Front GP", "Back GP", "Extra GP", "Game Pt", 
-               "Match Front", "Match Back", "Match Total", "Match Extra", 
-               "Match Pt", "Put Pt", "Total Pt"]
-    df = pd.DataFrame(results, columns=columns)
-    st.dataframe(df)
+    if agg_results:
+        agg_df = pd.DataFrame(agg_results, columns=["Player", "Total Pt"])
+        st.markdown(f"### {aggregation_type} 集計結果")
+        st.dataframe(agg_df)
+    else:
+        st.info("集計結果がありません。")
 
 
 #############################################
