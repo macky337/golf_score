@@ -707,20 +707,62 @@ def run():
                 .dataframe-container {
                     width: 100%;
                     overflow-x: auto !important;
+                    position: relative !important;
                 }
+                
                 .dataframe {
-                    margin: 0 !重要;
+                    margin: 0 !important;
+                    border-collapse: separate !important;
+                    border-spacing: 0 !important;
                 }
+                
                 .dataframe th:first-child,
                 .dataframe td:first-child {
                     position: sticky !important;
+                    left: 0 !important;
+                    background-color: white !important;
+                    z-index: 2 !important;
+                    box-shadow: 2px 0 5px -2px rgba(0,0,0,0.2) !important;
+                    border-right: 2px solid #ccc !important;
+                }
+                
+                .dataframe thead tr th {
+                    position: sticky !important;
+                    top: 0 !important;
+                    background-color: #ffffff !important;
+                    z-index: 1 !important;
+                }
+                
+                .dataframe thead tr th:first-child {
+                    z-index: 3 !important;
+                }
+                
+                .dataframe td, .dataframe th {
+                    white-space: nowrap !important;
+                    padding: 8px !important;
+                    border: 1px solid #ddd !important;
+                }
+                
+                .match-details-container {
+                    width: 100%;
+                    overflow-x: auto !重要;
+                    position: relative !重要;
+                }
+                
+                .match-details {
+                    margin: 0 !重要;
+                    border-collapse: separate !重要;
+                    border-spacing: 0 !重要;
+                }
+                
+                .match-details th:first-child,
+                .match-details td:first-child {
+                    position: sticky !重要;
                     left: 0 !重要;
                     background-color: white !重要;
-                    z-index: 1 !重要;
+                    z-index: 2 !重要;
+                    box-shadow: 2px 0 5px -2px rgba(0,0,0,0.2) !重要;
                     border-right: 2px solid #ccc !重要;
-                }
-                .index_col {
-                    display: none !重要;
                 }
             </style>
         """, unsafe_allow_html=True)
@@ -739,6 +781,7 @@ def run():
                 .match-details-container {
                     width: 100%;
                     overflow-x: auto !重要;
+                    position: relative !重要;
                 }
                 .match-details {
                     margin: 0 !重要;
@@ -748,7 +791,8 @@ def run():
                     position: sticky !重要;
                     left: 0 !重要;
                     background-color: white !重要;
-                    z-index: 1 !重要;
+                    z-index: 2 !重要;
+                    box-shadow: 2px 0 5px -2px rgba(0,0,0,0.2) !重要;
                     border-right: 2px solid #ccc !重要;
                 }
             </style>
