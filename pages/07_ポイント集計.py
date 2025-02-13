@@ -132,7 +132,7 @@ def show_all_past_data():
         
         # グラフのレイアウト調整
         fig.update_traces(
-            texttemplate='%{text:.1f}',  # 小数点1桁まで表示
+            texttemplate='%{text:.0f}',  # 整数で表示
             textposition='auto',
             hovertemplate='プレーヤー: %{x}<br>Total Pt: %{y:.1f}<extra></extra>'
         )
