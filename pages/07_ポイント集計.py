@@ -106,6 +106,8 @@ def show_all_past_data():
     
     if agg_results:
         agg_df = pd.DataFrame(agg_results, columns=["Player", "Total Pt"])
+        agg_df = agg_df.sort_values(by="Total Pt", ascending=False)  # Total Ptの降順でソート
+       
         st.markdown(f"### {aggregation_type} 集計結果")
         
         # データフレームの表示
