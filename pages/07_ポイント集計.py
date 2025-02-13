@@ -134,7 +134,7 @@ def show_all_past_data():
         fig.update_traces(
             texttemplate='%{text:.0f}',  # 整数で表示
             textposition='auto',
-            hovertemplate='プレーヤー: %{x}<br>Total Pt: %{y:.1f}<extra></extra>'
+            hovertemplate='プレーヤー: %{x}<br>Total Pt: %{y:.0f}<extra></extra>'
         )
         
         fig.update_layout(
