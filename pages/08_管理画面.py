@@ -148,6 +148,11 @@ def show_score_editor(session):
                             value=score.front_putt or 0,
                             key=f"fputt_{score.score_id}"
                         )
+                        front_game = st.number_input(
+                            "Game Pt",
+                            value=score.front_game_pt if hasattr(score, "front_game_pt") else 0,
+                            key=f"fgame_{score.score_id}"
+                        )
                     
                     with col2:
                         st.write("Back 9")
@@ -160,6 +165,11 @@ def show_score_editor(session):
                             "Putt",
                             value=score.back_putt or 0,
                             key=f"bputt_{score.score_id}"
+                        )
+                        back_game = st.number_input(
+                            "Game Pt",
+                            value=score.back_game_pt if hasattr(score, "back_game_pt") else 0,
+                            key=f"bgame_{score.score_id}"
                         )
                     
                     with col3:
@@ -175,9 +185,15 @@ def show_score_editor(session):
                                 value=score.extra_putt or 0,
                                 key=f"eputt_{score.score_id}"
                             )
+                            extra_game = st.number_input(
+                                "Game Pt",
+                                value=score.extra_game_pt if hasattr(score, "extra_game_pt") else 0,
+                                key=f"egame_{score.score_id}"
+                            )
                         else:
                             extra = 0
                             extra_putt = 0
+                            extra_game = 0
                     
                     updated_scores[score.score_id] = {
                         "front_score": front,
@@ -185,7 +201,10 @@ def show_score_editor(session):
                         "extra_score": extra,
                         "front_putt": front_putt,
                         "back_putt": back_putt,
-                        "extra_putt": extra_putt
+                        "extra_putt": extra_putt,
+                        "front_game_pt": front_game,
+                        "back_game_pt": back_game,
+                        "extra_game_pt": extra_game,
                     }
                 
                 if st.form_submit_button("スコアを更新"):
