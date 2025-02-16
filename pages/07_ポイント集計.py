@@ -27,6 +27,12 @@ def main():
 # 過去データ一覧表示：各ラウンドの各プレーヤーごとの詳細
 #############################################
 def show_all_past_data():
+    # パスワード認証
+    password = st.text_input("アクセスパスワードを入力してください", type="password")
+    if password != "tra":
+        st.error("パスワードが正しくありません。")
+        st.stop()
+
     st.subheader("過去ラウンドデータ一覧（プレーヤー別詳細）")
     
     # 集計期間の選択（デフォルトは通算成績）
