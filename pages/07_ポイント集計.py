@@ -24,13 +24,30 @@ def main():
 
 
 #############################################
+# パスワード認証の設定
+#############################################
+def check_password():
+    """パスワードチェック機能"""
+    if "password_correct" not in st.session_state:
+        st.session_state.password_correct = False
+
+    if not st.session_state.password_correct:
+        pwd = st.text_input("パスワードを入力してください", type="password")
+        if pwd:
+            if pwd == "tora":  # 実際の運用では、ハッシュ化したパスワードの使用を推奨
+                st.session_state.password_correct = True
+                st.rerun()
+            else:
+                st.error("パスワードが違います")
+        return False
+    return True
+
+
+#############################################
 # 過去データ一覧表示：各ラウンドの各プレーヤーごとの詳細
 #############################################
 def show_all_past_data():
-    # パスワード認証
-    password = st.text_input("アクセスパスワードを入力してください", type="password")
-    if password != "tora":
-        st.error("パスワードが正しくありません。")
+    if not check_password():
         st.stop()
 
     st.subheader("過去ラウンドデータ一覧（プレーヤー別詳細）")
