@@ -29,7 +29,7 @@ def main():
 def show_all_past_data():
     # パスワード認証
     password = st.text_input("アクセスパスワードを入力してください", type="password")
-    if password != "tra":
+    if password != "tora":
         st.error("パスワードが正しくありません。")
         st.stop()
 
