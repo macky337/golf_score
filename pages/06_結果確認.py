@@ -115,10 +115,11 @@ def get_round_date_attr():
     return None
 
 def get_play_date(active_round):
-    """active_roundからプレイ日を取得する（Noneの場合はNoneを返す）"""
-    for attr in ['play_date', 'date', 'round_date']:
-        if hasattr(active_round, attr) and getattr(active_round, attr) is not None:
-            return getattr(active_round, attr)
+    """active_roundからプレイ日を取得"""
+    if not active_round:
+        return None
+    if hasattr(active_round, 'date_played') and active_round.date_played:
+        return active_round.date_played
     return None
 
 def generate_pdf(final_df, detailed_df, star_df, active_round):
@@ -154,8 +155,8 @@ def generate_pdf(final_df, detailed_df, star_df, active_round):
         alignment=1
     )
 
-    # プレイ日を取得
-    play_date = get_play_date(active_round).strftime('%Y年%m月%d日')
+    # プレイ日とコース名を取得
+    play_date = active_round.date_played.strftime('%Y年%m月%d日')
     course_name = active_round.course_name if hasattr(active_round, 'course_name') else ''
     
     # タイトル行を追加
@@ -444,12 +445,10 @@ def color_points(val):
         return "background-color: transparent; color: black"
 
 def get_pdf_filename(active_round):
-    """PDFファイル名を生成する
-    
-    Format: YYYYMMDD_golf_results.pdf
-    例: 20250209_golf_results.pdf
-    """
-    return f"{get_play_date(active_round).strftime('%Y%m%d')}_golf_results.pdf"
+    """PDFファイル名を生成"""
+    play_date = active_round.date_played.strftime('%Y%m%d')
+    round_id = active_round.round_id
+    return f"{play_date}_Round{round_id}_golf_results.pdf"
 
 def run():
     st.title("集計結果確認 (Game Pt + Match Pt + Put Pt)")
@@ -745,93 +744,93 @@ def run():
                     
                     /* データセルのスタイル */
                     .dataframe td {
-                        background-color: #FFFFFF !important;
-                        color: #000000 !important;
-                        border: 1px solid #DEE2E6 !important;
-                        padding: 8px !important;
+                        background-color: #FFFFFF !重要;
+                        color: #000000 !重要;
+                        border: 1px solid #DEE2E6 !重要;
+                        padding: 8px !重要;
                     }
 
                     /* ホバー時の背景色 */
                     .dataframe tr:hover td {
-                        background-color: #f5f5f5 !important;
+                        background-color: #f5f5f5 !重要;
                     }
 
                     /* 固定列のホバー時 */
                     .dataframe tr:hover td:first-child {
-                        background-color: rgba(248, 249, 250, 0.98) !important;
+                        background-color: rgba(248, 249, 250, 0.98) !重要;
                     }
                 }
                 /* スマートフォン向けのスタイル */
                 @media (max-width: 991px) {
                     .dataframe-container {
                         width: 100%;
-                        overflow-x: auto !important;
-                        position: relative !important;
+                        overflow-x: auto !重要;
+                        position: relative !重要;
                     }
                     
                     .dataframe {
-                        margin: 0 !important;
-                        border-collapse: separate !important;
-                        border-spacing: 0 !important;
-                        background-color: #1E1E1E !important;
+                        margin: 0 !重要;
+                        border-collapse: separate !重要;
+                        border-spacing: 0 !重要;
+                        background-color: #1E1E1E !重要;
                     }
                     
                     .dataframe thead tr th {
-                        position: sticky !important;
-                        top: 0 !important;
-                        background-color: #2D2D2D !important;
-                        color: #FFFFFF !important;
-                        z-index: 1 !important;
+                        position: sticky !重要;
+                        top: 0 !重要;
+                        background-color: #2D2D2D !重要;
+                        color: #FFFFFF !重要;
+                        z-index: 1 !重要;
                     }
                     
                     .dataframe th:first-child,
                     .dataframe td:first-child {
-                        position: sticky !important;
-                        left: 0 !important;
-                        background-color: rgba(45, 45, 45, 0.9) !important;
-                        color: #FFFFFF !important;
-                        z-index: 2 !important;
-                        box-shadow: 2px 0 5px -2px rgba(0,0,0,0.4) !important;
-                        border-right: 2px solid #333 !important;
-                        backdrop-filter: blur(5px) !important;
-                        -webkit-backdrop-filter: blur(5px) !important;
+                        position: sticky !重要;
+                        left: 0 !重要;
+                        background-color: rgba(45, 45, 45, 0.9) !重要;
+                        color: #FFFFFF !重要;
+                        z-index: 2 !重要;
+                        box-shadow: 2px 0 5px -2px rgba(0,0,0,0.4) !重要;
+                        border-right: 2px solid #333 !重要;
+                        backdrop-filter: blur(5px) !重要;
+                        -webkit-backdrop-filter: blur(5px) !重要;
                     }
                     
                     .dataframe td {
-                        background-color: #2D2D2D !important;
-                        color: #FFFFFF !important;
-                        border: 1px solid #444 !important;
+                        background-color: #2D2D2D !重要;
+                        color: #FFFFFF !重要;
+                        border: 1px solid #444 !重要;
                     }
                 }
 
                 /* 共通のスタイル */
                 .dataframe th:first-child,
                 .dataframe td:first-child {
-                    transition: background-color 0.3s ease !important;
+                    transition: background-color 0.3s ease !重要;
                 }
 
                 .dataframe-container:hover th:first-child,
                 .dataframe-container:hover td:first-child {
-                    background-color: rgba(248, 249, 250, 0.9) !important; /* PC */
+                    background-color: rgba(248, 249, 250, 0.9) !重要; /* PC */
                 }
 
                 @media (max-width: 991px) {
                     .dataframe-container:hover th:first-child,
                     .dataframe-container:hover td:first-child {
-                        background-color: rgba(45, 45, 45, 0.9) !important; /* スマートフォン */
+                        background-color: rgba(45, 45, 45, 0.9) !重要; /* スマートフォン */
                     }
                 }
             </style><style>
                 /* データフレーム全体のスタイル */
                 .dataframe-container {
                     width: 100%;
-                    overflow-x: auto !important;
-                    position: relative !important;
+                    overflow-x: auto !重要;
+                    position: relative !重要;
                 }
                 
                 /* テーブルの基本スタイル */
                 .dataframe {
-                    margin: 0 !important;
+                    margin: 0 !重要;
                     border-collapse: separate !重要;
                     border-spacing: 0 !重要;
                 }
