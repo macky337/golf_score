@@ -1,13 +1,20 @@
 import streamlit as st
+from streamlit_extras.switch_page_button import switch_page
 
 def main():
     st.title("⛳ Golf Score App")
     
-    # アプリの説明
-    st.markdown("""
-    ### ようこそ Golf Score App へ
-    このアプリでは、ゴルフのスコア管理や集計が簡単に行えます。
-    """)
+    # アプリの説明とマニュアルリンク
+    col1, col2 = st.columns([0.8, 0.2])
+    with col1:
+        st.markdown("""
+        ### ようこそ Golf Score App へ
+        このアプリでは、ゴルフのスコア管理や集計が簡単に行えます。
+        """)
+    with col2:
+        # マニュアルページへのリンク
+        if st.button("📚 マニュアル", key="manual_button"):
+            switch_page("マニュアル")
 
     # メインメニューの作成
     st.subheader("📌 メインメニュー")
