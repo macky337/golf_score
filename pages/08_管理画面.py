@@ -8,6 +8,7 @@ import hashlib
 from streamlit_extras.switch_page_button import switch_page
 import json
 import os
+import pytz
 
 # パスワード認証の設定
 def check_password():
@@ -530,7 +531,10 @@ def backup_database(session):
 
 def save_backup(backup_data):
     """バックアップデータをJSONファイルとして保存"""
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    # 日本のタイムゾーンを設定
+    jst = pytz.timezone('Asia/Tokyo')
+    timestamp = datetime.datetime.now(jst).strftime("%Y%m%d_%H%M%S")
+    
     backup_dir = "backups"
     if not os.path.exists(backup_dir):
         os.makedirs(backup_dir)
@@ -539,6 +543,77 @@ def save_backup(backup_data):
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(backup_data, f, ensure_ascii=False, indent=2)
     return filename
+
+def restore_database(session, backup_file):
+    """データベースをバックアップから復元"""
+    try:
+        # バックアップファイルの読み込み
+        with open(backup_file, 'r', encoding='utf-8') as f:
+            backup_data = json.load(f)
+
+        # 既存のデータを全て削除
+        session.query(Score).delete()
+        session.query(HandicapMatch).delete()
+        session.query(Round).delete()
+        session.query(Member).delete()
+        session.commit()
+
+        # メンバーの復元
+        for member_data in backup_data['members']:
+            member = Member(
+                member_id=member_data['member_id'],
+                name=member_data['name']
+            )
+            session.add(member)
+        session.commit()
+
+        # ラウンドの復元
+        for round_data in backup_data['rounds']:
+            round = Round(
+                round_id=round_data['round_id'],
+                date_played=datetime.datetime.fromisoformat(round_data['date_played']).date(),
+                course_name=round_data['course_name'],
+                has_extra=round_data['has_extra'],
+                finalized=round_data['finalized']
+            )
+            session.add(round)
+        session.commit()
+
+        # スコアの復元
+        for score_data in backup_data['scores']:
+            score = Score(
+                score_id=score_data['score_id'],
+                round_id=score_data['round_id'],
+                member_id=score_data['member_id'],
+                front_score=score_data['front_score'],
+                back_score=score_data['back_score'],
+                extra_score=score_data['extra_score'],
+                front_putt=score_data['front_putt'],
+                back_putt=score_data['back_putt'],
+                extra_putt=score_data['extra_putt']
+            )
+            session.add(score)
+        session.commit()
+
+        # ハンディキャップの復元
+        for handicap_data in backup_data['handicap_matches']:
+            handicap = HandicapMatch(
+                id=handicap_data['id'],
+                round_id=handicap_data['round_id'],
+                player_1_id=handicap_data['player_1_id'],
+                player_2_id=handicap_data['player_2_id'],
+                player_1_to_2=handicap_data['player_1_to_2'],
+                player_2_to_1=handicap_data['player_2_to_1'],
+                total_only=handicap_data['total_only']
+            )
+            session.add(handicap)
+        session.commit()
+
+        return True
+    except Exception as e:
+        st.error(f"リストア中にエラーが発生しました: {str(e)}")
+        session.rollback()
+        return False
 
 def show_backup_restore(session):
     """バックアップ・リストア機能のUI"""
@@ -568,15 +643,26 @@ def show_backup_restore(session):
                     format_func=lambda x: x.replace('golf_score_backup_', '').replace('.json', '')
                 )
                 
-                if st.button("リストアを実行", key="restore_button"):
-                    try:
-                        # developブランチでリストアを実行
-                        # ここでGitの操作とリストア処理を実装
-                        st.warning("この操作は取り消せません。実行してよろしいですか？")
-                        # リストア処理の実装
-                        st.success("リストアが完了しました")
-                    except Exception as e:
-                        st.error(f"リストア中にエラーが発生しました: {str(e)}")
+                st.warning("⚠️ この操作は取り消せません。実行する前に必ずバックアップを作成してください。")
+                
+                if st.button("✅ リストアを実行", key="restore_ok"):
+                    backup_file = os.path.join(backup_dir, selected_backup)
+                    st.warning("⚠️ 現在のデータは全て削除され、バックアップデータに置き換えられます。")
+                    st.write("本当に実行しますか？")
+                    
+                    confirm_col1, confirm_col2 = st.columns(2)
+                    with confirm_col1:
+                        if st.button("はい、実行します", key="confirm_restore"):
+                            try:
+                                if restore_database(session, backup_file):
+                                    st.success("リストアが完了しました")
+                                    st.rerun()
+                            except Exception as e:
+                                st.error(f"リストア中にエラーが発生しました: {str(e)}")
+                    with confirm_col2:
+                        if st.button("いいえ、キャンセルします", key="cancel_restore"):
+                            st.info("リストアをキャンセルしました")
+                            st.rerun()
             else:
                 st.info("バックアップファイルが見つかりません")
         else:
