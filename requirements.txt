@@ -44,8 +44,4 @@ tzdata==2023.3
 urllib3==2.1.0
 watchdog==3.0.0
 reportlab==4.0.7
-plotly==5.18.0
-streamlit
-pandas
 plotly
-sqlalchemy
