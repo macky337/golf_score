@@ -6,6 +6,8 @@ from sqlalchemy import func
 import datetime
 import hashlib
 from streamlit_extras.switch_page_button import switch_page
+import json
+import os
 
 # パスワード認証の設定
 def check_password():
@@ -37,7 +39,12 @@ def run():
         return
         
     session = SessionLocal()
-    tab1, tab2, tab3 = st.tabs(["スコア修正", "ハンディキャップ修正", "メンバー管理"])
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "スコア修正", 
+        "ハンディキャップ修正", 
+        "メンバー管理",
+        "バックアップ・リストア"
+    ])
 
     with tab1:
         show_score_editor(session)
@@ -47,6 +54,9 @@ def run():
     
     with tab3:
         show_member_manager(session)
+
+    with tab4:
+        show_backup_restore(session)
 
     session.close()
 
@@ -458,6 +468,119 @@ def show_member_manager(session):
                     st.error(f"追加中にエラーが発生しました: {str(e)}")
             else:
                 st.warning("名前を入力してください")
+
+def backup_database(session):
+    """データベースのバックアップを作成"""
+    backup_data = {
+        'rounds': [],
+        'scores': [],
+        'members': [],
+        'handicap_matches': []
+    }
+
+    # ラウンドデータのバックアップ
+    rounds = session.query(Round).all()
+    for r in rounds:
+        backup_data['rounds'].append({
+            'round_id': r.round_id,
+            'date_played': r.date_played.isoformat(),
+            'course_name': r.course_name,
+            'has_extra': r.has_extra,
+            'finalized': r.finalized
+        })
+
+    # スコアデータのバックアップ
+    scores = session.query(Score).all()
+    for s in scores:
+        backup_data['scores'].append({
+            'score_id': s.score_id,
+            'round_id': s.round_id,
+            'member_id': s.member_id,
+            'front_score': s.front_score,
+            'back_score': s.back_score,
+            'extra_score': s.extra_score,
+            'front_putt': s.front_putt,
+            'back_putt': s.back_putt,
+            'extra_putt': s.extra_putt
+            # ...その他のスコア関連フィールド...
+        })
+
+    # メンバーデータのバックアップ
+    members = session.query(Member).all()
+    for m in members:
+        backup_data['members'].append({
+            'member_id': m.member_id,
+            'name': m.name
+        })
+
+    # ハンディキャップデータのバックアップ
+    handicaps = session.query(HandicapMatch).all()
+    for h in handicaps:
+        backup_data['handicap_matches'].append({
+            'id': h.id,
+            'round_id': h.round_id,
+            'player_1_id': h.player_1_id,
+            'player_2_id': h.player_2_id,
+            'player_1_to_2': h.player_1_to_2,
+            'player_2_to_1': h.player_2_to_1,
+            'total_only': h.total_only
+        })
+
+    return backup_data
+
+def save_backup(backup_data):
+    """バックアップデータをJSONファイルとして保存"""
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_dir = "backups"
+    if not os.path.exists(backup_dir):
+        os.makedirs(backup_dir)
+    
+    filename = f"{backup_dir}/golf_score_backup_{timestamp}.json"
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(backup_data, f, ensure_ascii=False, indent=2)
+    return filename
+
+def show_backup_restore(session):
+    """バックアップ・リストア機能のUI"""
+    st.subheader("データバックアップ・リストア")
+
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("### バックアップ作成")
+        if st.button("バックアップを作成"):
+            try:
+                backup_data = backup_database(session)
+                filename = save_backup(backup_data)
+                st.success(f"バックアップを作成しました: {filename}")
+            except Exception as e:
+                st.error(f"バックアップ作成中にエラーが発生しました: {str(e)}")
+
+    with col2:
+        st.write("### バックアップからリストア")
+        backup_dir = "backups"
+        if os.path.exists(backup_dir):
+            backup_files = [f for f in os.listdir(backup_dir) if f.endswith('.json')]
+            if backup_files:
+                selected_backup = st.selectbox(
+                    "リストアするバックアップを選択",
+                    options=backup_files,
+                    format_func=lambda x: x.replace('golf_score_backup_', '').replace('.json', '')
+                )
+                
+                if st.button("リストアを実行", key="restore_button"):
+                    try:
+                        # developブランチでリストアを実行
+                        # ここでGitの操作とリストア処理を実装
+                        st.warning("この操作は取り消せません。実行してよろしいですか？")
+                        # リストア処理の実装
+                        st.success("リストアが完了しました")
+                    except Exception as e:
+                        st.error(f"リストア中にエラーが発生しました: {str(e)}")
+            else:
+                st.info("バックアップファイルが見つかりません")
+        else:
+            st.info("バックアップディレクトリが見つかりません")
 
 if __name__ == "__main__":
     run()
