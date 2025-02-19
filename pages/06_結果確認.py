@@ -14,6 +14,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from streamlit_extras.switch_page_button import switch_page
 
 # 日本語対応フォントの登録（ipaexg.ttf が同一ディレクトリに存在する場合）
 FONT_NAME = "Helvetica"
@@ -451,7 +452,12 @@ def get_pdf_filename(active_round):
     return f"{play_date}_Round{round_id}_golf_results.pdf"
 
 def run():
-    st.title("集計結果確認 (Game Pt + Match Pt + Put Pt)")
+    col1, col2 = st.columns([0.8, 0.2])
+    with col1:
+        st.title("結果確認")
+    with col2:
+        if st.button("🏠 Home"):
+            switch_page("Main")
     session = SessionLocal()
 
     # 未確定ラウンドの存在チェック

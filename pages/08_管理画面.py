@@ -5,6 +5,7 @@ from modules.models import Round, Score, Member, HandicapMatch
 from sqlalchemy import func
 import datetime
 import hashlib
+from streamlit_extras.switch_page_button import switch_page
 
 # パスワード認証の設定
 def check_password():
@@ -24,7 +25,13 @@ def check_password():
     return True
 
 def run():
-    st.title("管理画面")
+    # タイトルとホームボタンを横に配置
+    col1, col2 = st.columns([0.8, 0.2])
+    with col1:
+        st.title("管理画面")
+    with col2:
+        if st.button("🏠 Home"):
+            switch_page("Main")
     
     if not check_password():
         return

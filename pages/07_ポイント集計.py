@@ -6,6 +6,18 @@ from modules.db import SessionLocal
 from modules.models import Round, Score, Member
 import plotly.express as px
 import plotly.graph_objects as go
+from streamlit_extras.switch_page_button import switch_page
+
+def run():
+    # タイトルとホームボタンを横に配置
+    col1, col2 = st.columns([0.8, 0.2])
+    with col1:
+        st.title("ページタイトル")  # 各ページに応じたタイトル
+    with col2:
+        if st.button("🏠 Home"):
+            switch_page("Main")
+    
+    main()
 
 def main():
     st.title("ポイント集計・過去データ管理")
@@ -327,4 +339,4 @@ def delete_front_score_zero_records():
 
 
 if __name__ == "__main__":
-    main()
+    run()

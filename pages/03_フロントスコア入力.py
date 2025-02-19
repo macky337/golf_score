@@ -3,9 +3,15 @@
 import streamlit as st
 from modules.db import SessionLocal
 from modules.models import Round, Score, Member
+from streamlit_extras.switch_page_button import switch_page
 
 def run():
-    st.title("Front 9 Score Input")
+    col1, col2 = st.columns([0.8, 0.2])
+    with col1:
+        st.title("フロントスコア入力")
+    with col2:
+        if st.button("🏠 Home"):
+            switch_page("Main")
 
     session = SessionLocal()
     

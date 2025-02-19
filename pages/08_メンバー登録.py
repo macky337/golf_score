@@ -3,10 +3,12 @@
 import streamlit as st
 from modules.db import SessionLocal
 from modules.models import Member, HandicapMatch, Score  # Score を追加
+from streamlit_extras.switch_page_button import switch_page
 
 def member_registration_page():
     """メンバー登録ページ"""
-    st.title("メンバー登録ページ")
+    # タイトルを削除（run関数で表示するため）
+    # st.title("メンバー登録ページ") を削除
 
     # 入力フォーム
     name_input = st.text_input("New Member Name", value="")
@@ -69,9 +71,17 @@ def show_member_list():
 # Streamlitのマルチページ構成の場合、以下のように記述
 # ページとして表示されるためには、このファイルをpagesフォルダに置くだけでOK
 def run():
+    # タイトルとホームボタンを横に配置
+    col1, col2 = st.columns([0.8, 0.2])
+    with col1:
+        st.title("メンバー登録")  # 各ページに応じたタイトル
+    with col2:
+        if st.button("🏠 Home"):
+            switch_page("Main")
+    
     member_registration_page()
 
 # 通常、Streamlitのマルチページではファイル名先頭にN_をつけるだけで
 # stのPageが自動的に生成されるため、直接呼ぶには:
 if __name__ == "__main__":
-    member_registration_page()
+    run()  # member_registration_page() から run() に変更
