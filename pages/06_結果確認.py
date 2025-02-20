@@ -760,6 +760,76 @@ def run():
                 }
             </style>
         """, unsafe_allow_html=True)
+        st.markdown("""
+            <style>
+                /* ダークモード対応のスタイル */
+                @media (prefers-color-scheme: dark) {
+                    .dataframe {
+                        color: #ffffff !important;
+                        background-color: #1e1e1e !important;
+                    }
+                    
+                    .dataframe thead th,
+                    .dataframe tbody td {
+                        background-color: #1e1e1e !important;
+                        color: #ffffff !重要;
+                        border-color: #404040 !重要;
+                    }
+                    
+                    /* 固定列の背景色 */
+                    .dataframe thead th:first-child,
+                    .dataframe tbody td:first-child {
+                        background-color: #2d2d2d !重要;
+                        box-shadow: 2px 0 5px -2px rgba(0,0,0,0.5);
+                    }
+                    
+                    /* ヘッダーの背景色 */
+                    .dataframe thead th {
+                        background-color: #2d2d2d !重要;
+                        border-bottom: 2px solid #404040 !重要;
+                    }
+                }
+
+                /* モバイル対応のスタイル */
+                @media (max-width: 768px) {
+                    .dataframe-container {
+                        position: relative;
+                        width: 100%;
+                        overflow-x: auto;
+                        -webkit-overflow-scrolling: touch;
+                    }
+                    
+                    .dataframe {
+                        white-space: nowrap;
+                        font-size: 14px;
+                    }
+                    
+                    /* 固定列とヘッダーのスタイル */
+                    .dataframe thead th:first-child,
+                    .dataframe tbody td:first-child {
+                        position: sticky !重要;
+                        left: 0;
+                        z-index: 1;
+                    }
+                    
+                    .dataframe thead th {
+                        position: sticky !重要;
+                        top: 0;
+                        z-index: 1;
+                    }
+                    
+                    .dataframe thead th:first-child {
+                        z-index: 2;
+                    }
+                    
+                    .dataframe th,
+                    .dataframe td {
+                        padding: 8px;
+                        min-width: 60px;
+                    }
+                }
+            </style>
+        """, unsafe_allow_html=True)
         st.markdown(
             f"""
             <div class="dataframe-container">
