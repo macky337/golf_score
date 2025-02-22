@@ -692,6 +692,7 @@ def run():
                 "Player": d["Player"],
                 "Front Score": d["Front Score"],
                 "Back Score": d["Back Score"],
+                "Total Score": d["Front Score"] + d["Back Score"],  # Total Scoreを追加
                 "Extra Score": d["Extra Score"],
                 "Front GP": d["Front GP"],
                 "Back GP": d["Back GP"],
