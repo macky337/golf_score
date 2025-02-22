@@ -96,11 +96,17 @@ def create_df_for_pdf(df):
     # データ行の作成（プレイヤー名を含む）
     for idx, row in df.iterrows():
         formatted_row = [Paragraph(str(idx), style)]  # プレイヤー名
-        for val in row:
+        for col, val in zip(df.columns, row):
             if pd.isna(val):
                 val = ""
-            if isinstance(val, (int, float)):
-                val = f"{val:+d}" if val != 0 else "0"
+            # スコア関連のカラムは+記号なしで表示
+            if col in ['Front Score', 'Back Score', 'Total Score', 'Extra Score']:
+                if isinstance(val, (int, float)):
+                    val = f"{int(val)}"
+            # その他のカラムは従来通り+記号付きで表示
+            else:
+                if isinstance(val, (int, float)):
+                    val = f"{val:+d}" if val != 0 else "0"
             formatted_row.append(Paragraph(str(val), style))
         formatted_data.append(formatted_row)
     
@@ -809,7 +815,7 @@ def run():
                     .dataframe thead th:first-child,
                     .dataframe tbody td:first-child {
                         position: sticky !重要;
-                        left: 0;
+                        left: 0 !重要;
                         z-index: 1;
                     }
                     
