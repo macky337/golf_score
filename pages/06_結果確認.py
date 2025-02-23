@@ -845,6 +845,46 @@ def run():
             """,
             unsafe_allow_html=True
         )
+        st.markdown("""
+            <style>
+                /* カラム名とヘッダーを太字に */
+                .dataframe thead th {
+                    font-weight: bold !important;
+                    color: #ffffff !important;
+                    background-color: #2d2d2d !important;
+                }
+
+                /* 左端の項目名（Player）を太字に */
+                .dataframe tbody td:first-child {
+                    font-weight: bold !important;
+                }
+
+                /* ダークモード対応のスタイル */
+                @media (prefers-color-scheme: dark) {
+                    .dataframe {
+                        color: #ffffff !important;
+                        background-color: #1e1e1e !important;
+                    }
+                    
+                    .dataframe thead th {
+                        background-color: #2d2d2d !important;
+                        border-bottom: 2px solid #404040 !important;
+                    }
+                    
+                    .dataframe tbody td:first-child {
+                        background-color: #2d2d2d !important;
+                    }
+                }
+
+                /* その他の既存のスタイルは維持 */
+                .match-matrix thead th,
+                .match-matrix tbody td:first-child,
+                .match-details thead th,
+                .match-details tbody td:first-child {
+                    font-weight: bold !important;
+                }
+            </style>
+        """, unsafe_allow_html=True)
         st.write("### マッチ戦詳細結果")
         detailed_df = create_detailed_match_results(player_data, handicaps, total_only_set)
         st.markdown("""
@@ -883,8 +923,52 @@ def run():
             unsafe_allow_html=True
         )
         star_df = create_match_matrix(player_data, handicaps, total_only_set)
-        st.write("### 対戦結果（Much Pt 集計）")
-        st.dataframe(star_df.style.map(color_points))
+        st.write("### 対戦結果（Match Pt 集計）")
+        st.markdown("""
+            <style>
+                /* 対戦結果テーブルのスタイル */
+                .match-matrix-container {
+                    width: 100%;
+                    overflow-x: auto !important;
+                    position: relative !important;
+                }
+                .match-matrix {
+                    margin: 0 !important;
+                    font-size: 14px !important;
+                }
+                .match-matrix th:first-child,
+                .match-matrix td:first-child {
+                    position: sticky !important;
+                    left: 0 !important;
+                    background-color: white !important;
+                    z-index: 2 !important;
+                    box-shadow: 2px 0 5px -2px rgba(0,0,0,0.2) !important;
+                    border-right: 2px solid #ccc !important;
+                }
+                
+                /* ダークモード対応 */
+                @media (prefers-color-scheme: dark) {
+                    .match-matrix th:first-child,
+                    .match-matrix td:first-child {
+                        background-color: #2d2d2d !important;
+                    }
+                    .match-matrix {
+                        color: #ffffff !important;
+                        background-color: #1e1e1e !important;
+                    }
+                }
+            </style>
+        """, unsafe_allow_html=True)
+
+        # star_dfの表示部分を修正
+        st.markdown(
+            f"""
+            <div class="match-matrix-container">
+                {star_df.style.map(color_points).to_html(classes='match-matrix', index=True)}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
         pdf_buffer = generate_pdf(final_df, detailed_df, star_df, active_round)
         st.download_button(
             label="Download PDF of Results",
