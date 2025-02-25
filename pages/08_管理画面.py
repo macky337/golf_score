@@ -642,26 +642,16 @@ def get_supabase_client():
 def save_backup_to_supabase(backup_data):
     """バックアップデータをSupabaseに保存（最新5件まで）"""
     try:
+        jst = pytz.timezone('Asia/Tokyo')
+        now = datetime.datetime.now(jst)
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        
+        # Supabaseに保存する際のタイムスタンプもJSTで設定
         supabase = get_supabase_client()
-        timestamp = datetime.datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y%m%d_%H%M%S")
-        
-        # 既存のバックアップ数を確認
-        result = supabase.table('backups').select('*').execute()
-        existing_backups = result.data
-        
-        # 最新5件を超える古いバックアップを削除
-        if len(existing_backups) >= 5:
-            # 日付でソート
-            sorted_backups = sorted(existing_backups, key=lambda x: x['created_at'])
-            # 古いものから削除
-            for old_backup in sorted_backups[:(len(existing_backups) - 4)]:
-                supabase.table('backups').delete().eq('backup_id', old_backup['backup_id']).execute()
-        
-        # 新しいバックアップを保存
         result = supabase.table('backups').insert({
             'backup_id': timestamp,
             'data': backup_data,
-            'created_at': datetime.datetime.now().isoformat(),
+            'created_at': now.isoformat(),
             'description': f"Backup {timestamp}"
         }).execute()
         
@@ -712,10 +702,21 @@ def show_backup_restore(session):
         try:
             backups = get_backups_from_supabase()
             if backups:
+                # タイムスタンプをJSTに変換して表示
+                jst = pytz.timezone('Asia/Tokyo')
+                backup_options = []
+                for b in backups:
+                    utc_time = datetime.datetime.fromisoformat(b['created_at'].replace('Z', '+00:00'))
+                    jst_time = utc_time.astimezone(jst)
+                    backup_options.append({
+                        'id': b['backup_id'],
+                        'created_at': jst_time.strftime('%Y-%m-%d %H:%M')
+                    })
+                
                 selected_backup = st.selectbox(
                     "リストアするバックアップを選択",
-                    options=[(b['backup_id'], b['created_at']) for b in backups],
-                    format_func=lambda x: f"{x[0]} ({x[1][:16]})"
+                    options=backup_options,
+                    format_func=lambda x: f"{x['id']} ({x['created_at']})"
                 )
                 
                 st.warning("⚠️ この操作は取り消せません")
