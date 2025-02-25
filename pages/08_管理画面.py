@@ -642,12 +642,24 @@ def get_supabase_client():
 def save_backup_to_supabase(backup_data):
     """バックアップデータをSupabaseに保存（最新5件まで）"""
     try:
+        supabase = get_supabase_client()
+        
+        # 既存のバックアップを取得
+        existing_backups = supabase.table('backups').select('*').order('created_at.desc').execute()
+        
+        # 5件以上ある場合、古いものを削除
+        if len(existing_backups.data) >= 5:
+            # 古い順にソート
+            sorted_backups = sorted(existing_backups.data, key=lambda x: x['created_at'])
+            # 超過分を削除
+            for old_backup in sorted_backups[:(len(existing_backups.data) - 4)]:
+                supabase.table('backups').delete().eq('backup_id', old_backup['backup_id']).execute()
+
+        # 新しいバックアップを保存
         jst = pytz.timezone('Asia/Tokyo')
         now = datetime.datetime.now(jst)
         timestamp = now.strftime("%Y%m%d_%H%M%S")
         
-        # Supabaseに保存する際のタイムスタンプもJSTで設定
-        supabase = get_supabase_client()
         result = supabase.table('backups').insert({
             'backup_id': timestamp,
             'data': backup_data,

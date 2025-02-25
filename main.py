@@ -1,5 +1,6 @@
 import streamlit as st
 from streamlit_extras.switch_page_button import switch_page
+from version import get_version_info
 
 def main():
     st.title("⛳ Golf Score App")
@@ -62,6 +63,16 @@ def main():
     - 入力したデータは「結果確認」画面で確認できます
     - データの修正が必要な場合は「管理画面」をご利用ください
     """)
+    
+    # バージョン情報
+    version_info = get_version_info()
+    st.markdown("---")
+    st.markdown(f"""
+    <div style='text-align: right; color: gray; font-size: 0.8em;'>
+        Version: {version_info['version']}<br>
+        Last updated: {version_info['last_updated']}
+    </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
