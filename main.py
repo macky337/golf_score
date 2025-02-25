@@ -55,6 +55,8 @@ def main():
         8. **メンバー登録**: 新しいプレイヤーを登録します
         """)
     
+    show_changelog()
+    
     # フッター
     st.markdown("---")
     st.markdown("""
@@ -73,6 +75,12 @@ def main():
         最終更新日: {version_info['last_updated']}
     </div>
     """, unsafe_allow_html=True)
+
+def show_changelog():
+    with st.expander("📋 更新履歴"):
+        with open("CHANGELOG.md", "r", encoding="utf-8") as f:
+            changelog = f.read()
+        st.markdown(changelog)
 
 if __name__ == "__main__":
     main()

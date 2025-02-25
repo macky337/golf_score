@@ -10,6 +10,7 @@
 - game_ptの更新処理を追加
 
 ### 修正
+- 修復
 - 微調整
 - resolve encoding issues in changelog generation
 - backup timestamp timezone to JST
