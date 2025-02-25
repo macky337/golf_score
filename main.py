@@ -69,8 +69,8 @@ def main():
     st.markdown("---")
     st.markdown(f"""
     <div style='text-align: right; color: gray; font-size: 0.8em;'>
-        Version {version_info['major']}.{version_info['minor']}.{version_info['patch']}<br>
-        Last updated: {version_info['last_updated']}
+        バージョン: {version_info['major']}.{version_info['minor']}.{version_info['patch']}<br>
+        最終更新日: {version_info['last_updated']}
     </div>
     """, unsafe_allow_html=True)
 
