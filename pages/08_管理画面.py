@@ -9,8 +9,15 @@ from streamlit_extras.switch_page_button import switch_page
 import json
 import os
 import pytz
-from supabase import create_client
 from dotenv import load_dotenv
+
+# Supabase関連の関数を条件付きでインポート
+try:
+    from supabase import create_client
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    SUPABASE_AVAILABLE = False
+    st.error("Supabaseライブラリがインストールされていません。'pip install supabase'を実行してください。")
 
 # パスワード認証の設定
 def check_password():
@@ -614,15 +621,21 @@ def restore_database(session, backup_data):
         return False
 
 def get_supabase_client():
-    """Supabaseクライアントの取得"""
+    """Supabaseクライアントの取得（エラーハンドリング強化）"""
+    if not SUPABASE_AVAILABLE:
+        raise ImportError("Supabaseライブラリがインストールされていません")
+    
     load_dotenv()
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_KEY")
     
     if not url or not key:
-        raise ValueError("環境変数が設定されていません")
+        raise ValueError("環境変数 SUPABASE_URL または SUPABASE_KEY が設定されていません")
     
-    return create_client(url, key)
+    try:
+        return create_client(url, key)
+    except Exception as e:
+        raise ConnectionError(f"Supabaseへの接続に失敗しました: {str(e)}")
 
 # バックアップ・リストア機能の修正版
 
