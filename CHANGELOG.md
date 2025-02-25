@@ -3,6 +3,7 @@
 ## [2025-02-25]
 
 ### 追加機能
+- 更新履歴を追加
 - implement changelog generation
 - add version management system
 - add Supabase backup functionality
