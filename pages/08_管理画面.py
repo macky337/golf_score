@@ -9,6 +9,8 @@ from streamlit_extras.switch_page_button import switch_page
 import json
 import os
 import pytz
+from supabase import create_client
+from dotenv import load_dotenv
 
 # パスワード認証の設定
 def check_password():
@@ -544,13 +546,9 @@ def save_backup(backup_data):
         json.dump(backup_data, f, ensure_ascii=False, indent=2)
     return filename
 
-def restore_database(session, backup_file):
+def restore_database(session, backup_data):
     """データベースをバックアップから復元"""
     try:
-        # バックアップファイルの読み込み
-        with open(backup_file, 'r', encoding='utf-8') as f:
-            backup_data = json.load(f)
-
         # 既存のデータを全て削除
         session.query(Score).delete()
         session.query(HandicapMatch).delete()
@@ -615,58 +613,113 @@ def restore_database(session, backup_file):
         session.rollback()
         return False
 
+def get_supabase_client():
+    """Supabaseクライアントの取得"""
+    load_dotenv()
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_KEY")
+    
+    if not url or not key:
+        raise ValueError("環境変数が設定されていません")
+    
+    return create_client(url, key)
+
+# バックアップ・リストア機能の修正版
+
+def save_backup_to_supabase(backup_data):
+    """バックアップデータをSupabaseに保存（最新5件まで）"""
+    try:
+        supabase = get_supabase_client()
+        timestamp = datetime.datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y%m%d_%H%M%S")
+        
+        # 既存のバックアップ数を確認
+        result = supabase.table('backups').select('*').execute()
+        existing_backups = result.data
+        
+        # 最新5件を超える古いバックアップを削除
+        if len(existing_backups) >= 5:
+            # 日付でソート
+            sorted_backups = sorted(existing_backups, key=lambda x: x['created_at'])
+            # 古いものから削除
+            for old_backup in sorted_backups[:(len(existing_backups) - 4)]:
+                supabase.table('backups').delete().eq('backup_id', old_backup['backup_id']).execute()
+        
+        # 新しいバックアップを保存
+        result = supabase.table('backups').insert({
+            'backup_id': timestamp,
+            'data': backup_data,
+            'created_at': datetime.datetime.now().isoformat(),
+            'description': f"Backup {timestamp}"
+        }).execute()
+        
+        return timestamp
+    except Exception as e:
+        raise Exception(f"Supabaseへの保存に失敗しました: {str(e)}")
+
+def get_backups_from_supabase():
+    """Supabaseからバックアップ一覧を取得"""
+    supabase = get_supabase_client()
+    result = supabase.table('backups').select('*').order('created_at.desc').execute()
+    return result.data
+
+def restore_from_supabase(session, backup_id):
+    """Supabaseのバックアップからデータを復元"""
+    try:
+        supabase = get_supabase_client()
+        result = supabase.table('backups').select('*').eq('backup_id', backup_id).execute()
+        
+        if not result.data:
+            raise ValueError("バックアップが見つかりません")
+            
+        backup_data = result.data[0]['data']
+        return restore_database(session, backup_data)
+    except Exception as e:
+        raise Exception(f"Supabaseからの復元に失敗しました: {str(e)}")
+
 def show_backup_restore(session):
-    """バックアップ・リストア機能のUI"""
+    """バックアップ・リストア機能のUI（Supabase版）"""
     st.subheader("データバックアップ・リストア")
 
     col1, col2 = st.columns(2)
     
     with col1:
         st.write("### バックアップ作成")
+        st.caption("※ 最新5件まで保存されます")
         if st.button("バックアップを作成"):
             try:
-                backup_data = backup_database(session)
-                filename = save_backup(backup_data)
-                st.success(f"バックアップを作成しました: {filename}")
+                with st.spinner("バックアップを作成中..."):
+                    backup_data = backup_database(session)
+                    backup_id = save_backup_to_supabase(backup_data)
+                    st.success(f"バックアップを作成しました: {backup_id}")
             except Exception as e:
                 st.error(f"バックアップ作成中にエラーが発生しました: {str(e)}")
 
     with col2:
         st.write("### バックアップからリストア")
-        backup_dir = "backups"
-        if os.path.exists(backup_dir):
-            backup_files = [f for f in os.listdir(backup_dir) if f.endswith('.json')]
-            if backup_files:
+        try:
+            backups = get_backups_from_supabase()
+            if backups:
                 selected_backup = st.selectbox(
                     "リストアするバックアップを選択",
-                    options=backup_files,
-                    format_func=lambda x: x.replace('golf_score_backup_', '').replace('.json', '')
+                    options=[(b['backup_id'], b['created_at']) for b in backups],
+                    format_func=lambda x: f"{x[0]} ({x[1][:16]})"
                 )
                 
-                st.warning("⚠️ この操作は取り消せません。実行する前に必ずバックアップを作成してください。")
+                st.warning("⚠️ この操作は取り消せません")
                 
-                if st.button("✅ リストアを実行", key="restore_ok"):
-                    backup_file = os.path.join(backup_dir, selected_backup)
-                    st.warning("⚠️ 現在のデータは全て削除され、バックアップデータに置き換えられます。")
-                    st.write("本当に実行しますか？")
-                    
-                    confirm_col1, confirm_col2 = st.columns(2)
-                    with confirm_col1:
-                        if st.button("はい、実行します", key="confirm_restore"):
-                            try:
-                                if restore_database(session, backup_file):
-                                    st.success("リストアが完了しました")
-                                    st.rerun()
-                            except Exception as e:
-                                st.error(f"リストア中にエラーが発生しました: {str(e)}")
-                    with confirm_col2:
-                        if st.button("いいえ、キャンセルします", key="cancel_restore"):
-                            st.info("リストアをキャンセルしました")
-                            st.rerun()
+                if st.button("リストアを実行"):
+                    if st.button("本当に実行しますか？"):
+                        try:
+                            with st.spinner("リストア中..."):
+                                restore_from_supabase(session, selected_backup[0])
+                                st.success("リストアが完了しました")
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"リストア中にエラーが発生しました: {str(e)}")
             else:
-                st.info("バックアップファイルが見つかりません")
-        else:
-            st.info("バックアップディレクトリが見つかりません")
+                st.info("バックアップが見つかりません")
+        except Exception as e:
+            st.error(f"バックアップ一覧の取得に失敗しました: {str(e)}")
 
 if __name__ == "__main__":
     run()
