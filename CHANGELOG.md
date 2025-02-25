@@ -3,6 +3,7 @@
 ## [2025-02-25]
 
 ### 追加機能
+- implement changelog generation
 - add version management system
 - add Supabase backup functionality
 - game_ptバックアップスクリプトを追加2
