@@ -32,16 +32,15 @@ def find_database():
     raise FileNotFoundError("有効なデータベースファイルが見つかりません")
 
 def create_backup_from_sqlite():
-    """正しいgame_pt値を持つSQLiteデータベースからバックアップを作成"""
-    # mainブランチのデータベースを使用
-    db_path = os.path.join(os.getcwd(), 'golf_app.db')
-    print(f"使用するデータベース: {db_path}")
+    """SQLiteデータベースからgame_ptを含むバックアップを作成"""
+    db_path = find_database()
+    print(f"\n使用するデータベース: {db_path}")
     
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
     try:
-        # スコアデータとgame_ptを取得
+        # game_ptデータの取得
         cursor.execute('''
             SELECT 
                 score_id,
@@ -75,10 +74,13 @@ def create_backup_from_sqlite():
         backup_dir = "backups"
         os.makedirs(backup_dir, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{backup_dir}/main_backup_{timestamp}.json"
+        filename = f"{backup_dir}/remote_main_backup_{timestamp}.json"
         
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(backup_data, f, ensure_ascii=False, indent=2)
+        
+        print(f"\nバックアップファイルを作成しました: {filename}")
+        print(f"スコアデータ数: {len(backup_data['scores'])}")
         
         return filename
         
