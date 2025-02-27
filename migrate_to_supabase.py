@@ -43,28 +43,8 @@ def clean_data(data, table_name):
                     cleaned[key] = value.isoformat()
             except ValueError:
                 continue
-                
-        # スコアテーブルのゲームポイント関連のカラム名を修正
-        elif table_name == 'score' and key in [
-            'front_game_pt', 'back_game_pt', 'extra_game_pt',  # 元のカラム名
-            'front_gp', 'back_gp', 'extra_gp',  # 新しいカラム名
-            'match_pt', 'put_pt', 'total_pt'
-        ]:
-            # カラム名の変換マッピング
-            column_mapping = {
-                'front_game_pt': 'front_gp',
-                'back_game_pt': 'back_gp',
-                'extra_game_pt': 'extra_gp'
-            }
-            
-            # キーを変換（必要な場合）
-            transformed_key = column_mapping.get(key, key)
-            cleaned[transformed_key] = float(value or 0)
-            
-        elif table_name == 'handicap_match' and key == 'total_only':
-            cleaned[key] = bool(value)
-            
         else:
+            # すべてのキーをそのまま使用
             cleaned[key] = value
             
     return cleaned
@@ -87,7 +67,7 @@ def migrate_table(conn, table_name, select_query):
                 if not cleaned_data:
                     print(f"Warning: Empty data for {table_name} ID {record[0]}")
                     continue
-
+                
                 # デバッグ情報の出力
                 if table_name == 'score':
                     print(f"Score data before migration: {data}")
