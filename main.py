@@ -1,6 +1,37 @@
 import streamlit as st
 from streamlit_extras.switch_page_button import switch_page
 from scripts.version_manager import load_version
+import os
+from dotenv import load_dotenv
+import traceback
+
+def check_supabase_connection():
+    """Supabaseの接続状況を確認する関数"""
+    load_dotenv()
+    
+    # 環境変数の確認
+    supabase_url = os.getenv('SUPABASE_URL')
+    supabase_key = os.getenv('SUPABASE_KEY')
+    
+    if not supabase_url or not supabase_key:
+        return False, "環境変数が設定されていません"
+    
+    try:
+        # Supabaseクライアントのインポートを試行
+        from supabase import create_client
+        
+        # クライアントの作成を試行
+        supabase = create_client(supabase_url, supabase_key)
+        
+        # 実際に存在するテーブルを使用して接続テスト
+        # existsメソッドを使用してテーブルの存在チェックのみを行う（データ取得は不要）
+        response = supabase.table('rounds').select('count').limit(1).execute()
+        
+        return True, "接続成功"
+    except ImportError:
+        return False, "supabaseモジュールがインストールされていません"
+    except Exception as e:
+        return False, f"接続エラー: {str(e)}"
 
 def main():
     st.title("⛳ Golf Score App")
@@ -66,13 +97,19 @@ def main():
     - データの修正が必要な場合は「管理画面」をご利用ください
     """)
     
+    # Supabase接続状況の確認と表示
+    supabase_connected, message = check_supabase_connection()
+    connection_status = "✅ 接続済み" if supabase_connected else f"❌ 未接続 ({message})"
+    connection_color = "green" if supabase_connected else "red"
+    
     # バージョン情報の表示
     version_info = load_version()
     st.markdown("---")
     st.markdown(f"""
     <div style='text-align: right; color: gray; font-size: 0.8em;'>
         バージョン: {version_info['major']}.{version_info['minor']}.{version_info['patch']}<br>
-        最終更新日: {version_info['last_updated']}
+        最終更新日: {version_info['last_updated']}<br>
+        Supabase: <span style='color: {connection_color};'>{connection_status}</span>
     </div>
     """, unsafe_allow_html=True)
 
