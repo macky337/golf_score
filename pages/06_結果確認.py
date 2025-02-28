@@ -1,13 +1,9 @@
 import streamlit as st
+import pandas as pd
+from modules.db import supabase
 import datetime
-import itertools
 import io
 import os
-import pandas as pd
-from sqlalchemy import func, extract
-from sqlalchemy.orm import joinedload  # 追加: スコアと同時に member をロードするためのjoinedload
-from modules.db import SessionLocal
-from modules.models import Round, Score, Member, HandicapMatch
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -434,8 +430,12 @@ def create_detailed_match_results(player_data, handicaps, total_only_set):
     return df
 
 def highlight_total_only(row):
-    if row["Total Only Mode"] == "Yes":
-        return ['background-color: #FFD700; color: black'] * len(row)
+    """Total Only Modeがデータにない場合はスタイリングを適用しない"""
+    try:
+        if "Total Only Mode" in row and row["Total Only Mode"] == "Yes":
+            return ['background-color: #FFD700; color: black'] * len(row)
+    except:
+        pass
     return ['background-color: #E6F3FF; color: black'] * len(row)
 
 def color_points(val):
@@ -464,41 +464,33 @@ def run():
     with col2:
         if st.button("🏠 Home"):
             switch_page("Main")
-    session = SessionLocal()
 
     # 未確定ラウンドの存在チェック
-    unfinalized_rounds = (
-        session.query(Round)
-        .filter(Round.finalized == False)
-        .order_by(Round.date_played.desc())
-        .all()
-    )
+    rounds_result = supabase.table('rounds').select('*').eq('finalized', False).order('date_played', desc=True).execute()
+    unfinalized_rounds = rounds_result.data
 
     # すべてのラウンドを取得（date_playedで降順ソート）
-    all_rounds = (
-        session.query(Round)
-        .order_by(Round.date_played.desc())
-        .all()
-    )
+    all_rounds_result = supabase.table('rounds').select('*').order('date_played', desc=True).execute()
+    all_rounds = all_rounds_result.data
     
     # 未確定ラウンドがある場合は警告表示
     if unfinalized_rounds:
         st.warning(f"⚠️ 未確定のラウンドが {len(unfinalized_rounds)} 件あります")
         # 未確定ラウンドの一覧を表示
         for r in unfinalized_rounds:
-            st.info(f"📝 {r.date_played.strftime('%Y-%m-%d')} - {r.course_name} (ID: {r.round_id})")
+            st.info(f"📝 {r['date_played']} - {r['course_name']} (ID: {r['round_id']})")
     
-    # ラウンド選択オプションの作成（すべてのラウンド）
+    # ラウンド選択オプションの作成
     round_options = [
-        f"{rnd.date_played.strftime('%Y-%m-%d')} - {rnd.course_name} (ID: {rnd.round_id})"
-        for rnd in all_rounds
+        f"{r['date_played']} - {r['course_name']} (ID: {r['round_id']})"
+        for r in all_rounds
     ]
     
     # 未確定ラウンドがある場合、最新の未確定ラウンドを初期選択に設定
     default_index = 0
     if unfinalized_rounds:
         default_round = unfinalized_rounds[0]
-        default_str = f"{default_round.date_played.strftime('%Y-%m-%d')} - {default_round.course_name} (ID: {default_round.round_id})"
+        default_str = f"{default_round['date_played']} - {default_round['course_name']} (ID: {default_round['round_id']})"
         default_index = round_options.index(default_str)
     
     selected_round_str = st.selectbox(
@@ -511,84 +503,83 @@ def run():
         # 選択されたラウンドIDを抽出
         round_id = int(selected_round_str.split("ID: ")[1].rstrip(")"))
         
-        active_round = (
-            session.query(Round)
-            .filter_by(round_id=round_id)
-            .first()
-        )
+        # ラウンド情報を取得
+        round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
+        active_round = round_result.data[0] if round_result.data else None
         
         if not active_round:
             st.warning("選択されたラウンドが見つかりません。")
-            session.close()
             return
-        
-        # 表示用日付を取得（Noneの場合は「未設定」と表示）
-        play_date = get_play_date(active_round)
-        play_date_str = play_date.strftime('%Y-%m-%d') if play_date else "未設定"
-        st.write(f"**Round ID**: {active_round.round_id}, **Course**: {active_round.course_name}, **Date**: {play_date_str}")
-        
+
         # スコアデータの取得
-        score_rows = (
-            session.query(Score)
-            .join(Member, Score.member_id == Member.member_id)
-            .options(joinedload(Score.member))
-            .filter(Score.round_id == active_round.round_id)
-            .all()
-        )
-        if not score_rows:
-            st.warning("No participants found for this round.")
-            session.close()
+        scores_result = supabase.table('score').select(
+            '*, member(name)'
+        ).eq('round_id', round_id).execute()
+        scores = scores_result.data
+
+        # ハンディキャップデータの取得
+        handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
+        handicaps_data = handicaps_result.data
+
+        if not scores:
+            st.warning("スコアデータが見つかりません。")
             return
 
-        # ハンディキャップデータの取得と設定
-        handicap_matches = session.query(HandicapMatch).filter_by(round_id=active_round.round_id).all()
-        handicaps = {}
-        total_only_pairs = []
-        for match in handicap_matches:
-            p1 = match.player_1_id
-            p2 = match.player_2_id
-            handicaps[(p1, p2)] = match.player_1_to_2
-            handicaps[(p2, p1)] = match.player_2_to_1
-            if match.total_only:
-                total_only_pairs.append((p1, p2))
-        total_only_set = {frozenset(pair) for pair in total_only_pairs}
-
-        # DBから全Memberを取得して辞書を作成
-        member_dict = {m.member_id: m.name for m in session.query(Member).all()}
-
+        # プレーヤーデータの準備
         player_data = {}
-        for sc in score_rows:
-            mid = sc.member_id
-            fscore = sc.front_score or 0
-            bscore = sc.back_score or 0
-            escore = sc.extra_score or 0
-            fgp = sc.front_game_pt or 0
-            bgp = sc.back_game_pt or 0
-            egp = sc.extra_game_pt or 0
-            player_data[mid] = {
-                "Player": sc.member.name,
-                "Front Score": fscore,
-                "Back Score": bscore,
-                "Extra Score": escore,
-                "Total Score": fscore + bscore,
-                "Front GP": fgp,
-                "Back GP": bgp,
-                "Extra GP": egp,
+        for sc in scores:
+            player_data[sc['member_id']] = {
+                "Player": sc['member']['name'],
+                "Front Score": sc['front_score'],
+                "Back Score": sc['back_score'],
+                "Extra Score": sc['extra_score'],
+                "Total Score": sc['front_score'] + sc['back_score'],
+                "Front GP": sc.get('front_game_pt', 0),
+                "Back GP": sc.get('back_game_pt', 0),
+                "Extra GP": sc.get('extra_game_pt', 0),
                 "Game Pt": 0,
                 "Match Front": 0,
                 "Match Back": 0,
                 "Match Total": 0,
                 "Match Extra": 0,
-                "Match Pt": 0,
-                "Putt Front": sc.front_putt or 0,
-                "Putt Back": sc.back_putt or 0,
-                "Put Pt": 0,
-                "Total Pt": 0
+                "Match Pt": sc.get('match_pt', 0),
+                "Putt Front": sc['front_putt'] or 0,
+                "Putt Back": sc['back_putt'] or 0,
+                "Put Pt": sc.get('put_pt', 0),
+                "Total Pt": sc.get('total_pt', 0)
             }
+
         player_ids = list(player_data.keys())
         n_players = len(player_ids)
 
-        # Game Ptの計算部分を修正
+        # ハンディキャップの準備（リストから辞書に変換）
+        handicaps = {}
+        total_only_set = set()
+        for h in handicaps_data:
+            handicaps[(h['player_1_id'], h['player_2_id'])] = h['player_1_to_2']
+            handicaps[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
+            if h['total_only']:
+                total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
+
+        # Putts (Front/Back/Extra) のデータ収集
+        front_putt = {mid: player_data[mid]["Putt Front"] for mid in player_data}
+        back_putt = {mid: player_data[mid]["Putt Back"] for mid in player_data}
+        extra_putt = {mid: player_data[mid].get("Putt Extra", 0) for mid in player_data} if active_round['has_extra'] else None
+
+        # Front, Back, Extraそれぞれのパットポイントを計算
+        putt_front_points = calc_putt_points(front_putt, n_players)
+        putt_back_points = calc_putt_points(back_putt, n_players)
+        putt_extra_points = calc_putt_points(extra_putt, n_players) if extra_putt else {mid: 0 for mid in player_data}
+
+        # 各プレイヤーのパットポイント合計を計算
+        for mid in player_data:
+            data = player_data[mid]
+            pf = putt_front_points.get(mid, 0)
+            pb = putt_back_points.get(mid, 0)
+            pe = putt_extra_points.get(mid, 0)
+            data["Put Pt"] = pf + pb + pe
+
+        # Game Ptの計算
         # まず、各プレイヤーのGame Ptを算出（Front GP + Back GP + Extra GP）
         for mid in player_data:
             fgp = player_data[mid]["Front GP"]
@@ -605,6 +596,7 @@ def run():
                 others_total = sum(original_game_pts[oid] for oid in original_game_pts if oid != mid)
                 player_data[mid]["Game Pt"] = my_total * 2 - others_total
 
+        # マッチポイントの計算
         for i in range(len(player_ids)):
             for j in range(i+1, len(player_ids)):
                 pid_i = player_ids[i]
@@ -621,436 +613,178 @@ def run():
                     elif net_total_i > net_total_j:
                         data_i["Match Total"] -= 10
                         data_j["Match Total"] += 10
-                    if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
-                        net_extra_i = calc_net_extra(data_i, handicaps.get((pid_j, pid_i), 0))
-                        net_extra_j = calc_net_extra(data_j, handicaps.get((pid_i, pid_j), 0))
-                        if net_extra_i < net_extra_j:
-                            data_i["Match Extra"] += 10
-                            data_j["Match Extra"] -= 10
-                        elif net_extra_i > net_extra_j:
-                            data_i["Match Extra"] -= 10
-                            data_j["Match Extra"] += 10
                 else:
-                    net_front_i = calc_net_score(data_i, "Front Score", handicaps.get((pid_j, pid_i), 0))
-                    net_front_j = calc_net_score(data_j, "Front Score", handicaps.get((pid_i, pid_j), 0))
-                    if net_front_i < net_front_j:
-                        data_i["Match Front"] += 10
-                        data_j["Match Front"] -= 10
-                    elif net_front_i > net_front_j:
-                        data_i["Match Front"] -= 10
-                        data_j["Match Front"] += 10
-                    if safe_get_score(data_i, "Back Score") > 0 and safe_get_score(data_j, "Back Score") > 0:
-                        net_back_i = calc_net_score(data_i, "Back Score", handicaps.get((pid_j, pid_i), 0))
-                        net_back_j = calc_net_score(data_j, "Back Score", handicaps.get((pid_i, pid_j), 0))
-                        if net_back_i < net_back_j:
-                            data_i["Match Back"] += 10
-                            data_j["Match Back"] -= 10
-                        elif net_back_i > net_back_j:
-                            data_i["Match Back"] -= 10
-                            data_j["Match Back"] += 10
-                        net_total_i = calc_net_total(data_i, handicaps.get((pid_j, pid_i), 0), multiplier=2)
-                        net_total_j = calc_net_total(data_j, handicaps.get((pid_i, pid_j), 0), multiplier=2)
-                        if net_total_i < net_total_j:
-                            data_i["Match Total"] += 10
-                            data_j["Match Total"] -= 10
-                        elif net_total_i > net_total_j:
-                            data_i["Match Total"] -= 10
-                            data_j["Match Total"] += 10
-                    if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
-                        net_extra_i = calc_net_extra(data_i, handicaps.get((pid_j, pid_i), 0))
-                        net_extra_j = calc_net_extra(data_j, handicaps.get((pid_i, pid_j), 0))
-                        if net_extra_i < net_extra_j:
-                            data_i["Match Extra"] += 10
-                            data_j["Match Extra"] -= 10
-                        elif net_extra_i > net_extra_j:
-                            data_i["Match Extra"] -= 10
-                            data_j["Match Extra"] += 10
-        for mid in player_data:
-            data = player_data[mid]
-            data["Match Pt"] = data["Match Front"] + data["Match Back"] + data["Match Total"] + data["Match Extra"]
-        # パットポイントの計算部分を修正
-        front_putt = {mid: player_data[mid]["Putt Front"] for mid in player_data}
-        back_putt = {mid: player_data[mid]["Putt Back"] for mid in player_data}
-        extra_putt = {mid: safe_get_score(player_data[mid], "Putt Extra") 
-                      for mid in player_data 
-                      if safe_get_score(player_data[mid], "Extra Score") > 0}
+                    # Front
+                    points = calc_match_points_by_section(
+                        data_i, data_j,
+                        handicaps.get((pid_j, pid_i), 0),
+                        handicaps.get((pid_i, pid_j), 0),
+                        "Front"
+                    )
+                    data_i["Match Front"] += points
+                    data_j["Match Front"] -= points
 
-        # Front, Back, Extraそれぞれのパットポイントを計算
-        putt_front_points = calc_putt_points(front_putt, n_players)
-        putt_back_points = calc_putt_points(back_putt, n_players)
-        putt_extra_points = calc_putt_points(extra_putt, n_players) if extra_putt else {mid: 0 for mid in player_data}
+                    # Back
+                    points = calc_match_points_by_section(
+                        data_i, data_j,
+                        handicaps.get((pid_j, pid_i), 0),
+                        handicaps.get((pid_i, pid_j), 0),
+                        "Back"
+                    )
+                    data_i["Match Back"] += points
+                    data_j["Match Back"] -= points
 
-        # 各プレイヤーのパットポイント合計を計算
-        for mid in player_data:
-            data = player_data[mid]
-            pf = putt_front_points.get(mid, 0)
-            pb = putt_back_points.get(mid, 0)
-            pe = putt_extra_points.get(mid, 0)
-            data["Put Pt"] = pf + pb + pe  # Front + Back + Extra の合計
+                    # Total
+                    points = calc_match_points_by_section(
+                        data_i, data_j,
+                        handicaps.get((pid_j, pid_i), 0),
+                        handicaps.get((pid_i, pid_j), 0),
+                        "Total",
+                        multiplier=2
+                    )
+                    data_i["Match Total"] += points
+                    data_j["Match Total"] -= points
 
+                    # Extra (if exists)
+                    if active_round['has_extra']:
+                        points = calc_match_points_by_section(
+                            data_i, data_j,
+                            handicaps.get((pid_j, pid_i), 0),
+                            handicaps.get((pid_i, pid_j), 0),
+                            "Extra"
+                        )
+                        data_i["Match Extra"] += points
+                        data_j["Match Extra"] -= points
+
+        # 最終的なマッチポイントとトータルポイントの計算
         for mid in player_data:
             d = player_data[mid]
-            total_pt = d["Game Pt"] + d["Match Pt"] + d["Put Pt"]
-            d["Total Pt"] = total_pt
-        result_data = []
-        for mid, d in player_data.items():
-            result_data.append({
-                "Player": d["Player"],
-                "Front Score": d["Front Score"],
-                "Back Score": d["Back Score"],
-                "Total Score": d["Front Score"] + d["Back Score"],  # Total Scoreを追加
-                "Extra Score": d["Extra Score"],
-                "Front GP": d["Front GP"],
-                "Back GP": d["Back GP"],
-                "Extra GP": d["Extra GP"],
-                "Game Pt": d["Game Pt"],
-                "Match Front": d["Match Front"],
-                "Match Back": d["Match Back"],
-                "Match Total": d["Match Total"],
-                "Match Extra": d["Match Extra"],
-                "Match Pt": d["Match Pt"],
-                "Put Pt": d["Put Pt"],
-                "Total Pt": d["Total Pt"],
-            })
-        final_df = pd.DataFrame(result_data)
-        st.write("### 最終結果（Game Pt + Match Pt + Put Pt ＝ Total Pt）")
-        st.markdown("""
-            <style>
-                /* モバイル対応のスタイル */
-                @media (max-width: 768px) {
-                    .dataframe-container {
-                        position: relative;
-                        width: 100%;
-                        overflow-x: auto;
-                        -webkit-overflow-scrolling: touch; /* スムーズスクロール */
-                    }
-                    
-                    .dataframe {
-                        white-space: nowrap;
-                        font-size: 14px;
-                    }
-                    
-                    /* 左端の列を固定 */
-                    .dataframe thead th:first-child,
-                    .dataframe tbody td:first-child {
-                        position: sticky !important;
-                        left: 0;
-                        background-color: #f8f9fa;
-                        z-index: 1;
-                        box-shadow: 2px 0 5px -2px rgba(0,0,0,0.15);
-                    }
-                    
-                    /* ヘッダーを固定 */
-                    .dataframe thead th {
-                        position: sticky !important;
-                        top: 0;
-                        background-color: #f8f9fa;
-                        z-index: 1;
-                    }
-                    
-                    /* 左上のセルは最前面に */
-                    .dataframe thead th:first-child {
-                        z-index: 2;
-                    }
-                    
-                    /* セルのパディングを調整 */
-                    .dataframe th,
-                    .dataframe td {
-                        padding: 8px;
-                        min-width: 60px;
-                    }
-                }
+            d["Match Pt"] = (
+                d["Match Front"] + 
+                d["Match Back"] + 
+                d["Match Total"] +
+                d["Match Extra"]
+            )
+            d["Total Pt"] = d["Game Pt"] + d["Match Pt"] + d["Put Pt"]
 
-                /* PC向けのスタイルは既存のまま維持 */
-                @media (min-width: 769px) {
-                    /* 既存のPC用スタイル */
-                }
-            </style>
-        """, unsafe_allow_html=True)
-        st.markdown("""
-            <style>
-                /* ダークモード対応のスタイル */
-                @media (prefers-color-scheme: dark) {
-                    .dataframe {
-                        color: #ffffff !important;
-                        background-color: #1e1e1e !important;
-                    }
-                    
-                    .dataframe thead th,
-                    .dataframe tbody td {
-                        background-color: #1e1e1e !important;
-                        color: #ffffff !重要;
-                        border-color: #404040 !重要;
-                    }
-                    
-                    /* 固定列の背景色 */
-                    .dataframe thead th:first-child,
-                    .dataframe tbody td:first-child {
-                        background-color: #2d2d2d !重要;
-                        box-shadow: 2px 0 5px -2px rgba(0,0,0,0.5);
-                    }
-                    
-                    /* ヘッダーの背景色 */
-                    .dataframe thead th {
-                        background-color: #2d2d2d !重要;
-                        border-bottom: 2px solid #404040 !重要;
-                    }
-                }
+        # 表示用のDataFrameを作成
+        df_columns = [
+            "Player",
+            "Front Score", "Back Score", "Total Score"
+        ]
+        
+        if active_round['has_extra']:
+            df_columns.append("Extra Score")
 
-                /* モバイル対応のスタイル */
-                @media (max-width: 768px) {
-                    .dataframe-container {
-                        position: relative;
-                        width: 100%;
-                        overflow-x: auto;
-                        -webkit-overflow-scrolling: touch;
-                    }
-                    
-                    .dataframe {
-                        white-space: nowrap;
-                        font-size: 14px;
-                    }
-                    
-                    /* 固定列とヘッダーのスタイル */
-                    .dataframe thead th:first-child,
-                    .dataframe tbody td:first-child {
-                        position: sticky !重要;
-                        left: 0 !重要;
-                        z-index: 1;
-                    }
-                    
-                    .dataframe thead th {
-                        position: sticky !重要;
-                        top: 0;
-                        z-index: 1;
-                    }
-                    
-                    .dataframe thead th:first-child {
-                        z-index: 2;
-                    }
-                    
-                    .dataframe th,
-                    .dataframe td {
-                        padding: 8px;
-                        min-width: 60px;
-                    }
-                }
-            </style>
-        """, unsafe_allow_html=True)
-        st.markdown(
-            f"""
-            <div class="dataframe-container">
-                {final_df.to_html(classes='dataframe', index=False)}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        st.markdown("""
-            <style>
-                /* カラム名とヘッダーを太字に */
-                .dataframe thead th {
-                    font-weight: bold !important;
-                    color: #ffffff !important;
-                    background-color: #2d2d2d !important;
-                }
+        df_columns.extend([
+            "Front GP", "Back GP"
+        ])
+        
+        if active_round['has_extra']:
+            df_columns.append("Extra GP")
+        
+        df_columns.extend([
+            "Game Pt",
+            "Match Front", "Match Back", "Match Total"
+        ])
+        
+        if active_round['has_extra']:
+            df_columns.append("Match Extra")
+        
+        df_columns.extend([
+            "Match Pt",
+            "Putt Front", "Putt Back"
+        ])
+        
+        if active_round['has_extra']:
+            df_columns.append("Putt Extra")
+        
+        df_columns.extend([
+            "Put Pt",
+            "Total Pt"
+        ])
 
-                /* 左端の項目名（Player）を太字に */
-                .dataframe tbody td:first-child {
-                    font-weight: bold !important;
-                }
+        # プレイヤーデータにPutt Extraがなければ追加
+        if active_round['has_extra']:
+            for mid in player_data:
+                if "Putt Extra" not in player_data[mid]:
+                    player_data[mid]["Putt Extra"] = player_data[mid].get("extra_putt", 0)
 
-                /* ダークモード対応のスタイル */
-                @media (prefers-color-scheme: dark) {
-                    .dataframe {
-                        color: #ffffff !important;
-                        background-color: #1e1e1e !important;
-                    }
-                    
-                    .dataframe thead th {
-                        background-color: #2d2d2d !important;
-                        border-bottom: 2px solid #404040 !important;
-                    }
-                    
-                    .dataframe tbody td:first-child {
-                        background-color: #2d2d2d !important;
-                    }
-                }
+        df = pd.DataFrame([
+            {col: data.get(col, 0) for col in df_columns}  # dataにキーがない場合は0をデフォルト値とする
+            for data in player_data.values()
+        ])
 
-                /* その他の既存のスタイルは維持 */
-                .match-matrix thead th,
-                .match-matrix tbody td:first-child,
-                .match-details thead th,
-                .match-details tbody td:first-child {
-                    font-weight: bold !important;
-                }
-            </style>
-        """, unsafe_allow_html=True)
-        st.write("### マッチ戦詳細結果")
-        detailed_df = create_detailed_match_results(player_data, handicaps, total_only_set)
-        st.markdown("""
-            <style>
-                .match-details-container {
-                    width: 100%;
-                    overflow-x: auto !重要;
-                    position: relative !重要;
-                }
-                .match-details {
-                    margin: 0 !重要;
-                }
-                .match-details th:first-child,
-                .match-details td:first-child {
-                    position: sticky !重要;
-                    left: 0 !重要;
-                    background-color: white !重要;
-                    z-index: 2 !重要;
-                    box-shadow: 2px 0 5px -2px rgba(0,0,0,0.2) !重要;
-                    border-right: 2px solid #ccc !重要;
-                }
-            </style>
-        """, unsafe_allow_html=True)
+        # 結果の表示
+        st.write("### スコア詳細")
+        st.dataframe(df.style.format({
+            col: '{:+d}' if col.endswith((' Pt', 'Front', 'Back', 'Total', 'Extra')) 
+                    and col not in ['Front Score', 'Back Score', 'Total Score', 'Extra Score',
+                                'Putt Front', 'Putt Back', 'Putt Extra']
+                    else '{:d}' 
+            for col in df.columns
+            if col != 'Player'
+        }))
 
-        # detailed_df をフラットなカラム名に変換してから表示
-        detailed_df_flat = detailed_df.copy()
-        # 例: "Player vs Player (handicap_ij vs handicap_ji)" の形式に変換
-        detailed_df_flat.columns = [f"{m}\n({h})" for m, h in detailed_df_flat.columns]
+        # マッチ対戦表の作成と表示
+        st.write("### マッチ対戦表")
+        match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
+        st.dataframe(match_matrix.style.format(None))
 
-        st.markdown(
-            f"""
-            <div class="match-details-container">
-                {detailed_df_flat.style.map(color_points).to_html(classes='match-details', index=True)}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        star_df = create_match_matrix(player_data, handicaps, total_only_set)
-        st.write("### 対戦結果（Match Pt 集計）")
-        st.markdown("""
-            <style>
-                /* 対戦結果テーブルのスタイル */
-                .match-matrix-container {
-                    width: 100%;
-                    overflow-x: auto !important;
-                    position: relative !important;
-                }
-                .match-matrix {
-                    margin: 0 !important;
-                    font-size: 14px !important;
-                }
-                .match-matrix th:first-child,
-                .match-matrix td:first-child {
-                    position: sticky !important;
-                    left: 0 !important;
-                    background-color: white !important;
-                    z-index: 2 !important;
-                    box-shadow: 2px 0 5px -2px rgba(0,0,0,0.2) !important;
-                    border-right: 2px solid #ccc !important;
-                }
-                
-                /* ダークモード対応 */
-                @media (prefers-color-scheme: dark) {
-                    .match-matrix th:first-child,
-                    .match-matrix td:first-child {
-                        background-color: #2d2d2d !important;
-                    }
-                    .match-matrix {
-                        color: #ffffff !important;
-                        background-color: #1e1e1e !important;
-                    }
-                }
-            </style>
-        """, unsafe_allow_html=True)
-
-        # star_dfの表示部分を修正
-        st.markdown(
-            f"""
-            <div class="match-matrix-container">
-                {star_df.style.map(color_points).to_html(classes='match-matrix', index=True)}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        pdf_buffer = generate_pdf(final_df, detailed_df, star_df, active_round)
-        st.download_button(
-            label="Download PDF of Results",
-            data=pdf_buffer,
-            file_name=get_pdf_filename(active_round),  # ここを変更
-            mime="application/pdf"
+        # 詳細なマッチ結果の表示
+        st.write("### 詳細なマッチ結果")
+        match_results = create_detailed_match_results(player_data, handicaps, total_only_set)
+        st.dataframe(
+            match_results.style.apply(highlight_total_only, axis=1)
+                           .map(color_points)  # applymap から map に変更
+                           .format(None)
         )
 
-        # ★ DB に計算結果を保存する処理 ★
-        for sc in score_rows:
-            mid = sc.member_id
-            if mid in player_data:
-                sc.match_front = player_data[mid]["Match Front"]
-                sc.match_back = player_data[mid]["Match Back"]
-                sc.match_total = player_data[mid]["Match Total"]
-                sc.match_extra = player_data[mid]["Match Extra"]
-                sc.match_pt = player_data[mid]["Match Pt"]
-                sc.put_pt = player_data[mid]["Put Pt"]
-                sc.total_pt = player_data[mid]["Total Pt"]
-        session.commit()
-        session.expire_all()  # キャッシュをクリアして再取得できるようにする
+        # ラウンドの確定ボタン
+        if not active_round['finalized']:
+            if st.button("このラウンドを確定する"):
+                try:
+                    # スコアの更新
+                    for mid, data in player_data.items():
+                        score_update = {
+                            'match_pt': data['Match Pt'],
+                            'put_pt': data['Put Pt'],
+                            'total_pt': data['Total Pt']
+                        }
+                        supabase.table('score').update(score_update).eq('round_id', round_id).eq('member_id', mid).execute()
+                    
+                    # ラウンドを確定済みに更新
+                    supabase.table('rounds').update({'finalized': True}).eq('round_id', round_id).execute()
+                    
+                    st.success("ラウンドを確定しました")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"ラウンドの確定中にエラーが発生しました: {str(e)}")
 
-        # ★ ラウンド設定およびハンディキャップ設定変更用フォーム ★
-        if not active_round.finalized:
-            with st.form("round_update_form"):
-                st.header("ラウンド設定・ハンディキャップ設定の変更")
-                new_course_name = st.text_input("コース名", value=active_round.course_name)
-                new_date_played = st.date_input("プレイ日", value=active_round.date_played)
-                st.subheader("【ハンディキャップ設定の変更】")
-                updated_handicap = {}
-                # 重複する対戦を除外するためのセットを用意
-                processed_matches = set()
-                # 各ハンディキャップ設定の変更項目を表示
-                for match in handicap_matches:
-                    key = frozenset({match.player_1_id, match.player_2_id})
-                    if key in processed_matches:
-                        continue
-                    processed_matches.add(key)
-                    # Player名を取得（存在しない場合はIDを文字列で表示）
-                    p1_name = member_dict.get(match.player_1_id, str(match.player_1_id))
-                    p2_name = member_dict.get(match.player_2_id, str(match.player_2_id))
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.markdown(f"**対戦:** {p1_name} vs {p2_name}")
-                        new_p1 = st.number_input(f"{p1_name}→{p2_name}", 
-                                                   min_value=-100, max_value=100, step=1, 
-                                                   value=match.player_1_to_2, key=f"p1_{match.id}")
-                    with col2:
-                        new_p2 = st.number_input(f"{p2_name}→{p1_name}", 
-                                                   min_value=-100, max_value=100, step=1, 
-                                                   value=match.player_2_to_1, key=f"p2_{match.id}")
-                    with col3:
-                        new_total_only = st.checkbox("Total Only", value=match.total_only, key=f"tot_{match.id}")
-                    updated_handicap[match.id] = {
-                        "player_1_to_2": new_p1,
-                        "player_2_to_1": new_p2,
-                        "total_only": new_total_only
-                    }
-                update_submit = st.form_submit_button("設定を更新する")
-                if update_submit:
-                    # ラウンド設定更新
-                    active_round.course_name = new_course_name
-                    active_round.date_played = new_date_played
-                    active_round.date = new_date_played  # dateも同様に更新（必要に応じて）
-                    # 各ハンディキャップ設定の更新
-                    for match in handicap_matches:
-                        updated = updated_handicap.get(match.id)
-                        if updated:
-                            match.player_1_to_2 = updated["player_1_to_2"]
-                            match.player_2_to_1 = updated["player_2_to_1"]
-                            match.total_only = updated["total_only"]
-                    session.commit()
-                    st.success("ラウンド設定とハンディキャップ設定が更新されました.")
-
-            # ★ Finalize ボタンはフォームの外で表示する ★
-            if st.button("Finalize Results"):
-                active_round.finalized = True
-                session.commit()
-                st.success("Results have been finalized.")
-                st.rerun()
+def calc_match_points_by_section(player_i, player_j, handicap_ij, handicap_ji, section, multiplier=1):
+    """セクション（Front/Back/Total/Extra）ごとのマッチポイントを計算"""
+    if section == "Front":
+        score_i = player_i["Front Score"] - handicap_ij//2
+        score_j = player_j["Front Score"] - handicap_ji//2
+    elif section == "Back":
+        score_i = player_i["Back Score"] - (handicap_ij - handicap_ij//2)
+        score_j = player_j["Back Score"] - (handicap_ji - handicap_ji//2)
+    elif section == "Total":
+        score_i = player_i["Total Score"] - handicap_ij
+        score_j = player_j["Total Score"] - handicap_ji
+    else:  # Extra
+        score_i = player_i["Extra Score"] - handicap_ij
+        score_j = player_j["Extra Score"] - handicap_ji
     
-    session.close()
+    if score_i < score_j:
+        return 5 * multiplier
+    elif score_i > score_j:
+        return -5 * multiplier
+    return 0
+
+def calc_net_total(player, handicap, multiplier=1):
+    """ネットトータルスコアを計算"""
+    return (player["Total Score"] - handicap) * multiplier
 
 if __name__ == "__main__":
     run()

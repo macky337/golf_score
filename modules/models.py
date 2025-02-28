@@ -2,6 +2,11 @@ import datetime
 from sqlalchemy import Column, Integer, Float, String, ForeignKey, Date, Boolean, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from supabase import create_client
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 Base = declarative_base()
 
@@ -63,6 +68,52 @@ class HandicapMatch(Base):
     # リレーションシップを追加
     player_1 = relationship("Member", foreign_keys=[player_1_id])
     player_2 = relationship("Member", foreign_keys=[player_2_id])
+
+def get_course_list():
+    """コース一覧を取得"""
+    try:
+        supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
+        response = supabase.table('courses').select('*').order('name').execute()
+        return response.data
+    except Exception as e:
+        print(f"Error fetching courses: {e}")
+        return []
+
+def create_course(name):
+    """新しいコースを作成"""
+    try:
+        supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
+        response = supabase.table('courses').insert({'name': name}).execute()
+        return response.data[0] if response.data else None
+    except Exception as e:
+        print(f"Error creating course: {e}")
+        return None
+
+def get_or_create_course(name):
+    """コースを取得、存在しない場合は新規作成"""
+    try:
+        supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
+        
+        # 既存のコースを検索
+        response = supabase.table('courses').select('*').eq('name', name).execute()
+        
+        if response.data:
+            return response.data[0]
+        
+        # 存在しない場合は新規作成（created_atは自動設定されるため省略）
+        response = supabase.table('courses').insert({'name': name}).execute()
+        
+        if not response.data:
+            print("Failed to create course. No data returned.")
+            return None
+            
+        return response.data[0]
+            
+    except Exception as e:
+        print(f"Error in get_or_create_course: {str(e)}")
+        if hasattr(e, 'details'):
+            print(f"Error details: {e.details}")
+        return None
 
 # 例: 新規ラウンド登録時（デバッグ用のサンプルコード）
 if __name__ == "__main__":

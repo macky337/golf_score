@@ -1,9 +1,23 @@
-# pages/03_front_score_input.py
-
 import streamlit as st
-from modules.db import SessionLocal
-from modules.models import Round, Score, Member
+from modules.db import supabase
 from streamlit_extras.switch_page_button import switch_page
+
+def calculate_game_pt(player_pt, other_pts):
+    """ゲームポイントを計算する
+    
+    3人プレーの場合：自分のポイント×2 - 他のプレイヤーの合計
+    4人プレーの場合：そのままのポイント
+    
+    Args:
+        player_pt (int): 自分のポイント
+        other_pts (list): 他のプレイヤーのポイントリスト
+    
+    Returns:
+        int: 計算されたゲームポイント
+    """
+    if len(other_pts) == 2:  # 3人プレー
+        return player_pt * 2 - sum(other_pts)
+    return player_pt  # 4人プレー
 
 def run():
     col1, col2 = st.columns([0.8, 0.2])
@@ -12,78 +26,114 @@ def run():
     with col2:
         if st.button("🏠 Home"):
             switch_page("Main")
-
-    session = SessionLocal()
     
-    # 1) 未確定( finalized=False )のラウンドを取得
-    active_round = session.query(Round).filter_by(finalized=False).order_by(Round.round_id.desc()).first()
-    if not active_round:
-        st.warning("No active round found. Please set up a round first.")
-        session.close()
+    # 未確定のラウンドを取得
+    rounds_result = supabase.table('rounds').select('*').eq('finalized', False).order('date_played', desc=True).execute()
+    unfinalized_rounds = rounds_result.data
+
+    if not unfinalized_rounds:
+        st.warning("未確定のラウンドがありません。新しいラウンドを設定してください。")
+        if st.button("ラウンド設定へ"):
+            switch_page("02_ラウンド設定")
         return
 
-    st.write(f"**Round ID**: {active_round.round_id}, **Course**: {active_round.course_name}")
-
-    # 2) 該当ラウンドの scores を JOIN してメンバー情報と一緒に取得
-    score_rows = (
-        session.query(Score)
-        .join(Member, Score.member_id == Member.member_id)
-        .filter(Score.round_id == active_round.round_id)
-        .all()
+    # ラウンド選択
+    round_options = [
+        f"{r['date_played']} - {r['course_name']} (ID: {r['round_id']})"
+        for r in unfinalized_rounds
+    ]
+    
+    selected_round = st.selectbox(
+        "ラウンドを選択",
+        options=round_options,
+        index=0
     )
-
-    if not score_rows:
-        st.warning("No participants found for this round.")
-        session.close()
-        return
-
-    # 3) 入力フォーム: 各メンバーの前半スコア(front_score)、パット(front_putt)、ゲームポイント(front_game_pt)
-    updates = {}
-    for sc in score_rows:
-        st.subheader(f"Member: {sc.member.name}")
+    
+    if selected_round:
+        round_id = int(selected_round.split("ID: ")[1].rstrip(")"))
+        round_data = next((r for r in unfinalized_rounds if r['round_id'] == round_id), None)
         
-        # Front Score: 0～200 の範囲で整数
-        front_score_val = st.number_input(
-            f"Front Score ({sc.member.name})",
-            value=sc.front_score or 0,
-            min_value=0,
-            max_value=200,
-            step=1,
-            key=f"front_score_{sc.score_id}"
-        )
-        
-        # Front Putt: 0～50 の範囲で整数
-        front_putt_val = st.number_input(
-            f"Front Putt ({sc.member.name})",
-            value=sc.front_putt or 0,
-            min_value=0,
-            max_value=50,
-            step=1,
-            key=f"front_putt_{sc.score_id}"
-        )
-        
-        # Front Game Points: 小数やマイナスもOK、範囲制限なし
-        front_game_pt_val = st.number_input(
-            f"Front Game Points ({sc.member.name})",
-            value=float(sc.front_game_pt or 0.0),
-            step=0.1,          # 小数ステップ
-            format="%.1f",     # 小数点以下1桁表示など、必要に応じて調整
-            key=f"front_gamept_{sc.score_id}"
-        )
-        
-        updates[sc.score_id] = (front_score_val, front_putt_val, front_game_pt_val)
+        if round_data:
+            # スコアデータの取得
+            scores_result = supabase.table('score').select(
+                '*, member(name)'
+            ).eq('round_id', round_id).execute()
+            scores = scores_result.data
 
-    # 4) "Save Front Scores" ボタン
-    if st.button("Save Front Scores"):
-        for sc in score_rows:
-            fs, fp, fgp = updates[sc.score_id]
-            sc.front_score = int(fs)            # front_scoreは整数カラムに保存想定
-            sc.front_putt = int(fp)            # front_puttも整数カラム
-            sc.front_game_pt = float(fgp)      # game_pt は小数OKにする
-        session.commit()
-        st.success("Front 9 scores saved successfully!")
+            if not scores:
+                st.error("スコアデータが見つかりません")
+                return
 
-    session.close()
+            # スコア入力フォーム
+            with st.form("front_score_form"):
+                players_game_pts = {}  # プレイヤーごとのゲームポイントを保持
+                
+                # 最初のパスでゲームポイントを収集
+                for score in scores:
+                    player_name = score['member']['name']
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.number_input(
+                            f"{player_name} - Front Score",
+                            min_value=0,
+                            max_value=100,
+                            value=score['front_score'],
+                            key=f"front_{score['score_id']}"
+                        )
+                    
+                    with col2:
+                        st.number_input(
+                            f"{player_name} - Front Putt",
+                            min_value=0,
+                            max_value=50,
+                            value=score['front_putt'] or 0,
+                            key=f"putt_{score['score_id']}"
+                        )
+                    
+                    with col3:
+                        game_pt = st.number_input(
+                            f"{player_name} - Front Game Pt",
+                            value=score['front_game_pt'] or 0,
+                            key=f"game_{score['score_id']}"
+                        )
+                        players_game_pts[player_name] = game_pt
+                
+                # 3人プレーの場合、ゲームポイントを再計算
+                if len(scores) == 3:
+                    st.info("3人プレーの場合、ゲームポイントは自動計算されます（自分のポイント×2 - 他のプレイヤーの合計）")
+                    for score in scores:
+                        player_name = score['member']['name']
+                        other_pts = [pt for name, pt in players_game_pts.items() if name != player_name]
+                        calculated_pt = calculate_game_pt(players_game_pts[player_name], other_pts)
+                        # セッション状態を更新
+                        st.session_state[f"game_{score['score_id']}"] = calculated_pt
+                
+                submitted = st.form_submit_button("スコアを保存")
+                
+                if submitted:
+                    try:
+                        for score in scores:
+                            # 更新データの準備
+                            updated_data = {
+                                'front_score': st.session_state[f"front_{score['score_id']}"],
+                                'front_putt': st.session_state[f"putt_{score['score_id']}"],
+                                'front_game_pt': st.session_state[f"game_{score['score_id']}"]
+                            }
+                            
+                            # スコアの更新
+                            supabase.table('score').update(
+                                updated_data
+                            ).eq('score_id', score['score_id']).execute()
+                        
+                        st.success("フロントスコアを保存しました")
+                        
+                        # Backスコア入力ページへ移動するボタン
+                        if st.button("Backスコア入力へ"):
+                            switch_page("04_バックスコア入力")
+                            
+                    except Exception as e:
+                        st.error(f"スコアの保存中にエラーが発生しました: {str(e)}")
 
 if __name__ == "__main__":
     run()

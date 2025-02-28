@@ -1,87 +1,58 @@
-# pages/08_member_registration.py
-
 import streamlit as st
-from modules.db import SessionLocal
-from modules.models import Member, HandicapMatch, Score  # Score を追加
+import pandas as pd
+from modules.db import supabase
 from streamlit_extras.switch_page_button import switch_page
 
-def member_registration_page():
-    """メンバー登録ページ"""
-    # タイトルを削除（run関数で表示するため）
-    # st.title("メンバー登録ページ") を削除
-
-    # 入力フォーム
-    name_input = st.text_input("New Member Name", value="")
-
-    if st.button("Register"):
-        if name_input.strip() == "":
-            st.warning("Member name cannot be empty.")
-        else:
-            # DBに接続してINSERT
-            session = SessionLocal()
-            new_member = Member(name=name_input.strip())
-            session.add(new_member)
-            session.commit()
-            session.close()
-            st.success(f"New member '{name_input}' has been registered.")
-    
-    st.subheader("Current Member List")
-    show_member_list()
-
-# show_member_list 関数の修正例（メンバー削除時に関連する HandicapMatch レコードも削除）
-def show_member_list():
-    """登録済みメンバー一覧を表示する"""
-    session = SessionLocal()
-    members = session.query(Member).all()
-    session.close()
-
-    if not members:
-        st.info("No members registered.")
-    else:
-        for member in members:
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.write(member.name)
-            with col2:
-                if st.button("削除", key=f"delete_{member.member_id}"):
-                    session = SessionLocal()
-                    # 先に関連する Score レコードを削除する
-                    session.query(Score).filter(
-                        Score.member_id == member.member_id
-                    ).delete(synchronize_session=False)
-                    # 次に関連する HandicapMatch レコードを削除する
-                    session.query(HandicapMatch).filter(
-                        (HandicapMatch.player_1_id == member.member_id) | 
-                        (HandicapMatch.player_2_id == member.member_id)
-                    ).delete(synchronize_session=False)
-                    # 最後に Member レコードを削除する
-                    member_to_delete = session.query(Member).filter_by(member_id=member.member_id).first()
-                    if member_to_delete:
-                        session.delete(member_to_delete)
-                        # メンバー削除処理の修正例
-                        session.commit()
-                        st.success(f"Member '{member.name}' has been deleted.")
-                        session.close()
-                        # st.experimental_rerun() が存在しない場合は st.stop() で処理を終了
-                        if hasattr(st, "experimental_rerun"):
-                            st.experimental_rerun()
-                        else:
-                            st.stop()
-
-# Streamlitのマルチページ構成の場合、以下のように記述
-# ページとして表示されるためには、このファイルをpagesフォルダに置くだけでOK
 def run():
-    # タイトルとホームボタンを横に配置
     col1, col2 = st.columns([0.8, 0.2])
     with col1:
-        st.title("メンバー登録")  # 各ページに応じたタイトル
+        st.title("メンバー登録")
     with col2:
         if st.button("🏠 Home"):
             switch_page("Main")
-    
-    member_registration_page()
 
-# 通常、Streamlitのマルチページではファイル名先頭にN_をつけるだけで
-# stのPageが自動的に生成されるため、直接呼ぶには:
+    # 既存メンバーの表示
+    members_result = supabase.table('member').select('*').order('name').execute()
+    members = members_result.data
+
+    if members:
+        st.write("### 登録済みメンバー")
+        member_df = pd.DataFrame(
+            [(m['member_id'], m['name']) for m in members],
+            columns=["ID", "名前"]
+        )
+        st.dataframe(member_df)
+
+    # 新規メンバー追加フォーム
+    with st.form("add_member_form"):
+        st.write("### 新規メンバー追加")
+        new_name = st.text_input("名前")
+        if st.form_submit_button("追加"):
+            if new_name:
+                try:
+                    # 同じ名前のメンバーが既に存在するかチェック
+                    existing = supabase.table('member').select('*').eq('name', new_name).execute()
+                    if existing.data:
+                        st.error(f"メンバー「{new_name}」は既に登録されています")
+                    else:
+                        # 最大のmember_idを取得して、新しいIDを作成
+                        max_id_result = supabase.table('member').select('member_id').order('member_id', desc=True).limit(1).execute()
+                        next_id = 1
+                        if max_id_result.data:
+                            next_id = max_id_result.data[0]['member_id'] + 1
+                        
+                        # member_idを明示的に指定して挿入
+                        supabase.table('member').insert({
+                            'member_id': next_id,
+                            'name': new_name
+                        }).execute()
+                        
+                        st.success(f"メンバー「{new_name}」を追加しました (ID: {next_id})")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"メンバーの追加に失敗しました: {str(e)}")
+            else:
+                st.warning("名前を入力してください")
+
 if __name__ == "__main__":
-    run()  # member_registration_page() から run() に変更
+    run()

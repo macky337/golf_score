@@ -1,12 +1,16 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from modules.models import Base
+import os
+from dotenv import load_dotenv
+from supabase import create_client
 
-# 例として SQLite を使用。実際の環境に合わせて DATABASE_URL を変更してください。
-DATABASE_URL = "sqlite:///./golf_app.db"
+# 環境変数の読み込み
+load_dotenv()
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Supabaseの接続設定
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# テーブルが存在しない場合は作成
-Base.metadata.create_all(bind=engine)
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise ValueError("環境変数 SUPABASE_URL または SUPABASE_KEY が設定されていません")
+
+# Supabaseクライアントの作成
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
