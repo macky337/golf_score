@@ -220,6 +220,33 @@ def show_score_editor():
         round_id = int(selected_round.split("ID: ")[1].rstrip(")"))
         round_data = next((r for r in rounds if r['round_id'] == round_id), None)
         
+        # ラウンド削除機能
+        with st.expander("⚠️ ラウンドの削除"):
+            st.warning("このラウンドのデータをすべて削除します。この操作は取り消せません。")
+            
+            # 削除の確認チェックボックス
+            confirm_delete = st.checkbox("このラウンドを削除することを確認しました")
+            
+            if st.button("ラウンドを削除", disabled=not confirm_delete, type="primary"):
+                try:
+                    # 関連データの削除（順序が重要）
+                    # 1. ハンディキャップマッチデータの削除
+                    supabase.table('handicap_match').delete().eq('round_id', round_id).execute()
+                    
+                    # 2. スコアデータの削除
+                    supabase.table('score').delete().eq('round_id', round_id).execute()
+                    
+                    # 3. ラウンドデータの削除
+                    supabase.table('rounds').delete().eq('round_id', round_id).execute()
+                    
+                    st.success(f"ラウンドID: {round_id} を削除しました")
+                    st.rerun()  # 画面を再読み込み
+                    
+                except Exception as e:
+                    st.error(f"ラウンドの削除中にエラーが発生しました: {str(e)}")
+                    if hasattr(e, 'details'):
+                        st.error(f"エラーの詳細: {e.details}")
+        
         if round_data:
             # スコアデータの取得
             scores_result = supabase.table('score').select(
