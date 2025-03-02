@@ -342,3 +342,59 @@ def enter_debug_mode():
 
 def exit_debug_mode():
     st.session_state.debug_mode = False
+
+import streamlit as st
+from streamlit_extras.switch_page_button import switch_page
+from modules.debug import is_debug_mode, enter_debug_mode, exit_debug_mode
+import pandas as pd
+from modules.data_integrity import check_rounds_integrity, fix_missing_scores
+
+def run():
+    # ...existing code...
+    
+    # サイドバーにデバッグモード切替ボタンを追加
+    with st.sidebar:
+        st.write("---")
+        if is_debug_mode():
+            if st.button("🔍 デバッグモード終了"):
+                exit_debug_mode()
+                st.rerun()
+            st.info("デバッグモードが有効です")
+            
+            # デバッグモード時に追加の診断ツール表示
+            st.write("## 診断ツール")
+            if st.button("データ整合性チェック"):
+                with st.spinner("データ整合性をチェック中..."):
+                    issues, stats = check_rounds_integrity()
+                
+                st.write(f"**ラウンド数**: {stats['total_rounds']}")
+                st.write(f"**問題あり**: {stats['missing_scores'] + stats['incomplete_scores']}")
+                
+                if issues:
+                    st.error(f"{len(issues)}件の問題が見つかりました")
+                    issue_df = pd.DataFrame(issues)
+                    st.dataframe(issue_df)
+                    
+                    # 修復オプション表示
+                    if st.button("問題を修復する"):
+                        for issue in issues:
+                            round_id = issue["round_id"]
+                            with st.spinner(f"ラウンドID {round_id} を修復中..."):
+                                success, message = fix_missing_scores(round_id)
+                                if success:
+                                    st.success(f"ラウンドID {round_id}: {message}")
+                                else:
+                                    st.error(f"ラウンドID {round_id}: {message}")
+                else:
+                    st.success("問題は見つかりませんでした")
+        else:
+            # 特殊なキーコンビネーションなど非表示の方法でもOK
+            with st.expander("開発者オプション", expanded=False):
+                if st.button("🔧 デバッグモード開始"):
+                    enter_debug_mode()
+                    st.rerun()
+    
+    # ...existing code...
+
+if __name__ == "__main__":
+    run()
