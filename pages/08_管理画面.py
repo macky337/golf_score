@@ -464,8 +464,8 @@ def show_handicap_editor():
 def show_member_manager():
     st.subheader("メンバー管理")
     
-    # メンバーデータの取得
-    members_result = supabase.table('member').select('*').order('name').execute()
+    # メンバーデータの取得 (ID昇順)
+    members_result = supabase.table('member').select('*').order('member_id').execute()
     members = members_result.data
     
     if members:

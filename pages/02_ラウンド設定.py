@@ -2,7 +2,7 @@ import streamlit as st
 import datetime
 from modules.db import supabase
 from streamlit_extras.switch_page_button import switch_page
-from modules.models import get_course_list, get_or_create_course
+from modules.models import get_course_list, get_or_create_course, get_course_by_id, get_members_list
 
 def run():
     col1, col2 = st.columns([0.8, 0.2])
@@ -12,16 +12,15 @@ def run():
         if st.button("🏠 Home"):
             switch_page("Main")
 
-    # メンバー一覧の取得（ID順）
-    members_result = supabase.table('member').select('*').order('member_id').execute()
-    member_dict = {m['name']: m['member_id'] for m in members_result.data}
+    # メンバー一覧の取得（ID順） 
+    members = get_members_list()
+    member_dict = {m['name']: m['member_id'] for m in members}
     
     # 名前とIDのリストを用意
-    member_names = [m['name'] for m in members_result.data]
+    member_names = [m['name'] for m in members]
 
     # 過去のゴルフ場名を取得（coursesテーブルから）
     courses = get_course_list()
-    unique_courses = sorted([c['name'] for c in courses])
     
     # コース管理画面へのリンク（フォームの外に配置）
     col1, col2 = st.columns([0.85, 0.15])
@@ -38,17 +37,24 @@ def run():
     )
     
     # 2) ゴルフ場の選択
-    if not unique_courses:
+    if not courses:
         st.warning("登録済みのゴルフ場がありません。")
         st.info("コース管理画面でゴルフ場を登録してください。")
         if st.button("コース管理へ"):
             switch_page("コース管理")
         return
     
-    course_name = st.selectbox(
+    # コースのID, 名前のタプルを作成
+    course_options = [(c.get('id'), c.get('name')) for c in courses]
+    
+    selected_course = st.selectbox(
         "ゴルフ場を選択",
-        options=unique_courses
+        options=course_options,
+        format_func=lambda x: x[1]  # IDは表示せず、名前だけ表示
     )
+    
+    # 選択されたコースのIDと名前を取得
+    course_id, course_name = selected_course if selected_course else (None, None)
     
     # 3) 参加者の選択（ID昇順表示）
     st.write("### 参加者選択")
@@ -135,13 +141,7 @@ def run():
             st.error("少なくとも2人の参加者を選択してください。")
         else:
             try:
-                # コースの取得
-                course_name = course_name.strip()
-                course = get_or_create_course(course_name)
-                
-                if not course:
-                    st.error(f"ゴルフ場「{course_name}」の登録に失敗しました。")
-                    return
+                # コースを取得（すでに選択済み）
                 
                 # 最大のround_idを取得して、新しいIDを作成
                 max_id_result = supabase.table('rounds').select('round_id').order('round_id', desc=True).limit(1).execute()
@@ -154,7 +154,8 @@ def run():
                     'round_id': next_round_id,
                     'date_played': date_played.isoformat(),
                     'date': date_played.isoformat(),
-                    'course_name': course_name,
+                    'course_name': course_name,  # 後方互換性のために残す
+                    'course_id': course_id,      # 新しいリレーション用
                     'num_players': num_players,
                     'has_extra': False,
                     'finalized': False

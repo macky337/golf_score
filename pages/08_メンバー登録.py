@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from modules.db import supabase
 from streamlit_extras.switch_page_button import switch_page
+from modules.models import get_members_list
 
 def run():
     col1, col2 = st.columns([0.8, 0.2])
@@ -11,9 +12,8 @@ def run():
         if st.button("🏠 Home"):
             switch_page("Main")
 
-    # 既存メンバーの表示
-    members_result = supabase.table('member').select('*').order('name').execute()
-    members = members_result.data
+    # 既存メンバーの表示（ID昇順で取得するように変更）
+    members = get_members_list()
 
     if members:
         st.write("### 登録済みメンバー")
@@ -21,6 +21,8 @@ def run():
             [(m['member_id'], m['name']) for m in members],
             columns=["ID", "名前"]
         )
+        # データフレームをIDの昇順で表示することを明示
+        member_df = member_df.sort_values("ID", ascending=True)
         st.dataframe(member_df)
 
     # 新規メンバー追加フォーム

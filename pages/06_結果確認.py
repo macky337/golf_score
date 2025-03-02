@@ -11,6 +11,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from streamlit_extras.switch_page_button import switch_page
+from modules.debug import handle_error
 
 # 日本語対応フォントの登録（ipaexg.ttf が同一ディレクトリに存在する場合）
 FONT_NAME = "Helvetica"
@@ -613,7 +614,11 @@ def run():
             st.warning("選択されたラウンドが見つかりません。")
             return
         # スコアデータの取得（フォールバック機能付き）
-        scores = get_scores_with_fallback(round_id)
+        try:
+            scores = get_scores_with_fallback(round_id)
+        except Exception as e:
+            handle_error(e)
+            return  # エラー発生時は処理を中断
         
         # デバッグ情報を非表示に修正
         if st.session_state.get("debug_mode", False):  # デバッグモード時のみ表示

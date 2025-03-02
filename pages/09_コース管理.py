@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from modules.db import supabase
 from streamlit_extras.switch_page_button import switch_page
-from modules.models import get_course_list, create_course
+from modules.models import get_course_list, create_course, is_course_in_use, update_rounds_course_references
 
 def run():
     col1, col2 = st.columns([0.8, 0.2])
@@ -14,6 +14,12 @@ def run():
             
     # 既存コースの一覧を表示
     courses = get_course_list()
+    
+    # マイグレーションボタン（一度だけ実行）
+    if st.sidebar.button("ラウンドデータのコース参照を更新"):
+        with st.spinner("ラウンドデータを更新中..."):
+            count = update_rounds_course_references()
+            st.sidebar.success(f"{count}件のラウンドデータを更新しました")
     
     if courses:
         st.write("### 登録済みコース")
@@ -27,19 +33,23 @@ def run():
         
         if delete_course_id:
             course_id, course_name = delete_course_id
-            # 削除確認
-            if st.button(f"「{course_name}」を削除", type="primary", help="このコースを削除します"):
-                try:
-                    # コース削除処理
-                    result = supabase.table('courses').delete().eq('id', course_id).execute()
-                    if result.data:
-                        st.success(f"ゴルフ場「{course_name}」を削除しました")
-                        # 画面更新
-                        st.rerun()
-                    else:
-                        st.error("削除に失敗しました。別の画面で利用されている可能性があります。")
-                except Exception as e:
-                    st.error(f"削除中にエラーが発生しました: {str(e)}")
+            # コースが使用中か確認
+            if is_course_in_use(course_id):
+                st.warning(f"「{course_name}」はラウンドデータで使用されているため削除できません")
+            else:
+                # 削除確認
+                if st.button(f"「{course_name}」を削除", type="primary", help="このコースを削除します"):
+                    try:
+                        # コース削除処理
+                        result = supabase.table('courses').delete().eq('id', course_id).execute()
+                        if result.data:
+                            st.success(f"ゴルフ場「{course_name}」を削除しました")
+                            # 画面更新
+                            st.rerun()
+                        else:
+                            st.error("削除に失敗しました。別の画面で利用されている可能性があります。")
+                    except Exception as e:
+                        st.error(f"削除中にエラーが発生しました: {str(e)}")
         
         # コース一覧をテーブル表示
         course_df = pd.DataFrame(
