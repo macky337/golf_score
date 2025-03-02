@@ -614,14 +614,18 @@ def run():
             return
         # スコアデータの取得（フォールバック機能付き）
         scores = get_scores_with_fallback(round_id)
-        st.write(f"取得したスコア数: {len(scores)}")
+        
+        # デバッグ情報を非表示に修正
+        if st.session_state.get("debug_mode", False):  # デバッグモード時のみ表示
+            st.write(f"取得したスコア数: {len(scores)}")
+            if scores:
+                sample = scores[0]
+                st.write(f"サンプルデータ構造: {list(sample.keys())}")
+        
         if not scores:
             st.warning("スコアデータが見つかりません。")
             return
-        # デバッグ情報を表示
-        if scores:
-            sample = scores[0]
-            st.write(f"サンプルデータ構造: {list(sample.keys())}")
+            
         # ハンディキャップデータの取得
         handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
         handicaps_data = handicaps_result.data
@@ -815,8 +819,8 @@ def run():
         total_match_pts = sum(player_data[mid]["Match Pt"] for mid in player_ids)
         if abs(total_match_pts) > 0.01:  # 浮動小数点の計算誤差を考慮
             st.warning(f"警告: プレイヤー間のマッチポイント合計が0になっていません。合計: {total_match_pts}pt")
-        # デバッグ情報: 特定のラウンドのマッチポイント確認
-        if round_id == 16:  # 2025-02-15 - 千葉よみうり
+        # デバッグ情報: 特定のラウンドのマッチポイント確認を非表示に修正
+        if round_id == 16 and st.session_state.get("debug_mode", False):  # デバッグモード時のみ表示
             st.info("### マッチポイント確認 (ID: 16)")
             for mid, data in player_data.items():
                 player_name = data["Player"]

@@ -17,6 +17,31 @@ def run():
     
     if courses:
         st.write("### 登録済みコース")
+        
+        # 削除対象のコース選択用のセレクトボックス
+        delete_course_id = st.selectbox(
+            "削除するコースを選択",
+            options=[None] + [(c.get('id', ''), c.get('name', '')) for c in courses],
+            format_func=lambda x: "選択してください" if x is None else f"{x[1]} (ID: {x[0]})"
+        )
+        
+        if delete_course_id:
+            course_id, course_name = delete_course_id
+            # 削除確認
+            if st.button(f"「{course_name}」を削除", type="primary", help="このコースを削除します"):
+                try:
+                    # コース削除処理
+                    result = supabase.table('courses').delete().eq('id', course_id).execute()
+                    if result.data:
+                        st.success(f"ゴルフ場「{course_name}」を削除しました")
+                        # 画面更新
+                        st.rerun()
+                    else:
+                        st.error("削除に失敗しました。別の画面で利用されている可能性があります。")
+                except Exception as e:
+                    st.error(f"削除中にエラーが発生しました: {str(e)}")
+        
+        # コース一覧をテーブル表示
         course_df = pd.DataFrame(
             [(c.get('id', ''), c.get('name', '')) for c in courses],
             columns=["ID", "ゴルフ場名"]
