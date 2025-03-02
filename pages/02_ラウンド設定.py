@@ -1,9 +1,68 @@
 import streamlit as st
-from streamlit_extras.switch_page_button import switch_page
 import datetime
-import itertools
-from modules.db import SessionLocal
-from modules.models import Round, Member, Score, HandicapMatch
+from modules.db import supabase
+from streamlit_extras.switch_page_button import switch_page
+from modules.models import get_course_list, get_or_create_course, get_course_by_id, get_members_list
+
+def create_scores(round_id, selected_members, member_dict, retry=3):
+    """スコアレコードを作成し、エラーが発生した場合は再試行"""
+    try:
+        # 最大のスコアIDを取得
+        max_score_id_result = supabase.table('score').select('score_id').order('score_id', desc=True).limit(1).execute()
+        next_score_id = 1
+        if max_score_id_result.data:
+            next_score_id = max_score_id_result.data[0]['score_id'] + 1
+
+        success_count = 0
+        failed_members = []
+        
+        for member_name in selected_members:
+            member_id = member_dict[member_name]
+            success = False
+            
+            # 複数回試行
+            for attempt in range(retry):
+                try:
+                    score_data = {
+                        'score_id': next_score_id,
+                        'round_id': round_id,
+                        'member_id': member_id,
+                        'front_score': 0,
+                        'back_score': 0,
+                        'extra_score': 0,
+                        'front_putt': 0,
+                        'back_putt': 0,
+                        'extra_putt': 0,
+                        'front_game_pt': 0,
+                        'back_game_pt': 0,
+                        'extra_game_pt': 0,
+                        'match_front': 0,
+                        'match_back': 0,
+                        'match_total': 0,
+                        'match_extra': 0,
+                        'match_pt': 0,
+                        'put_pt': 0,
+                        'total_pt': 0
+                    }
+                    supabase.table('score').insert(score_data).execute()
+                    next_score_id += 1
+                    success_count += 1
+                    success = True
+                    break
+                except Exception as e:
+                    if attempt < retry - 1:
+                        # 1秒待ってリトライ
+                        import time
+                        time.sleep(1)
+                    else:
+                        failed_members.append((member_name, member_id, str(e)))
+                        
+            if not success:
+                st.warning(f"メンバー「{member_name}」のスコア作成に失敗しました")
+                
+        return success_count, failed_members
+    except Exception as e:
+        return 0, [(None, None, str(e))]
 
 def run():
     col1, col2 = st.columns([0.8, 0.2])
@@ -12,137 +71,216 @@ def run():
     with col2:
         if st.button("🏠 Home"):
             switch_page("Main")
-    st.write("Set up a new round with date, course, and players.")
 
-    # 1) ラウンド情報の入力フォーム
-    date_played = st.date_input("Date of Round", value=datetime.date.today())
+    # メンバー一覧の取得（ID順） 
+    members = get_members_list()
+    member_dict = {m['name']: m['member_id'] for m in members}
+    
+    # 名前とIDのリストを用意
+    member_names = [m['name'] for m in members]
 
-    # 過去のラウンドから使用済みのコース名を取得
-    session = SessionLocal()
-    past_courses = session.query(Round.course_name).distinct().all()
-    session.close()
-    past_course_list = [course for (course,) in past_courses if course]
+    # 過去のゴルフ場名を取得（coursesテーブルから）
+    courses = get_course_list()
+    
+    # コース管理画面へのリンク（フォームの外に配置）
+    col1, col2 = st.columns([0.85, 0.15])
+    with col2:
+        if st.button("➕ コース管理"):
+            switch_page("コース管理")
 
-    # 選択肢に「新規入力」を追加
-    course_options = ["新規入力"] + past_course_list
-    selected_option = st.selectbox("Select Course Name", course_options)
-    if selected_option != "新規入力":
-        if st.button("Delete Selected Course"):
-            session = SessionLocal()
-            try:
-                session.query(Round).filter(Round.course_name == selected_option).delete()
-                session.commit()
-                st.success(f"Course '{selected_option}' has been deleted from past courses. Please refresh the page.")
-            except Exception as e:
-                session.rollback()
-                st.error(f"削除時にエラーが発生しました: {e}")
-            finally:
-                session.close()
-        course_name = selected_option
-    else:
-        course_name = st.text_input("Course Name", value="Sample Golf Club")
-
-    num_players = st.selectbox("Number of Players", [3, 4], index=1)
-
-    # 2) DBから既存メンバーを取得し、参加者を選択
-    session = SessionLocal()
-    all_members = session.query(Member).all()
-    session.close()
-    member_dict = {m.name: m.member_id for m in all_members}
-    selected_members = st.multiselect("Select participants", options=list(member_dict.keys()))
-
-    # 3) ハンデキャップおよび例外設定の入力
-    st.subheader("Handicap & Match Calculation Settings")
+    # フォーム入力部分 - 全体のフォームをやめて個別のフォームに変更
+    # 1) 開催日の選択
+    date_played = st.date_input(
+        "プレー日を選択",
+        value=datetime.date.today(),
+        min_value=datetime.date(2024, 1, 1)
+    )
+    
+    # 2) ゴルフ場の選択
+    if not courses:
+        st.warning("登録済みのゴルフ場がありません。")
+        st.info("コース管理画面でゴルフ場を登録してください。")
+        if st.button("コース管理へ"):
+            switch_page("コース管理")
+        return
+    
+    # コースのID, 名前のタプルを作成
+    course_options = [(c.get('id'), c.get('name')) for c in courses]
+    
+    selected_course = st.selectbox(
+        "ゴルフ場を選択",
+        options=course_options,
+        format_func=lambda x: x[1]  # IDは表示せず、名前だけ表示
+    )
+    
+    # 選択されたコースのIDと名前を取得
+    course_id, course_name = selected_course if selected_course else (None, None)
+    
+    # 3) 参加者の選択（ID昇順表示）
+    st.write("### 参加者選択")
+    selected_members = st.multiselect(
+        "参加者を選択してください",
+        options=member_names
+    )
+    
+    num_players = len(selected_members)
+    
+    # ハンディキャップ設定セクション
+    st.write("### ハンディキャップ設定")
+    
+    # ハンディキャップ設定の初期化
+    if "handicaps" not in st.session_state:
+        st.session_state.handicaps = {}
+    
+    # 参加者が2名以上いる場合に表示
     match_handicaps = []
-    if len(selected_members) >= 2:
-        for pair in itertools.combinations(selected_members, 2):
-            st.markdown(f"#### {pair[0]} vs {pair[1]}")
-            h1to2 = st.number_input(
-                f"{pair[0]} → {pair[1]} Handicap",
-                min_value=0, max_value=50, step=1, value=0,
-                key=f"h_{pair[0]}_{pair[1]}"
-            )
-            h2to1 = st.number_input(
-                f"{pair[1]} → {pair[0]} Handicap",
-                min_value=0, max_value=50, step=1, value=0,
-                key=f"h_{pair[1]}_{pair[0]}"
-            )
-            total_only = st.checkbox("total scoreのみで戦う", key=f"total_only_{pair[0]}_{pair[1]}")
+    if num_players >= 2:
+        # すべての可能なペアを生成
+        pairs = []
+        for i in range(len(selected_members)):
+            for j in range(i+1, len(selected_members)):
+                pairs.append((selected_members[i], selected_members[j]))
+        
+        # 各ペアのハンディキャップを設定
+        for i, (player1, player2) in enumerate(pairs):
+            pair_key = f"{player1}_vs_{player2}"
+            
+            # セッションステートに保存されていなければ初期化
+            if pair_key not in st.session_state.handicaps:
+                st.session_state.handicaps[pair_key] = {
+                    "h1to2": 0,
+                    "h2to1": 0,
+                    "total_only": False
+                }
+                
+            st.write(f"#### {player1} vs {player2}")
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                h1to2 = st.number_input(
+                    f"{player1} → {player2} ハンディキャップ",
+                    min_value=0, max_value=50, step=1, 
+                    value=st.session_state.handicaps[pair_key]["h1to2"],
+                    key=f"h1to2_{player1}_{player2}"
+                )
+                st.session_state.handicaps[pair_key]["h1to2"] = h1to2
+                
+            with col2:
+                h2to1 = st.number_input(
+                    f"{player2} → {player1} ハンディキャップ",
+                    min_value=0, max_value=50, step=1,
+                    value=st.session_state.handicaps[pair_key]["h2to1"],
+                    key=f"h2to1_{player1}_{player2}"
+                )
+                st.session_state.handicaps[pair_key]["h2to1"] = h2to1
+                
+            with col3:
+                total_only = st.checkbox(
+                    "total scoreのみで戦う",
+                    value=st.session_state.handicaps[pair_key]["total_only"],
+                    key=f"total_only_{player1}_{player2}"
+                )
+                st.session_state.handicaps[pair_key]["total_only"] = total_only
+            
+            # この対戦カードのハンディキャップ情報を保存
             match_handicaps.append({
-                "player1": pair[0],
-                "player2": pair[1],
+                "player1": player1,
+                "player2": player2,
                 "handicap_1_to_2": h1to2,
                 "handicap_2_to_1": h2to1,
                 "total_only": total_only
             })
     else:
-        st.info("ハンデキャップ設定は、参加者が2名以上選ばれた場合に利用可能です。")
+        st.info("ハンディキャップ設定は、参加者が2名以上選ばれた場合に利用可能です。")
 
     # 4) 「Start Round」ボタン
     if st.button("Start Round"):
-        if len(selected_members) < 2:
+        if not course_name:
+            st.error("ゴルフ場を選択してください。")
+        elif len(selected_members) < 2:
             st.error("少なくとも2人の参加者を選択してください。")
         else:
-            session = SessionLocal()
             try:
-                # rounds テーブルへ新規ラウンドをINSERT
-                new_round = Round(
-                    date_played=date_played,
-                    course_name=course_name.strip(),
-                    num_players=num_players,
-                    has_extra=False,
-                    finalized=False
-                )
-                session.add(new_round)
-                session.commit()
-                round_id = new_round.round_id
+                # コースを取得（すでに選択済み）
+                
+                # 最大のround_idを取得して、新しいIDを作成
+                max_id_result = supabase.table('rounds').select('round_id').order('round_id', desc=True).limit(1).execute()
+                next_round_id = 1
+                if max_id_result.data:
+                    next_round_id = max_id_result.data[0]['round_id'] + 1
+                
+                # roundsテーブルへ新規ラウンドをINSERT（round_idを明示的に指定）
+                round_data = {
+                    'round_id': next_round_id,
+                    'date_played': date_played.isoformat(),
+                    'date': date_played.isoformat(),
+                    'course_name': course_name,  # 後方互換性のために残す
+                    'course_id': course_id,      # 新しいリレーション用
+                    'num_players': num_players,
+                    'has_extra': False,
+                    'finalized': False
+                }
+                
+                round_result = supabase.table('rounds').insert(round_data).execute()
+                round_id = round_result.data[0]['round_id']
 
-                # 各メンバーのスコア枠を scores テーブルへINSERT
-                for member_name in selected_members:
-                    member_id = member_dict[member_name]
-                    new_score = Score(
-                        round_id=round_id,
-                        member_id=member_id,
-                        front_score=0,
-                        back_score=0,
-                        extra_score=0,
-                        front_putt=0,
-                        back_putt=0,
-                        extra_putt=0,
-                        front_game_pt=0,
-                        back_game_pt=0,
-                        extra_game_pt=0
-                    )
-                    session.add(new_score)
-                session.commit()
+                # スコアの作成（頑健な実装に置き換え）
+                success_count, failed_members = create_scores(round_id, selected_members, member_dict)
+                
+                if failed_members:
+                    st.warning(f"{len(selected_members) - success_count}名分のスコアデータ作成に失敗しました。")
+                    for name, member_id, error in failed_members:
+                        if name:
+                            st.error(f"{name}のスコア作成エラー: {error}")
+                        else:
+                            st.error(f"エラー: {error}")
+                    
+                    # セッションに失敗情報を保存
+                    if "failed_scores" not in st.session_state:
+                        st.session_state.failed_scores = {}
+                    
+                    st.session_state.failed_scores[round_id] = {
+                        "round_id": round_id,
+                        "failed_members": failed_members,
+                        "selected_members": selected_members,
+                        "member_dict": member_dict
+                    }
+                    
+                    # 失敗したメンバーのスコア作成を再試行するボタン
+                    if st.button("スコア作成を再試行"):
+                        success_count, failed_members = create_scores(round_id, 
+                                                                    [name for name, _, _ in failed_members], 
+                                                                    member_dict, 
+                                                                    retry=5)
+                        if not failed_members:
+                            st.success("すべてのスコアデータの作成に成功しました。")
+                            switch_page("フロントスコア入力")
+                
+                # ハンディキャップ設定の保存
+                max_handicap_id_result = supabase.table('handicap_match').select('id').order('id', desc=True).limit(1).execute()
+                next_handicap_id = 1
+                if max_handicap_id_result.data:
+                    next_handicap_id = max_handicap_id_result.data[0]['id'] + 1
 
-                # HandicapMatch テーブルにマッチ設定をINSERT
-                for mh in match_handicaps:
-                    p1_id = member_dict[mh["player1"]]
-                    p2_id = member_dict[mh["player2"]]
-                    new_match = HandicapMatch(
-                        round_id=round_id,
-                        player_1_id=p1_id,
-                        player_2_id=p2_id,
-                        player_1_to_2=mh["handicap_1_to_2"],
-                        player_2_to_1=mh["handicap_2_to_1"],
-                        total_only=mh["total_only"]
-                    )
-                    session.add(new_match)
-                session.commit()
-                session.close()
+                for match in match_handicaps:
+                    handicap_data = {
+                        'id': next_handicap_id,
+                        'round_id': round_id,
+                        'player_1_id': member_dict[match['player1']],
+                        'player_2_id': member_dict[match['player2']],
+                        'player_1_to_2': match['handicap_1_to_2'],
+                        'player_2_to_1': match['handicap_2_to_1'],
+                        'total_only': match['total_only']
+                    }
+                    supabase.table('handicap_match').insert(handicap_data).execute()
+                    next_handicap_id += 1
 
-                st.success(f"New round created! Round ID = {round_id}")
-                st.info(f"Participants: {', '.join(selected_members)}")
-                st.info("Match settings have been saved with the following handicap values and calculation methods:")
-                for mh in match_handicaps:
-                    calc_method = "Total Score Only" if mh["total_only"] else "Front/Back/Total"
-                    st.write(f"- {mh['player1']} vs {mh['player2']}: {mh['handicap_1_to_2']} / {mh['handicap_2_to_1']} (Calculation: {calc_method})")
+                if not failed_members:
+                    st.success("ラウンド設定が完了しました。")
+                    switch_page("フロントスコア入力")
+
             except Exception as e:
-                session.rollback()
-                st.error(f"エラーが発生しました: {e}")
-            finally:
-                session.close()
+                st.error(f"ラウンド設定の保存中にエラーが発生しました: {str(e)}")
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
     run()

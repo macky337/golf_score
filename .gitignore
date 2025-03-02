@@ -6,5 +6,7 @@ __pycache__/
 .env
 .venv/
 venv/
+# 設定ファイル
+config.py
 backups/*.json
 !backups/.gitkeep
