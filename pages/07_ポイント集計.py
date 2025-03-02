@@ -3,6 +3,7 @@ import pandas as pd
 import datetime
 import numpy as np
 from modules.db import supabase
+from modules.supabase_client import get_supabase_client  # supabase_client から直接インポート
 import calendar
 from streamlit_extras.switch_page_button import switch_page
 import plotly.express as px
@@ -17,7 +18,7 @@ def run():
             switch_page("Main")
 
     # 3つのタブを作成
-    tab1, tab2, tab3 = st.tabs(["通算成績", "年度別集計", "月間集計"])
+    tab1, tab2, tab3, tab4 = st.tabs(["通算成績", "年度別集計", "月間集計", "集計検証"])
     
     with tab1:
         show_all_time_statistics()
@@ -27,6 +28,9 @@ def run():
     
     with tab3:
         show_monthly_statistics()
+    
+    with tab4:
+        verify_point_balance()
 
 def get_all_scores():
     """すべての確定済みスコアデータを取得"""
@@ -215,6 +219,19 @@ def show_all_time_statistics():
             textposition='auto'
         ))
     
+    # Total Ptを追加
+    fig.add_trace(go.Bar(
+        x=df['Player'],
+        y=df['Total Pt'],
+        name='Total Pt',
+        text=df['Total Pt'].apply(lambda x: f"{x:+d}"),
+        textposition='auto',
+        marker_color='rgba(50, 171, 96, 0.7)',  # 透明度のある緑色
+        marker_line_color='rgba(50, 171, 96, 1)',
+        marker_line_width=1.5,
+        opacity=0.8
+    ))
+    
     fig.update_layout(
         barmode='group',
         xaxis_title='プレイヤー',
@@ -363,6 +380,19 @@ def show_yearly_statistics():
                 text=df[pt_type].apply(lambda x: f"{x:+d}"),
                 textposition='auto'
             ))
+        
+        # Total Ptを追加
+        fig.add_trace(go.Bar(
+            x=df['Player'],
+            y=df['Total Pt'],
+            name='Total Pt',
+            text=df['Total Pt'].apply(lambda x: f"{x:+d}"),
+            textposition='auto',
+            marker_color='rgba(50, 171, 96, 0.7)',  # 透明度のある緑色
+            marker_line_color='rgba(50, 171, 96, 1)',
+            marker_line_width=1.5,
+            opacity=0.8
+        ))
         
         fig.update_layout(
             barmode='group',
@@ -599,6 +629,19 @@ def show_monthly_statistics():
                 textposition='auto'
             ))
         
+        # Total Ptを追加
+        fig.add_trace(go.Bar(
+            x=df['Player'],
+            y=df['Total Pt'],
+            name='Total Pt',
+            text=df['Total Pt'].apply(lambda x: f"{x:+d}"),
+            textposition='auto',
+            marker_color='rgba(50, 171, 96, 0.7)',  # 透明度のある緑色
+            marker_line_color='rgba(50, 171, 96, 1)',
+            marker_line_width=1.5,
+            opacity=0.8
+        ))
+        
         fig.update_layout(
             barmode='group',
             xaxis_title='プレイヤー',
@@ -659,6 +702,381 @@ def show_monthly_statistics():
                 formatted_round_df,
                 use_container_width=True
             )
+
+def verify_point_balance():
+    """各種集計期間でのポイント合計値が0かどうかを検証する"""
+    st.subheader("ポイント集計検証")
+    
+    # すべてのスコアを取得
+    all_scores = get_all_scores()
+    
+    if not all_scores:
+        st.info("スコアデータが見つかりません。")
+        return
+    
+    # 合計検証用のデータフレームを作成
+    verification_data = []
+    
+    # 1. ラウンドごとの検証
+    round_ids = set(score['round_id'] for score in all_scores)
+    
+    with st.expander("ラウンドごとの検証"):
+        for round_id in sorted(round_ids):
+            round_scores = [s for s in all_scores if s['round_id'] == round_id]
+            
+            if not round_scores:
+                continue
+                
+            # ラウンド情報
+            date_played = round_scores[0]['rounds']['date_played']
+            course_name = round_scores[0]['rounds']['course_name']
+            
+            # 各ポイントタイプの合計
+            game_pt_sum = sum(s.get('front_game_pt', 0) + s.get('back_game_pt', 0) + s.get('extra_game_pt', 0) for s in round_scores)
+            match_pt_sum = sum(s.get('match_pt', 0) for s in round_scores)
+            put_pt_sum = sum(s.get('put_pt', 0) for s in round_scores)
+            total_pt_sum = sum(s.get('total_pt', 0) for s in round_scores)
+            
+            # 記録
+            verification_data.append({
+                'Type': 'Round',
+                'ID': round_id,
+                'Description': f"{date_played} - {course_name}",
+                'Game Pt Sum': game_pt_sum,
+                'Match Pt Sum': match_pt_sum,
+                'Put Pt Sum': put_pt_sum,
+                'Total Pt Sum': total_pt_sum,
+                'Is Balanced': abs(match_pt_sum) < 0.01 and abs(total_pt_sum) < 0.01
+            })
+            
+        # テーブル表示
+        if verification_data:
+            df = pd.DataFrame(verification_data)
+            
+            # 表示用にフォーマット
+            formatted_df = df.copy()
+            for col in ['Game Pt Sum', 'Match Pt Sum', 'Put Pt Sum', 'Total Pt Sum']:
+                formatted_df[col] = formatted_df[col].apply(lambda x: f"{x:+d}" if x != 0 else "0")
+            
+            # 結果を色付けして表示
+            st.dataframe(
+                formatted_df,
+                column_config={
+                    'Is Balanced': st.column_config.CheckboxColumn(
+                        "バランス",
+                        help="ポイント合計が0になっているか",
+                    )
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            # 不均衡があるラウンドの警告
+            unbalanced_rounds = df[~df['Is Balanced']]
+            if not unbalanced_rounds.empty:
+                st.warning(f"⚠️ {len(unbalanced_rounds)} ラウンドでポイントバランスが取れていません。")
+                
+                # 修正オプションを提供
+                if st.button("不均衡ラウンドデータを修正", key="fix_rounds"):
+                    fixed_count = 0
+                    
+                    for _, row in unbalanced_rounds.iterrows():
+                        round_id = row['ID']
+                        # そのラウンドのスコアを取得
+                        round_scores = [s for s in all_scores if s['round_id'] == round_id]
+                        
+                        # ハンディキャップデータを取得
+                        handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
+                        handicaps_data = handicaps_result.data
+                        
+                        # ラウンド情報を取得
+                        round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
+                        round_data = round_result.data[0] if round_result.data else None
+                        
+                        if round_scores and handicaps_data and round_data:
+                            # 再計算
+                            from pages.handicap_calc_logic import process_round_scores
+                            updated_scores = process_round_scores(round_scores, handicaps_data, round_data)
+                            
+                            # 更新データの準備
+                            update_data = {}
+                            for score in updated_scores:
+                                member_id = score['member_id']
+                                update_data[member_id] = {
+                                    'game_pt': score['game_pt'],
+                                    'match_pt': score['match_pt'],
+                                    'put_pt': score['put_pt'],
+                                    'total_pt': score['total_pt']
+                                }
+                            
+                            # 一括更新
+                            from modules.supabase_client import update_scores_batch
+                            success, updates, failures = update_scores_batch(round_id, update_data)
+                            if success:
+                                fixed_count += 1
+                    
+                    if fixed_count > 0:
+                        st.success(f"{fixed_count} ラウンドのデータを修正しました。再読み込みしてください。")
+                        st.rerun()
+                    else:
+                        st.error("修正に失敗しました。")
+        else:
+            st.info("検証するラウンドデータが見つかりません。")
+    
+    # 2. 月別の検証
+    with st.expander("月別の検証"):
+        # 月別データの準備
+        monthly_data = {}
+        for score in all_scores:
+            if not score['rounds']['date_played']:
+                continue
+                
+            date_parts = score['rounds']['date_played'].split('-')
+            if len(date_parts) >= 2:
+                year_month = f"{date_parts[0]}-{date_parts[1]}"
+                
+                if year_month not in monthly_data:
+                    monthly_data[year_month] = {
+                        'Game Pt': 0,
+                        'Match Pt': 0,
+                        'Put Pt': 0,
+                        'Total Pt': 0,
+                    }
+                
+                # ポイントの集計
+                game_pt = (score.get('front_game_pt') or 0) + (score.get('back_game_pt') or 0) + (score.get('extra_game_pt') or 0)
+                match_pt = score.get('match_pt') or 0
+                put_pt = score.get('put_pt') or 0
+                total_pt = score.get('total_pt') or 0
+                
+                monthly_data[year_month]['Game Pt'] += game_pt
+                monthly_data[year_month]['Match Pt'] += match_pt
+                monthly_data[year_month]['Put Pt'] += put_pt
+                monthly_data[year_month]['Total Pt'] += total_pt
+        
+        # 月別集計データの表示
+        monthly_verification = []
+        for year_month, data in sorted(monthly_data.items(), reverse=True):
+            year, month = year_month.split('-')
+            monthly_verification.append({
+                'Type': 'Month',
+                'ID': year_month,
+                'Description': f"{year}年{int(month)}月",
+                'Game Pt Sum': data['Game Pt'],
+                'Match Pt Sum': data['Match Pt'],
+                'Put Pt Sum': data['Put Pt'],
+                'Total Pt Sum': data['Total Pt'],
+                'Is Balanced': abs(data['Match Pt']) < 0.01 and abs(data['Total Pt']) < 0.01
+            })
+        
+        # テーブル表示
+        if monthly_verification:
+            monthly_df = pd.DataFrame(monthly_verification)
+            
+            # 表示用にフォーマット
+            formatted_df = monthly_df.copy()
+            for col in ['Game Pt Sum', 'Match Pt Sum', 'Put Pt Sum', 'Total Pt Sum']:
+                formatted_df[col] = formatted_df[col].apply(lambda x: f"{x:+d}" if x != 0 else "0")
+            
+            st.dataframe(
+                formatted_df,
+                column_config={
+                    'Is Balanced': st.column_config.CheckboxColumn(
+                        "バランス",
+                        help="ポイント合計が0になっているか",
+                    )
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            # 不均衡がある月の警告
+            unbalanced_months = monthly_df[~monthly_df['Is Balanced']]
+            if not unbalanced_months.empty:
+                st.warning(f"⚠️ {len(unbalanced_months)} 月でポイントバランスが取れていません。")
+        else:
+            st.info("検証する月別データが見つかりません。")
+    
+    # 3. 年別の検証
+    with st.expander("年別の検証"):
+        # 年別データの準備
+        yearly_data = {}
+        for score in all_scores:
+            if not score['rounds']['date_played']:
+                continue
+                
+            year = score['rounds']['date_played'].split('-')[0]
+            
+            if year not in yearly_data:
+                yearly_data[year] = {
+                    'Game Pt': 0,
+                    'Match Pt': 0,
+                    'Put Pt': 0,
+                    'Total Pt': 0,
+                }
+            
+            # ポイントの集計
+            game_pt = (score.get('front_game_pt') or 0) + (score.get('back_game_pt') or 0) + (score.get('extra_game_pt') or 0)
+            match_pt = score.get('match_pt') or 0
+            put_pt = score.get('put_pt') or 0
+            total_pt = score.get('total_pt') or 0
+            
+            yearly_data[year]['Game Pt'] += game_pt
+            yearly_data[year]['Match Pt'] += match_pt
+            yearly_data[year]['Put Pt'] += put_pt
+            yearly_data[year]['Total Pt'] += total_pt
+        
+        # 年別集計データの表示
+        yearly_verification = []
+        for year, data in sorted(yearly_data.items(), reverse=True):
+            yearly_verification.append({
+                'Type': 'Year',
+                'ID': year,
+                'Description': f"{year}年",
+                'Game Pt Sum': data['Game Pt'],
+                'Match Pt Sum': data['Match Pt'],
+                'Put Pt Sum': data['Put Pt'],
+                'Total Pt Sum': data['Total Pt'],
+                'Is Balanced': abs(data['Match Pt']) < 0.01 and abs(data['Total Pt']) < 0.01
+            })
+        
+        # テーブル表示
+        if yearly_verification:
+            yearly_df = pd.DataFrame(yearly_verification)
+            
+            # 表示用にフォーマット
+            formatted_df = yearly_df.copy()
+            for col in ['Game Pt Sum', 'Match Pt Sum', 'Put Pt Sum', 'Total Pt Sum']:
+                formatted_df[col] = formatted_df[col].apply(lambda x: f"{x:+d}" if x != 0 else "0")
+            
+            st.dataframe(
+                formatted_df,
+                column_config={
+                    'Is Balanced': st.column_config.CheckboxColumn(
+                        "バランス",
+                        help="ポイント合計が0になっているか",
+                    )
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            # 不均衡がある年の警告
+            unbalanced_years = yearly_df[~yearly_df['Is Balanced']]
+            if not unbalanced_years.empty:
+                st.warning(f"⚠️ {len(unbalanced_years)} 年でポイントバランスが取れていません。")
+        else:
+            st.info("検証する年別データが見つかりません。")
+    
+    # 4. 全期間の検証
+    with st.expander("全期間の検証"):
+        # 全期間のポイント集計
+        all_game_pt = sum((s.get('front_game_pt') or 0) + (s.get('back_game_pt') or 0) + (s.get('extra_game_pt') or 0) for s in all_scores)
+        all_match_pt = sum(s.get('match_pt') or 0 for s in all_scores)
+        all_put_pt = sum(s.get('put_pt') or 0 for s in all_scores)
+        all_total_pt = sum(s.get('total_pt') or 0 for s in all_scores)
+        
+        # 表示
+        st.markdown(f"### 全期間ポイント合計")
+        st.markdown(f"- Game Pt: **{all_game_pt:+d}**")
+        st.markdown(f"- Match Pt: **{all_match_pt:+d}**")
+        st.markdown(f"- Put Pt: **{all_put_pt:+d}**")
+        st.markdown(f"- Total Pt: **{all_total_pt:+d}**")
+        
+        # 追加: プレイヤー別の合計を表示
+        if st.checkbox("プレイヤー別の合計を表示"):
+            # プレイヤーごとのスコア合計を集計
+            player_totals = {}
+            for score in all_scores:
+                player = score['member']['name']
+                if player not in player_totals:
+                    player_totals[player] = {
+                        'Game Pt': 0,
+                        'Match Pt': 0,
+                        'Put Pt': 0,
+                        'Total Pt': 0,
+                        'Rounds': 0
+                    }
+                
+                player_totals[player]['Game Pt'] += (score.get('front_game_pt') or 0) + (score.get('back_game_pt') or 0) + (score.get('extra_game_pt') or 0)
+                player_totals[player]['Match Pt'] += score.get('match_pt') or 0
+                player_totals[player]['Put Pt'] += score.get('put_pt') or 0
+                player_totals[player]['Total Pt'] += score.get('total_pt') or 0
+                player_totals[player]['Rounds'] += 1
+            
+            # プレイヤー別の合計をDataFrameとして表示
+            player_df = pd.DataFrame.from_dict(player_totals, orient='index').reset_index()
+            player_df.columns = ['Player', 'Game Pt', 'Match Pt', 'Put Pt', 'Total Pt', 'Rounds']
+            
+            # データ型を整数に変換
+            for col in ['Game Pt', 'Match Pt', 'Put Pt', 'Total Pt', 'Rounds']:
+                player_df[col] = player_df[col].astype(int)
+            
+            # 表示用にフォーマット
+            formatted_player_df = player_df.copy()
+            for col in ['Game Pt', 'Match Pt', 'Put Pt', 'Total Pt']:
+                formatted_player_df[col] = formatted_player_df[col].map('{:+d}'.format)
+            
+            # 合計を追加
+            sums = player_df.sum().to_frame().T
+            sums['Player'] = 'Total'
+            formatted_sums = sums.copy()
+            for col in ['Game Pt', 'Match Pt', 'Put Pt', 'Total Pt']:
+                formatted_sums[col] = formatted_sums[col].map('{:+d}'.format)
+            
+            # 合計行を追加して表示
+            formatted_result = pd.concat([formatted_player_df, formatted_sums]).reset_index(drop=True)
+            st.dataframe(formatted_result, use_container_width=True)
+        
+        # 追加: 詳細診断ツール
+        if st.checkbox("詳細な不均衡診断を実行"):
+            st.write("### 不均衡の詳細分析")
+            
+            # 1. ラウンド別のMatch Ptチェック
+            round_match_pts = {}
+            for score in all_scores:
+                round_id = score['round_id']
+                if round_id not in round_match_pts:
+                    round_match_pts[round_id] = 0
+                round_match_pts[round_id] += score.get('match_pt') or 0
+            
+            # 不均衡なラウンドを特定
+            unbalanced_rounds = {r_id: pts for r_id, pts in round_match_pts.items() if abs(pts) > 0.01}
+            if unbalanced_rounds:
+                st.warning(f"不均衡なラウンドが {len(unbalanced_rounds)} 件見つかりました")
+                unbalanced_details = []
+                for r_id, pts in unbalanced_rounds.items():
+                    # ラウンド情報を取得
+                    round_data = next((s['rounds'] for s in all_scores if s['round_id'] == r_id), None)
+                    if round_data:
+                        unbalanced_details.append({
+                            'Round ID': r_id,
+                            'Date': round_data['date_played'],
+                            'Course': round_data['course_name'],
+                            'Match Pt Sum': pts
+                        })
+                
+                if unbalanced_details:
+                    st.dataframe(pd.DataFrame(unbalanced_details))
+            else:
+                st.success("すべてのラウンドでマッチポイントは均衡しています")
+            
+        if abs(all_match_pt) < 0.01 and abs(all_total_pt) < 0.01:
+            st.success("✅ 全期間でのポイントバランスは正常です。")
+        else:
+            st.error(f"❌ 全期間でのポイントバランスが取れていません。（Match Pt: {all_match_pt}, Total Pt: {all_total_pt}）")
+            
+            # 一括修正ボタン
+            if st.button("すべてのデータを再計算して修正", key="fix_all"):
+                # 過去データ再計算関数を呼び出す
+                from modules.supabase_client import recalculate_all_past_rounds
+                with st.spinner("すべてのデータを再計算中..."):
+                    success = recalculate_all_past_rounds()
+                    if success:
+                        st.success("すべてのデータを再計算しました。ページを再読み込みしてください。")
+                        st.rerun()
+                    else:
+                        st.error("再計算に失敗しました。")
 
 if __name__ == "__main__":
     run()
