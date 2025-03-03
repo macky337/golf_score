@@ -20,6 +20,29 @@ def calculate_game_pt(player_pt, other_pts):
         return player_pt * 2 - sum(other_pts)
     return player_pt  # 4人プレー
 
+# パスワード取得関数を定義（config.pyからインポートできなかった場合のフォールバック）
+def get_admin_password():
+    """管理画面用のパスワードを取得する（フォールバック実装）"""
+    try:
+        # まず外部モジュールからインポートを試みる
+        from config import get_admin_password
+        return get_admin_password()
+    except ImportError:
+        # インポートできない場合は代替実装を使用
+        try:
+            # 環境変数から取得
+            if 'ADMIN_PASSWORD' in os.environ:
+                return os.environ['ADMIN_PASSWORD']
+            
+            # Streamlit secretsから取得
+            if 'admin_password' in st.secrets:
+                return st.secrets['admin_password']
+        except Exception:
+            pass  # エラーは無視
+        
+        # デフォルトパスワード
+        return "golf_score_admin"
+
 def check_password():
     """パスワードチェック機能"""
     if "password_correct" not in st.session_state:
@@ -28,7 +51,7 @@ def check_password():
     if not st.session_state.password_correct:
         pwd = st.text_input("パスワードを入力してください", type="password")
         if pwd:
-            # configから管理者パスワードを取得
+            # 管理者パスワードを取得
             admin_password = get_admin_password()
             if pwd == admin_password:
                 st.session_state.password_correct = True
