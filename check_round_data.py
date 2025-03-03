@@ -2,6 +2,8 @@ import pandas as pd
 from modules.db import supabase
 import argparse
 import sys
+import streamlit as st
+from modules.data_integrity import verify_putt_points
 
 def check_round_data(round_id=None, show_all=False, limit=10):
     """
@@ -59,20 +61,82 @@ def check_round_data(round_id=None, show_all=False, limit=10):
         print("No score data found")
 
 def main():
-    """Main function with command line interface"""
-    parser = argparse.ArgumentParser(description='Check golf score database')
-    parser.add_argument('-r', '--round', type=int, help='Specific round ID to check')
-    parser.add_argument('-a', '--all', action='store_true', help='Show all rounds')
-    parser.add_argument('-l', '--limit', type=int, default=10, help='Limit for number of records to display')
+    st.title("ラウンドデータ検証")
     
-    args = parser.parse_args()
+    # 検証するラウンドID
+    round_id = 41  # 2025-03-03 - テストコース
     
-    try:
-        check_round_data(args.round, args.all, args.limit)
-    except Exception as e:
-        print(f"Error: {e}")
-        return 1
-    return 0
+    # ラウンド情報を取得
+    round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
+    if not round_result.data:
+        st.error(f"ラウンドID {round_id} が見つかりません")
+        return
+    
+    round_data = round_result.data[0]
+    st.write(f"### {round_data['date_played']} - {round_data['course_name']} (ID: {round_id})")
+    
+    # パット戦ポイントの検証
+    st.write("### パット戦ポイント計算の検証")
+    with st.spinner("検証中..."):
+        result = verify_putt_points(round_id)
+    
+    if result.get("status") == "error":
+        st.error(f"検証中にエラーが発生しました: {result['message']}")
+        return
+    
+    # プレイヤー情報を表示
+    st.write(f"プレイヤー数: {result['player_count']}")
+    
+    # データフレームの作成
+    player_data = []
+    for p in result["players"]:
+        player_data.append({
+            "名前": p["name"],
+            "フロントパット": p["front_putt"],
+            "バックパット": p["back_putt"],
+            "エキストラパット": p["extra_putt"],
+            "フロントPt": p["front_pt"],
+            "バックPt": p["back_pt"],
+            "エキストラPt": p["extra_pt"],
+            "計算合計": p["calculated_put_pt"],
+            "実際の値": p["actual_put_pt"],
+            "差分": p["calculated_put_pt"] - p["actual_put_pt"]
+        })
+    
+    df = pd.DataFrame(player_data)
+    st.dataframe(df)
+    
+    # 検証結果
+    if result["is_correct"]:
+        st.success("✅ パット戦のポイント計算は正確です")
+    else:
+        st.error("❌ パット戦のポイント計算に不一致があります")
+        
+        st.write("### 不一致の詳細")
+        diff_data = []
+        for d in result["differences"]:
+            diff_data.append({
+                "プレイヤー": d["player"],
+                "実際の値": d["actual"],
+                "計算値": d["calculated"],
+                "差分": d["diff"]
+            })
+        
+        st.dataframe(pd.DataFrame(diff_data))
+        
+        # 不一致があれば修正オプションを提供
+        if st.button("パット戦のポイントを修正"):
+            try:
+                # スコアデータを更新
+                for p in result["players"]:
+                    supabase.table('score').update({
+                        'put_pt': p["calculated_put_pt"]
+                    }).eq('member_id', p["member_id"]).eq('round_id', round_id).execute()
+                
+                st.success("パット戦のポイントを修正しました")
+                st.rerun()  # ページを再読み込み
+            except Exception as e:
+                st.error(f"修正中にエラーが発生しました: {str(e)}")
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

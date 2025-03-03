@@ -1,0 +1,41 @@
+import streamlit as st
+from streamlit_extras.switch_page_button import switch_page
+
+def run():
+    col1, col2 = st.columns([0.8, 0.2])
+    with col1:
+        st.title("セッション情報デバッグ")
+    with col2:
+        if st.button("🏠 Home"):
+            switch_page("Main")
+    
+    # セッション内容をすべて表示
+    st.write("### セッション状態")
+    st.write(st.session_state)
+    
+    # アクティブなラウンドIDを確認
+    st.write("### アクティブなラウンドID")
+    if "active_round_id" in st.session_state:
+        round_id = st.session_state.active_round_id
+        st.success(f"active_round_id = {round_id}")
+        
+        # ラウンド情報の取得
+        from modules.db import supabase
+        round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
+        if round_result.data:
+            st.write("ラウンド情報:")
+            st.write(round_result.data[0])
+        else:
+            st.error("指定されたラウンドIDの情報が見つかりません。")
+    else:
+        st.error("active_round_id がセッション状態に存在しません。")
+    
+    # セッションのリセット機能
+    if st.button("セッションをリセット"):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.success("セッションをリセットしました。")
+        st.rerun()
+
+if __name__ == "__main__":
+    run()

@@ -350,51 +350,60 @@ import pandas as pd
 from modules.data_integrity import check_rounds_integrity, fix_missing_scores
 
 def run():
-    # ...existing code...
+    st.title("ゴルフスコア管理")
+
+    # 最近のラウンド一覧を取得
+    col1, col2 = st.columns([0.7, 0.3])
     
-    # サイドバーにデバッグモード切替ボタンを追加
-    with st.sidebar:
-        st.write("---")
-        if is_debug_mode():
-            if st.button("🔍 デバッグモード終了"):
-                exit_debug_mode()
-                st.rerun()
-            st.info("デバッグモードが有効です")
+    with col1:
+        st.subheader("ラウンド選択")
+        rounds = supabase.table('rounds').select('*').order('date_played', desc=True).limit(10).execute()
+        
+        if rounds.data:
+            round_options = [f"{r['date_played']} - {r['course_name']} (ID: {r['round_id']})" for r in rounds.data]
+            selected_round = st.selectbox("最近のラウンドから選択", options=round_options)
             
-            # デバッグモード時に追加の診断ツール表示
-            st.write("## 診断ツール")
-            if st.button("データ整合性チェック"):
-                with st.spinner("データ整合性をチェック中..."):
-                    issues, stats = check_rounds_integrity()
+            if selected_round:
+                # ラウンドIDの抽出
+                round_id = int(selected_round.split("ID: ")[1].rstrip(")"))
                 
-                st.write(f"**ラウンド数**: {stats['total_rounds']}")
-                st.write(f"**問題あり**: {stats['missing_scores'] + stats['incomplete_scores']}")
+                # アクティブなラウンドIDをセッション状態に保存
+                st.session_state.active_round_id = round_id
                 
-                if issues:
-                    st.error(f"{len(issues)}件の問題が見つかりました")
-                    issue_df = pd.DataFrame(issues)
-                    st.dataframe(issue_df)
-                    
-                    # 修復オプション表示
-                    if st.button("問題を修復する"):
-                        for issue in issues:
-                            round_id = issue["round_id"]
-                            with st.spinner(f"ラウンドID {round_id} を修復中..."):
-                                success, message = fix_missing_scores(round_id)
-                                if success:
-                                    st.success(f"ラウンドID {round_id}: {message}")
-                                else:
-                                    st.error(f"ラウンドID {round_id}: {message}")
-                else:
-                    st.success("問題は見つかりませんでした")
-        else:
-            # 特殊なキーコンビネーションなど非表示の方法でもOK
-            with st.expander("開発者オプション", expanded=False):
-                if st.button("🔧 デバッグモード開始"):
-                    enter_debug_mode()
-                    st.rerun()
+                col_a, col_b, col_c = st.columns(3)
+                with col_a:
+                    if st.button("スコア入力", use_container_width=True):
+                        switch_page("フロントスコア入力")
+                with col_b:
+                    if st.button("結果確認", use_container_width=True):
+                        switch_page("結果確認")
+                with col_c:
+                    if st.button("ポイント集計", use_container_width=True):
+                        switch_page("ポイント集計")
     
-    # ...existing code...
+    with col2:
+        st.subheader("新規ラウンド")
+        if st.button("ラウンド設定", use_container_width=True):
+            # 新規ラウンド用のフラグをクリア
+            if "active_round_id" in st.session_state:
+                del st.session_state.active_round_id
+            switch_page("ラウンド設定")
+    
+    # 管理機能セクション
+    st.write("---")
+    st.subheader("管理機能")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("メンバー登録", use_container_width=True):
+            switch_page("メンバー登録")
+    with col2:
+        if st.button("コース管理", use_container_width=True):
+            switch_page("コース管理")
+    with col3:
+        if st.button("管理画面", use_container_width=True):
+            switch_page("管理画面")
 
 if __name__ == "__main__":
     run()

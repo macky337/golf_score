@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import sys
+import traceback
 
 def enter_debug_mode():
     """デバッグモードを有効化する"""
@@ -16,28 +17,27 @@ def is_debug_mode():
     """現在デバッグモードかどうかを確認する"""
     return st.session_state.get("debug_mode", False)
 
-def handle_error(error, show_traceback=False):
-    """エラーを適切に処理し、必要に応じてデバッグモードを有効化する"""
-    st.error(f"エラーが発生しました: {str(error)}")
+def handle_error(exception):
+    """例外をキャプチャして表示する"""
+    st.error(f"エラーが発生しました: {str(exception)}")
     
-    # セッションに記録
-    if "errors" not in st.session_state:
-        st.session_state.errors = []
-    st.session_state.errors.append(str(error))
-    
-    # デバッグモードに切り替えるオプションを表示
-    if not is_debug_mode():
-        if st.button("デバッグモードに切り替え", key="enable_debug"):
-            enter_debug_mode()
-            # デバッグ情報表示
-            debug_info()
+    # デバッグモードが有効な場合は詳細情報を表示
+    if st.session_state.get("debug_mode", False):
+        st.code(traceback.format_exc())
     else:
-        debug_info()
+        st.info("詳細情報を表示するには、デバッグモードを有効にしてください。")
+
+def toggle_debug_mode():
+    """デバッグモードの切り替え"""
+    if "debug_mode" not in st.session_state:
+        st.session_state.debug_mode = False
         
-    # スタックトレースの表示
-    if show_traceback or is_debug_mode():
-        import traceback
-        st.code(traceback.format_exc(), language="python")
+    st.session_state.debug_mode = not st.session_state.debug_mode
+    
+    if st.session_state.debug_mode:
+        return "デバッグモードを無効化"
+    else:
+        return "デバッグモードを有効化"
 
 def debug_info():
     """デバッグ情報を表示"""
