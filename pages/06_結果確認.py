@@ -203,7 +203,7 @@ def generate_pdf(final_df, detailed_df, star_df, active_round):
     result_df = result_df[available_cols]
     
     # player列をindexにセットして詳細表示用のデータフレーム作成
-    table_df = result_df.setIndex('Player')
+    table_df = result_df.set_Index('Player')
     
     # PDFテーブル用のデータ作成
     final_data = create_df_for_pdf(table_df)
