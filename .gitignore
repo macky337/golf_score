@@ -10,3 +10,4 @@ venv/
 config.py
 backups/*.json
 !backups/.gitkeep
+.streamlit/secrets.toml
