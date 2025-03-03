@@ -617,6 +617,52 @@ def run():
     with col2:
         if st.button("🏠 Home"):
             switch_page("Main")
+    
+    # カスタムCSSを追加して最初の列を固定表示に（より強力な選択子でスタイルを適用）
+    st.markdown("""
+        <style>
+        /* スコア詳細テーブルのプレイヤー列を固定表示にする */
+        [data-testid="stDataFrame"] table {
+            position: relative !important;
+        }
+        
+        [data-testid="stDataFrame"] table th:first-child,
+        [data-testid="stDataFrame"] table td:first-child {
+            position: sticky !important;
+            left: 0 !important;
+            background-color: white !important;
+            z-index: 1 !important;
+            box-shadow: 2px 0px 3px rgba(0,0,0,0.1) !important;
+        }
+        
+        /* テーブルヘッダーとプレイヤー列の交差部分 */
+        [data-testid="stDataFrame"] table th:first-child {
+            z-index: 2 !important;
+            background-color: #f0f2f6 !important;
+        }
+        
+        /* スクロール時にヘッダーの背景が透明になるのを防ぐ */
+        [data-testid="stDataFrame"] table thead th {
+            background-color: #f0f2f6 !important;
+        }
+        
+        /* スクロールバーを常に表示 */
+        [data-testid="stDataFrame"] {
+            overflow-x: auto !important;
+            max-width: 100% !important;
+        }
+        
+        /* マルチインデックスヘッダー対応 */
+        [data-testid="stDataFrame"] table tr:nth-child(1) th:first-child,
+        [data-testid="stDataFrame"] table tr:nth-child(2) th:first-child {
+            position: sticky !important;
+            left: 0 !important;
+            z-index: 2 !important;
+            background-color: #f0f2f6 !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
     rounds_result = supabase.table('rounds').select('*').eq('finalized', False).order('date_played', desc=True).execute()
     # 未確定ラウンドの存在チェック
     unfinalized_rounds = rounds_result.data
@@ -934,6 +980,38 @@ def run():
         )
         # 結果の表示
         st.write("### スコア詳細")
+        
+        # カスタムCSSを追加して最初の列を固定表示に
+        st.markdown("""
+            <style>
+            /* スコア詳細テーブルのプレイヤー列を固定表示にする */
+            [data-testid="stDataFrame"] table {
+                position: relative;
+            }
+            
+            [data-testid="stDataFrame"] table th:first-child,
+            [data-testid="stDataFrame"] table td:first-child {
+                position: sticky;
+                left: 0;
+                background-color: white;
+                z-index: 1;
+                box-shadow: 2px 0px 3px rgba(0,0,0,0.1);
+            }
+            
+            /* テーブルヘッダーとプレイヤー列の交差部分 */
+            [data-testid="stDataFrame"] table th:first-child {
+                z-index: 2;
+                background-color: white;
+            }
+            
+            /* スクロールバーを常に表示 */
+            [data-testid="stDataFrame"] {
+                overflow-x: auto;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        # DataFrame表示（スタイル定義は従来通り）
         st.dataframe(df.style.format({
             col: '{:+d}' if col.endswith((' Pt', 'Front', 'Back', 'Total', 'Extra')) 
                     and col not in ['Front Score', 'Back Score', 'Total Score', 'Extra Score',
@@ -941,9 +1019,25 @@ def run():
                     else '{:d}'
             for col in df.columns
             if col != 'Player'
-        }))
+        }), use_container_width=True)
+
         # マッチ対戦表の作成と表示
         st.write("### マッチ対戦表")
+        # 星取表のCSSも追加
+        st.markdown("""
+            <style>
+            /* マッチ対戦表のプレイヤー列を固定表示にする */
+            [data-testid="stDataFrame"] + div + div [data-testid="stDataFrame"] table th:first-child,
+            [data-testid="stDataFrame"] + div + div [data-testid="stDataFrame"] table td:first-child {
+                position: sticky;
+                left: 0;
+                background-color: white;
+                z-index: 1;
+                box-shadow: 2px 0px 3px rgba(0,0,0,0.1);
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
         match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
         
         # 表示スタイルを詳細なマッチ結果と揃える
@@ -955,6 +1049,21 @@ def run():
         # 詳細なマッチ結果
         st.write("### 詳細なマッチ結果")
         match_results = create_detailed_match_results(player_data, handicaps, total_only_set)
+        
+        # 詳細マッチ結果のCSS追加 - マルチインデックスヘッダー対応
+        st.markdown("""
+            <style>
+            /* 詳細マッチ結果のプレイヤー列を固定表示にする */
+            [data-testid="stDataFrame"] + div + div + div [data-testid="stDataFrame"] table th:first-child,
+            [data-testid="stDataFrame"] + div + div + div [data-testid="stDataFrame"] table td:first-child {
+                position: sticky;
+                left: 0;
+                background-color: white;
+                z-index: 1;
+                box-shadow: 2px 0px 3px rgba(0,0,0,0.1);
+            }
+            </style>
+        """, unsafe_allow_html=True)
         
         # 各カラムの最大幅を設定（カラム名が長いため適切な幅に調整）
         custom_css = """
@@ -1041,7 +1150,7 @@ def run():
                 try:
                     # 更新データの準備
                     update_data = {}
-                    for mid, data in player_data.items():
+                    for mid, data in player_data:
                         update_data[mid] = {
                             'game_pt': data['Game Pt'],
                             'match_pt': data['Match Pt'],

@@ -175,6 +175,36 @@ def show_all_time_statistics():
     # 結果の表示
     st.markdown("### 全期間通算成績")
     
+    # カスタムCSSを追加して最初の列を固定表示に
+    st.markdown("""
+        <style>
+        /* テーブルのプレイヤー列を固定表示にする */
+        [data-testid="stDataFrame"] table {
+            position: relative;
+        }
+        
+        [data-testid="stDataFrame"] table th:first-child,
+        [data-testid="stDataFrame"] table td:first-child {
+            position: sticky;
+            left: 0;
+            background-color: white;
+            z-index: 1;
+            box-shadow: 2px 0px 3px rgba(0,0,0,0.1);
+        }
+        
+        /* テーブルヘッダーとプレイヤー列の交差部分 */
+        [data-testid="stDataFrame"] table th:first-child {
+            z-index: 2;
+            background-color: white;
+        }
+        
+        /* スクロールバーを常に表示 */
+        [data-testid="stDataFrame"] {
+            overflow-x: auto;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
     # データフレームの表示（数値を見やすく整形）
     formatted_df = df.copy()
     numeric_cols = df.select_dtypes(include=[np.number]).columns
@@ -337,6 +367,25 @@ def show_yearly_statistics():
         
         # 結果の表示
         st.markdown(f"### {selected_year}年度 集計結果")
+        
+        # スタイル追加（この関数内でも同様のCSSを追加）
+        st.markdown("""
+            <style>
+            /* テーブルのプレイヤー列を固定表示にする */
+            [data-testid="stDataFrame"] table {
+                position: relative;
+            }
+            
+            [data-testid="stDataFrame"] table th:first-child,
+            [data-testid="stDataFrame"] table td:first-child {
+                position: sticky;
+                left: 0;
+                background-color: white;
+                z-index: 1;
+                box-shadow: 2px 0px 3px rgba(0,0,0,0.1);
+            }
+            </style>
+        """, unsafe_allow_html=True)
         
         # データフレームの表示（数値を見やすく整形）
         formatted_df = df.copy()
@@ -585,6 +634,25 @@ def show_monthly_statistics():
         
         # 結果の表示
         st.markdown(f"### {year}年{month}月 集計結果")
+        
+        # スタイル追加
+        st.markdown("""
+            <style>
+            /* テーブルのプレイヤー列を固定表示にする */
+            [data-testid="stDataFrame"] table {
+                position: relative;
+            }
+            
+            [data-testid="stDataFrame"] table th:first-child,
+            [data-testid="stDataFrame"] table td:first-child {
+                position: sticky;
+                left: 0;
+                background-color: white;
+                z-index: 1;
+                box-shadow: 2px 0px 3px rgba(0,0,0,0.1);
+            }
+            </style>
+        """, unsafe_allow_html=True)
         
         # データフレームの表示（数値を見やすく整形）
         formatted_df = df.copy()
