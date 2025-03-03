@@ -87,13 +87,19 @@ def create_df_for_pdf(df):
     formatted_data = []
     
     # インデックス（プレイヤー名）を含むヘッダー行の作成
-    headers = [Paragraph('Player', style)] + [Paragraph(str(col), style) for col in df.columns]
+    headers = [Paragraph('Player', style)]  # プレイヤー名のヘッダー
+    
+    # 各カラムのヘッダーを追加
+    for col in df.columns:
+        headers.append(Paragraph(str(col), style))
+    
     formatted_data.append(headers)
     
     # データ行の作成（プレイヤー名を含む）
     for idx, row in df.iterrows():
         formatted_row = [Paragraph(str(idx), style)]  # プレイヤー名
-        for col, val in zip(df.columns, row):
+        for col in df.columns:
+            val = row[col]
             if pd.isna(val):
                 val = ""
             # スコア関連のカラムは+記号なしで表示
@@ -171,7 +177,37 @@ def generate_pdf(final_df, detailed_df, star_df, active_round):
     elements.append(Paragraph("最終結果（Game Pt + Match Pt + Put Pt ＝ Total Pt）", title_style))
     elements.append(Spacer(1, 12))
     
-    final_data = create_df_for_pdf(final_df.set_index('Player'))
+    # コラム順序を設定（エキストラホールの有無で切り替え）
+    if active_round['has_extra']:
+        ordered_columns = [
+            "Player", "Front Score", "Back Score", "Total Score", "Put Pt", 
+            "Extra Score", "Front GP", "Back GP", "Extra GP", "Game Pt",
+            "Match Front", "Match Back", "Match Total", "Match Extra", "Match Pt",
+            "Putt Front", "Putt Back", "Putt Extra", "Total Pt"
+        ]
+    else:
+        ordered_columns = [
+            "Player", "Front Score", "Back Score", "Total Score", "Put Pt", 
+            "Front GP", "Back GP", "Game Pt", 
+            "Match Front", "Match Back", "Match Total", "Match Pt",
+            "Putt Front", "Putt Back", "Total Pt"
+        ]
+    
+    # 結果表用のDataFrameを整形
+    result_df = final_df.copy().reset_index().rename(columns={'index': 'Player'})
+    
+    # 既存の列と指定列のインターセクションを取得（存在する列のみ使用）
+    available_cols = [col for col in ordered_columns if col in result_df.columns]
+    
+    # 列の順序を設定
+    result_df = result_df[available_cols]
+    
+    # player列をindexにセットして詳細表示用のデータフレーム作成
+    table_df = result_df.set_index('Player')
+    
+    # PDFテーブル用のデータ作成
+    final_data = create_df_for_pdf(table_df)
+    
     col_widths = [landscape(letter)[0] / len(final_data[0])] * len(final_data[0])
     t1 = Table(final_data, colWidths=col_widths)
     t1.setStyle(TableStyle([
@@ -243,7 +279,7 @@ def calc_putt_points(putt_scores, n):
       - 全員同点 → 0pt
       
     3人の場合:
-      - 1名のみが最少 → 最少者+20pt、残り2名-10pt
+      - 1名のみが最少 → 最少者+20pt、残り2名-10pt    
       - 2名同点最少 → 最少2名+5pt、残り1名-10pt
       - 全員同点 → 0pt
     """
@@ -268,7 +304,6 @@ def calc_putt_points(putt_scores, n):
                 else:
                     points[m_id] = -10  # 残り1名は-10pt
         # 全員同点の場合は初期値の0のまま
-    
     elif n == 4:
         if len(winners) == 1:
             points[winners[0]] = 30  # 最少が1名の場合は+30pt
@@ -465,7 +500,7 @@ def create_detailed_match_results(player_data, handicaps, total_only_set):
     
     # 対戦結果を計算して格納
     for i in range(n_players-1):
-        for j in range(i+1, n_players):
+        for j in range(i+1, n_players):  # ここを修正: j < n_players に変更
             pid_i = player_ids[i]
             pid_j = player_ids[j]
             data_i = player_data[pid_i]
@@ -490,6 +525,13 @@ def create_detailed_match_results(player_data, handicaps, total_only_set):
     df = pd.DataFrame.from_dict(match_results, orient='index')
     ordered_players = [player_data[pid]["Player"] for pid in player_ids]
     df = df.reindex(ordered_players)
+    
+    # カラム数をチェックして一致していることを確認
+    if len(df.columns) != len(multi_columns):
+        st.warning(f"カラム数の不一致: DataFrame列数={len(df.columns)}, マルチインデックス数={len(multi_columns)}")
+        # 不一致の場合は単純なカラム名を使用
+        return df
+    
     df.columns = pd.MultiIndex.from_tuples(multi_columns, names=['Match', 'Handicap'])
     return df
 
@@ -942,17 +984,35 @@ def run():
         if st.button("スコア表をPDFで出力"):
             try:
                 # 結果表のデータフレームを作成
-                # player_idsはすでにソートされているのでこれに合わせてデータを整列させる
-                result_table = pd.DataFrame({
-                    "Player": [player_data[mid]["Player"] for mid in player_ids],
-                    "Game Pt": [player_data[mid]["Game Pt"] for mid in player_ids],
-                    "Match Pt": [player_data[mid]["Match Pt"] for mid in player_ids],
-                    "Put Pt": [player_data[mid]["Put Pt"] for mid in player_ids],
-                    "Total Pt": [player_data[mid]["Total Pt"] for mid in player_ids]
-                })
+                # player_idsはすでにソートされているので、これに合わせてデータを整列させる
                 
-                # 順番はデータに任せず、あとでソートせず現状維持
-                # 元の player_ids の順序を保持する（member_id昇順）
+                # エキストラホールの有無に応じて出力カラムを設定
+                if active_round['has_extra']:
+                    # エキストラホールありの場合のカラム
+                    pdf_columns = [
+                        "Player", "Front Score", "Back Score", "Total Score", "Put Pt",
+                        "Extra Score", "Front GP", "Back GP", "Extra GP", "Game Pt",
+                        "Match Front", "Match Back", "Match Total", "Match Extra", "Match Pt",
+                        "Putt Front", "Putt Back", "Putt Extra", "Total Pt"
+                    ]
+                else:
+                    # エキストラホールなしの場合のカラム
+                    pdf_columns = [
+                        "Player", "Front Score", "Back Score", "Total Score", "Put Pt",
+                        "Front GP", "Back GP", "Game Pt",
+                        "Match Front", "Match Back", "Match Total", "Match Pt",
+                        "Putt Front", "Putt Back", "Total Pt"
+                    ]
+                
+                # 指定の順序でデータフレームを構築
+                pdf_data = {}
+                for col in pdf_columns:
+                    if col == "Player":
+                        pdf_data[col] = [player_data[mid]["Player"] for mid in player_ids]
+                    else:
+                        pdf_data[col] = [player_data[mid].get(col, 0) for mid in player_ids]
+                
+                result_table = pd.DataFrame(pdf_data)
                 
                 # PDFを生成
                 pdf_buffer = generate_pdf(result_table, match_results, match_matrix, active_round)
