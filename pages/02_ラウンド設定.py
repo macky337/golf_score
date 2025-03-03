@@ -224,6 +224,9 @@ def run():
                 round_result = supabase.table('rounds').insert(round_data).execute()
                 round_id = round_result.data[0]['round_id']
 
+                # アクティブなラウンドIDをセッション状態に保存
+                st.session_state.active_round_id = round_id
+
                 # スコアの作成（頑健な実装に置き換え）
                 success_count, failed_members = create_scores(round_id, selected_members, member_dict)
                 

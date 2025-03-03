@@ -203,7 +203,7 @@ def generate_pdf(final_df, detailed_df, star_df, active_round):
     result_df = result_df[available_cols]
     
     # player列をindexにセットして詳細表示用のデータフレーム作成
-    table_df = result_df.set_index('Player')
+    table_df = result_df.setIndex('Player')
     
     # PDFテーブル用のデータ作成
     final_data = create_df_for_pdf(table_df)
@@ -291,6 +291,7 @@ def calc_putt_points(putt_scores, n):
     winners = [m_id for m_id, score in putt_scores.items() if score == min_score]
     points = {m_id: 0 for m_id in putt_scores}
     
+    # 正しく実装されたロジック
     if n == 3:
         if len(winners) == 1:
             points[winners[0]] = 20  # 最少が1名の場合は+20pt
