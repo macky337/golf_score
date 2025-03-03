@@ -178,29 +178,41 @@ def show_all_time_statistics():
     # カスタムCSSを追加して最初の列を固定表示に
     st.markdown("""
         <style>
-        /* テーブルのプレイヤー列を固定表示にする */
-        [data-testid="stDataFrame"] table {
-            position: relative;
+        /* プレイヤー列を強制的に固定表示するためのより強力なCSS */
+        [data-testid="stDataFrame"] div[data-testid="stTable"] table,
+        [data-testid="stDataFrame"] > div > div > div > div > div table {
+            position: relative !important;
+            border-collapse: collapse !important;
+            table-layout: auto !important;
         }
         
-        [data-testid="stDataFrame"] table th:first-child,
-        [data-testid="stDataFrame"] table td:first-child {
-            position: sticky;
-            left: 0;
-            background-color: white;
-            z-index: 1;
-            box-shadow: 2px 0px 3px rgba(0,0,0,0.1);
+        [data-testid="stDataFrame"] div[data-testid="stTable"] table th:first-of-type,
+        [data-testid="stDataFrame"] div[data-testid="stTable"] table td:first-of-type,
+        [data-testid="stDataFrame"] > div > div > div > div > div table th:first-of-type,
+        [data-testid="stDataFrame"] > div > div > div > div > div table td:first-of-type {
+            position: sticky !important;
+            left: 0 !important;
+            background-color: white !important;
+            z-index: 10 !important;
+            box-shadow: 2px 0px 3px rgba(0,0,0,0.1) !important;
+            min-width: 100px !important;
         }
         
-        /* テーブルヘッダーとプレイヤー列の交差部分 */
-        [data-testid="stDataFrame"] table th:first-child {
-            z-index: 2;
-            background-color: white;
+        /* ヘッダーとプレイヤー列の交差部分 */
+        [data-testid="stDataFrame"] div[data-testid="stTable"] table thead tr:first-child th:first-child,
+        [data-testid="stDataFrame"] div[data-testid="stTable"] table thead tr:nth-child(2) th:first-child,
+        [data-testid="stDataFrame"] > div > div > div > div > div table thead tr:first-child th:first-child,
+        [data-testid="stDataFrame"] > div > div > div > div > div table thead tr:nth-child(2) th:first-child {
+            z-index: 20 !important;
+            background-color: #f0f2f6 !important;
         }
         
-        /* スクロールバーを常に表示 */
-        [data-testid="stDataFrame"] {
-            overflow-x: auto;
+        /* すべてのヘッダーセルの背景色を設定 */
+        [data-testid="stDataFrame"] div[data-testid="stTable"] table thead th,
+        [data-testid="stDataFrame"] > div > div > div > div > div table thead th {
+            background-color: #f0f2f6 !important;
+            position: relative !important;
+            z-index: 5 !important;
         }
         </style>
     """, unsafe_allow_html=True)
