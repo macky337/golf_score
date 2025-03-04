@@ -635,7 +635,7 @@ def run():
         [data-testid="stDataFrame"] > div > div > div > div > div table td:first-of-type {
             position: sticky !important;
             left: 0 !important;
-            background-color: white !重要;
+            background-color: white !important;
             z-index: 10 !important;
             box-shadow: 2px 0px 3px rgba(0,0,0,0.1) !important;
             min-width: 100px !important;
@@ -668,7 +668,7 @@ def run():
         /* マルチインデックスヘッダー対応 */
         [data-testid="stDataFrame"] div[data-testid="stTable"] table tr th:first-child,
         [data-testid="stDataFrame"] > div > div > div > div > div table tr th:first-child {
-            position: sticky !important;
+            position: sticky !重要;
             left: 0 !important;
             z-index: 20 !important;
         }
