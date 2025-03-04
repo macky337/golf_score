@@ -3,6 +3,7 @@
 ## [2025-03-04]
 
 ### 更新
+- マッチポイントのロジックを修正した
 - Merge remote-tracking branch 'origin/main' into develop
 - Fix player column stickiness in result confirmation page
 - 06_結果確認.py を更新

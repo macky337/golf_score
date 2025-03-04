@@ -86,37 +86,42 @@ def create_df_for_pdf(df):
     
     formatted_data = []
     
-    # インデックス（プレイヤー名）を含むヘッダー行の作成
-    headers = [Paragraph('Player', style)]  # プレイヤー名のヘッダー
-    
-    # 各カラムのヘッダーを追加
+    # ヘッダー行
+    headers = [Paragraph('Player', style)]
     for col in df.columns:
         headers.append(Paragraph(str(col), style))
-    
     formatted_data.append(headers)
     
-    # データ行の作成（プレイヤー名を含む）
+    # データ行の作成
     for idx, row in df.iterrows():
-        formatted_row = [Paragraph(str(idx), style)]  # プレイヤー名
+        formatted_row = [Paragraph(str(idx), style)]
         for col in df.columns:
             val = row[col]
             if pd.isna(val):
                 val = ""
-            # スコア関連のカラムは+記号なしで表示
-            if col in ['Front Score', 'Back Score', 'Total Score', 'Extra Score']:
-                if isinstance(val, (int, float)):
-                    val = f"{int(val)}"
-            # その他のカラムは従来通り+記号付きで表示
+            # スコア関連のカラム（符号なし表示）
+            elif col in ['Front Score', 'Back Score', 'Total Score', 'Extra Score', 
+                         'Putt Front', 'Putt Back', 'Putt Extra']:
+                val = f"{int(round(val))}" if isinstance(val, (int, float)) else str(val)
+            # Match系カラム（符号付きの整数表示）
+            elif col in ['Match Front', 'Match Back', 'Match Total', 'Match Extra', 'Match Pt']:
+                try:
+                    val = f"{int(round(val)):+d}" if isinstance(val, (int, float)) else str(val)
+                except ValueError:
+                    val = "0"  # 変換に失敗した場合は "0" を表示
+            # ゲーム点、パット得点、合計点
+            elif col in ['Front GP', 'Back GP', 'Extra GP', 'Game Pt', 'Put Pt', 'Total Pt']:
+                val = f"{int(round(val)):+d}" if isinstance(val, (int, float)) and val != 0 else "0"
             else:
-                if isinstance(val, (int, float)):
-                    val = f"{val:+d}" if val != 0 else "0"
+                val = str(val)
+            
             formatted_row.append(Paragraph(str(val), style))
         formatted_data.append(formatted_row)
     
     return formatted_data
 
 def get_round_date_attr(active_round):
-    """Roundモデルで利用可能な日付属性を返す。
+    """Roundモデルで利用可能な日付属性を返す。round_date > created_at
     優先順位: play_date > date > round_date > created_at
     """
     for attr in ['play_date', 'date', 'round_date', 'created_at']:
@@ -146,7 +151,7 @@ def generate_pdf(final_df, detailed_df, star_df, active_round):
     
     elements = []
     
-    # メインタイトルのスタイル定義
+    # スタイル定義
     main_title_style = ParagraphStyle(
         'MainTitle',
         fontName=FONT_NAME,
@@ -155,8 +160,7 @@ def generate_pdf(final_df, detailed_df, star_df, active_round):
         alignment=1,
         spaceAfter=10
     )
-
-    # サブタイトルのスタイル
+    
     title_style = ParagraphStyle(
         'Title',
         fontName=FONT_NAME,
@@ -164,53 +168,27 @@ def generate_pdf(final_df, detailed_df, star_df, active_round):
         leading=16,
         alignment=1
     )
-
-    # プレイ日とコース名を取得（辞書アクセス方式に修正）
+    
+    # プレイ日とコース名を取得
     play_date = datetime.datetime.strptime(active_round['date_played'], '%Y-%m-%d').strftime('%Y年%m月%d日')
     course_name = active_round['course_name'] if 'course_name' in active_round else ''
     
-    # タイトル行を追加
+    # セクション1: メインタイトル
     elements.append(Paragraph(f"{play_date} {course_name} スコア集計結果", main_title_style))
     elements.append(Spacer(1, 20))
-
-    # セクション1: 最終結果
-    elements.append(Paragraph("最終結果（Game Pt + Match Pt + Put Pt ＝ Total Pt）", title_style))
-    elements.append(Spacer(1, 12))
     
-    # コラム順序を設定（エキストラホールの有無で切り替え）
-    if active_round['has_extra']:
-        ordered_columns = [
-            "Player", "Front Score", "Back Score", "Total Score", "Put Pt", 
-            "Extra Score", "Front GP", "Back GP", "Extra GP", "Game Pt",
-            "Match Front", "Match Back", "Match Total", "Match Extra", "Match Pt",
-            "Putt Front", "Putt Back", "Putt Extra", "Total Pt"
-        ]
-    else:
-        ordered_columns = [
-            "Player", "Front Score", "Back Score", "Total Score", "Put Pt", 
-            "Front GP", "Back GP", "Game Pt", 
-            "Match Front", "Match Back", "Match Total", "Match Pt",
-            "Putt Front", "Putt Back", "Total Pt"
-        ]
+    # Match系カラムを確実に数値型に変換
+    for col in ['Match Front', 'Match Back', 'Match Total', 'Match Pt']:
+        if col in final_df.columns:
+            final_df[col] = pd.to_numeric(final_df[col], errors='coerce').fillna(0)
     
-    # 結果表用のDataFrameを整形
-    result_df = final_df.copy().reset_index().rename(columns={'index': 'Player'})
+    # テーブルデータの作成
+    table_data = create_df_for_pdf(final_df)
     
-    # 既存の列と指定列のインターセクションを取得（存在する列のみ使用）
-    available_cols = [col for col in ordered_columns if col in result_df.columns]
-    
-    # 列の順序を設定
-    result_df = result_df[available_cols]
-    
-    # player列をindexにセットして詳細表示用のデータフレーム作成
-    table_df = result_df.set_index('Player')
-    
-    # PDFテーブル用のデータ作成
-    final_data = create_df_for_pdf(table_df)
-    
-    col_widths = [landscape(letter)[0] / len(final_data[0])] * len(final_data[0])
-    t1 = Table(final_data, colWidths=col_widths)
-    t1.setStyle(TableStyle([
+    # テーブルの設定
+    col_widths = [landscape(letter)[0] / len(table_data[0])] * len(table_data[0])
+    table = Table(table_data, colWidths=col_widths)
+    table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -221,9 +199,8 @@ def generate_pdf(final_df, detailed_df, star_df, active_round):
         ('TOPPADDING', (0, 0), (-1, -1), 3),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
     ]))
-    elements.append(t1)
-    elements.append(Spacer(1, 20))
-
+    elements.append(table)
+    
     # セクション2: マッチ戦詳細結果
     elements.append(Paragraph("マッチ戦詳細結果", title_style))
     elements.append(Spacer(1, 12))
@@ -244,9 +221,9 @@ def generate_pdf(final_df, detailed_df, star_df, active_round):
     ]))
     elements.append(t2)
     elements.append(Spacer(1, 20))
-
+    
     # セクション3: 対戦表
-    elements.append(Paragraph("対戦結果（Much Pt 集計）", title_style))
+    elements.append(Paragraph("対戦結果（Match Pt 集計）", title_style))
     elements.append(Spacer(1, 12))
     
     star_data = create_df_for_pdf(star_df)  # インデックスを保持
@@ -264,34 +241,21 @@ def generate_pdf(final_df, detailed_df, star_df, active_round):
         ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
     ]))
     elements.append(t3)
-
+    
     doc.build(elements)
     buffer.seek(0)
     return buffer
 
 def calc_putt_points(putt_scores, n):
-    """パット戦の得点計算（4人 or 3人の場合）
-    
-    4人の場合:
-      - 1名のみが最少 → 最少者+30pt、残り3名-10pt
-      - 2名同点最少 → 最少2名+10pt、残り2名-10pt
-      - 3名同点最少 → 最少3名+10pt、残り1名-30pt
-      - 全員同点 → 0pt
-      
-    3人の場合:
-      - 1名のみが最少 → 最少者+20pt、残り2名-10pt    
-      - 2名同点最少 → 最少2名+5pt、残り1名-10pt
-      - 全員同点 → 0pt
-    """
+    """パット戦の得点計算（4人 or 3人の場合）"""
     if not putt_scores:  # スコアが空の場合
         return {}
-        
+    
     scores = list(putt_scores.values())
     min_score = min(scores)
     winners = [m_id for m_id, score in putt_scores.items() if score == min_score]
     points = {m_id: 0 for m_id in putt_scores}
     
-    # 正しく実装されたロジック
     if n == 3:
         if len(winners) == 1:
             points[winners[0]] = 20  # 最少が1名の場合は+20pt
@@ -304,7 +268,6 @@ def calc_putt_points(putt_scores, n):
                     points[m_id] = 5  # 最少が2名の場合は+5pt
                 else:
                     points[m_id] = -10  # 残り1名は-10pt
-        # 全員同点の場合は初期値の0のまま
     elif n == 4:
         if len(winners) == 1:
             points[winners[0]] = 30  # 最少が1名の場合は+30pt
@@ -323,36 +286,30 @@ def calc_putt_points(putt_scores, n):
                     points[m_id] = 10  # 最少が3名の場合は+10pt
                 else:
                     points[m_id] = -30  # 残り1名は-30pt
-        # 全員同点の場合は初期値の0のまま
     
     return points
 
 def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=False):
     """1対1のマッチポイント計算（各セクション±10pt）"""
     front_pt = back_pt = total_pt = extra_pt = 0
-
+    
     if is_total_only:
-        # Total Onlyモードではトータルスコアとエキストラスコアの比較のみ行い
-        # Front/Backは無視して、Totalで±10pt
+        # Total Onlyモードではトータルスコアとエキストラスコアの比較のみ行う
         total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
         total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
         if total_i < total_j:
-            total_pt = 10  # ±10pt
+            total_pt = 10
         elif total_i > total_j:
-            total_pt = -10  # ±10pt
-            
+            total_pt = -10
+        
         # エキストラスコアがある場合は比較
         if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
             extra_i = calc_net_extra(data_i, handicap_ij)
             extra_j = calc_net_extra(data_j, handicap_ji)
             if extra_i < extra_j:
-                extra_pt = 10  # ±10pt
+                extra_pt = 10
             elif extra_i > extra_j:
-                extra_pt = -10  # ±10pt
-                
-        # Front/Backのポイントはゼロ
-        front_pt = 0
-        back_pt = 0
+                extra_pt = -10
     else:
         # 通常モード - 各セクションごとに比較
         front_i = calc_net_score(data_i, "Front Score", handicap_ij, multiplier=1)
@@ -361,7 +318,7 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
             front_pt = 10
         elif front_i > front_j:
             front_pt = -10
-            
+        
         if safe_get_score(data_i, "Back Score") > 0 and safe_get_score(data_j, "Back Score") > 0:
             back_i = calc_net_score(data_i, "Back Score", handicap_ij, multiplier=1)
             back_j = calc_net_score(data_j, "Back Score", handicap_ji, multiplier=1)
@@ -369,14 +326,14 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
                 back_pt = 10
             elif back_i > back_j:
                 back_pt = -10
-                
-            total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
-            total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
-            if total_i < total_j:
-                total_pt = 10
-            elif total_i > total_j:
-                total_pt = -10
-                
+        
+        total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
+        total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
+        if total_i < total_j:
+            total_pt = 10
+        elif total_i > total_j:
+            total_pt = -10
+        
         if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
             extra_i = calc_net_extra(data_i, handicap_ij)
             extra_j = calc_net_extra(data_j, handicap_ji)
@@ -384,7 +341,7 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
                 extra_pt = 10
             elif extra_i > extra_j:
                 extra_pt = -10
-
+    
     # スコア情報を更新
     data_i["Match Front"] = front_pt
     data_i["Match Back"] = back_pt
@@ -394,8 +351,8 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
     data_j["Match Back"] = -back_pt
     data_j["Match Total"] = -total_pt
     data_j["Match Extra"] = -extra_pt
-
-    # 合計ポイントを計算 - 制限なしで元の計算結果をそのまま返す
+    
+    # 合計ポイントを計算
     total_points_i = front_pt + back_pt + total_pt + extra_pt
     total_points_j = -(front_pt + back_pt + total_pt + extra_pt)
     
@@ -575,37 +532,33 @@ def get_pdf_filename(active_round):
 def test_calculation_logic(round_id):
     """計算ロジックのテストを行う"""
     supabase = get_supabase_client()
-    
+    from pages.handicap_calc_logic import process_round_scores
     st.subheader("計算ロジックのテスト")
-    
     # スコアデータを取得
     scores = get_scores_with_fallback(round_id)
     if not scores:
         st.error("スコアデータが取得できませんでした")
         return
-    
+
     # ハンディキャップデータを取得
     handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
     handicaps_data = handicaps_result.data
     if not handicaps_data:
         st.error("ハンディキャップデータが取得できませんでした")
         return
-    
+
     # ラウンド情報を取得
     round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
     round_data = round_result.data[0] if round_result.data else None
     if not round_data:
         st.error("ラウンド情報が取得できませんでした")
         return
-    
+
     # テスト実行
-    from pages.handicap_calc_logic import process_round_scores
     with st.spinner("計算ロジックをテスト中..."):
         updated_scores = process_round_scores(scores, handicaps_data, round_data)
-    
-    # 結果表示
-    st.success(f"{len(updated_scores)}名分のスコア計算が完了しました")
-    
+        st.success(f"{len(updated_scores)}名分のスコア計算が完了しました")
+
     # 詳細表示
     with st.expander("計算結果の詳細を表示"):
         for score in updated_scores:
@@ -619,83 +572,76 @@ def test_calculation_logic(round_id):
 def run():
     # Supabaseクライアントの取得
     supabase = get_supabase_client()
-    # Supabaseクライアントの取得
     col1, col2 = st.columns([0.8, 0.2])
     with col1:
         st.title("結果確認")
     with col2:
         if st.button("🏠 Home"):
             switch_page("Main")
-    
-    # カスタムCSSを追加して最初の列を固定表示に（より強力な選択子で確実に適用）
-    st.markdown("""
-        <style>
-        /* プレイヤー列を強制的に固定表示するためのより強力なCSS */
-        [data-testid="stDataFrame"] div[data-testid="stTable"] table,
-        [data-testid="stDataFrame"] > div > div > div > div > div table {
-            position: relative !important;
-            border-collapse: collapse !important;
-            table-layout: auto !important;
-        }
-        
-        [data-testid="stDataFrame"] div[data-testid="stTable"] table th:first-of-type,
-        [data-testid="stDataFrame"] div[data-testid="stTable"] table td:first-of-type,
-        [data-testid="stDataFrame"] > div > div > div > div > div table th:first-of-type,
-        [data-testid="stDataFrame"] > div > div > div > div > div table td:first-of-type {
-            position: sticky !important;
-            left: 0 !important;
-            background-color: white !重要;
-            z-index: 10 !important;
-            box-shadow: 2px 0px 3px rgba(0,0,0,0.1) !important;
-            min-width: 100px !important;
-        }
-        
-        /* ヘッダーとプレイヤー列の交差部分 */
-        [data-testid="stDataFrame"] div[data-testid="stTable"] table thead tr:first-child th:first-child,
-        [data-testid="stDataFrame"] div[data-testid="stTable"] table thead tr:nth-child(2) th:first-child,
-        [data-testid="stDataFrame"] > div > div > div > div > div table thead tr:first-child th:first-child,
-        [data-testid="stDataFrame"] > div > div > div > div > div table thead tr:nth-child(2) th:first-child {
-            z-index: 20 !important;
-            background-color: #f0f2f6 !important;
-        }
-        
-        /* すべてのヘッダーセルの背景色を設定 */
-        [data-testid="stDataFrame"] div[data-testid="stTable"] table thead th,
-        [data-testid="stDataFrame"] > div > div > div > div > div table thead th {
-            background-color: #f0f2f6 !important;
-            position: relative !important;
-            z-index: 5 !important;
-        }
-        
-        /* スクロールコンテナを指定 */
-        [data-testid="stDataFrame"] > div {
-            overflow-x: auto !important;
-            max-width: 100% !important;
-            display: block !important;
-        }
-        
-        /* マルチインデックスヘッダー対応 */
-        [data-testid="stDataFrame"] div[data-testid="stTable"] table tr th:first-child,
-        [data-testid="stDataFrame"] > div > div > div > div > div table tr th:first-child {
-            position: sticky !重要;
-            left: 0 !important;
-            z-index: 20 !important;
-        }
-        
-        /* スタイルの優先度を上げる */
-        html body [data-testid="stDataFrame"] div[data-testid="stTable"] table td:first-of-type {
-            position: sticky !important;
-            left: 0 !important;
-            background-color: white !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
+
+    with col1:
+        # カスタムCSSを追加して最初の列を固定表示に（より強力な選択子で確実に適用）
+        st.markdown("""
+            <style>
+            /* スコア詳細テーブルのプレイヤー列を強制的に固定表示するためのより強力なCSS */
+            [data-testid="stDataFrame"] div[data-testid="stTable"] table,
+            [data-testid="stDataFrame"] > div > div > div > div > div table {
+                position: relative !important;
+                border-collapse: collapse !important;
+                table-layout: auto !important;
+            }
+            [data-testid="stDataFrame"] div[data-testid="stTable"] table th:first-of-type,
+            [data-testid="stDataFrame"] div[data-testid="stTable"] table td:first-of-type,
+            [data-testid="stDataFrame"] > div > div > div > div > div table th:first-of-type,
+            [data-testid="stDataFrame"] > div > div > div > div > div table td:first-of-type {
+                position: sticky !important;
+                left: 0 !important;
+                background-color: white !important;
+                z-index: 10 !important;
+                box-shadow: 2px 0px 3px rgba(0,0,0,0.1) !important;
+                min-width: 100px !important;
+            }
+            /* ヘッダーとプレイヤー列の交差部分 */
+            [data-testid="stDataFrame"] div[data-testid="stTable"] table thead tr:first-child th:first-child,
+            [data-testid="stDataFrame"] div[data-testid="stTable"] table thead tr:nth-child(2) th:first-child,
+            [data-testid="stDataFrame"] > div > div > div > div > div table thead tr:nth-child(2) th:first-child {
+                z-index: 20 !important;
+                background-color: #f0f2f6 !important;
+            }
+            /* すべてのヘッダーセルの背景色を設定 */
+            [data-testid="stDataFrame"] div[data-testid="stTable"] table thead th,
+            [data-testid="stDataFrame"] > div > div > div > div > div table thead th {
+                background-color: #f0f2f6 !important;
+                position: relative !important;
+                z-index: 5 !important;
+            }
+            /* スクロールコンテナを指定 */
+            [data-testid="stDataFrame"] > div {
+                overflow-x: auto !important;
+                max-width: 100% !important;
+                display: block !important;
+            }
+            /* マルチインデックスヘッダー対応 */
+            [data-testid="stDataFrame"] div[data-testid="stTable"] table tr th:first-child,
+            [data-testid="stDataFrame"] > div > div > div > div > div table tr th:first-child {
+                position: sticky !important;
+                left: 0 !important;
+                z-index: 20 !important;
+            }
+            /* スタイルの優先度を上げる */
+            html body [data-testid="stDataFrame"] div[data-testid="stTable"] table td:first-of-type {
+                position: sticky !important;
+                left: 0 !important;
+                background-color: white !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
+    # 未確定ラウンドの取得
     rounds_result = supabase.table('rounds').select('*').eq('finalized', False).order('date_played', desc=True).execute()
-    # 未確定ラウンドの存在チェック
     unfinalized_rounds = rounds_result.data
-    all_rounds_result = supabase.table('rounds').select('*').order('date_played', desc=True).execute()
     # すべてのラウンドを取得（date_playedで降順ソート）
+    all_rounds_result = supabase.table('rounds').select('*').order('date_played', desc=True).execute()
     all_rounds = all_rounds_result.data
     if unfinalized_rounds:
         # 未確定ラウンドがある場合は警告表示
@@ -724,7 +670,7 @@ def run():
         round_id = int(selected_round_str.split("ID: ")[1].rstrip(")"))
         # セッションにスコアをキャッシュ
         cache_scores_in_session(round_id)
-        # ラウンド情報を取得
+        # ラウンド情報を取得準備
         round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
         active_round = round_result.data[0] if round_result.data else None
         if not active_round:
@@ -736,18 +682,15 @@ def run():
         except Exception as e:
             handle_error(e)
             return  # エラー発生時は処理を中断
-        
         # デバッグ情報を非表示に修正
         if st.session_state.get("debug_mode", False):  # デバッグモード時のみ表示
             st.write(f"取得したスコア数: {len(scores)}")
             if scores:
                 sample = scores[0]
                 st.write(f"サンプルデータ構造: {list(sample.keys())}")
-        
         if not scores:
             st.warning("スコアデータが見つかりません。")
             return
-            
         # ハンディキャップデータの取得
         handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
         handicaps_data = handicaps_result.data
@@ -844,7 +787,6 @@ def run():
             player_data[mid]["Match Total"] = 0
             player_data[mid]["Match Extra"] = 0
             player_data[mid]["Match Pt"] = 0
-            
         # マッチポイントの計算
         for i in range(len(player_ids)):
             for j in range(i+1, len(player_ids)):
@@ -853,7 +795,6 @@ def run():
                 data_i = player_data[pid_i]
                 data_j = player_data[pid_j]
                 pair_key = frozenset([pid_i, pid_j])
-                
                 # total_onlyモードの場合は専用の処理
                 if pair_key in total_only_set:
                     # Total Onlyモード - Front/Backはスキップ、TotalとExtraだけ計算
@@ -869,7 +810,6 @@ def run():
                         data_j["Match Total"] -= points
                         data_i["Match Pt"] += points
                         data_j["Match Pt"] -= points
-                    
                     # Extra (if exists)
                     if active_round['has_extra']:
                         points = calc_match_points_by_section(
@@ -885,7 +825,7 @@ def run():
                             data_j["Match Pt"] -= points
                 else:
                     # 通常モード（Front, Back, Total, Extra別々に勝敗を決める）
-                    # Front
+                    # Front - バックスコアが入力されている場合のみ判定
                     points = calc_match_points_by_section(
                         data_i, data_j,
                         handicaps.get((pid_j, pid_i), 0),
@@ -897,7 +837,6 @@ def run():
                         data_j["Match Front"] -= points
                         data_i["Match Pt"] += points
                         data_j["Match Pt"] -= points
-                    
                     # Back
                     points = calc_match_points_by_section(
                         data_i, data_j,
@@ -910,7 +849,6 @@ def run():
                         data_j["Match Back"] -= points
                         data_i["Match Pt"] += points
                         data_j["Match Pt"] -= points
-                    
                     # Total - バックスコアが入力されている場合のみ判定
                     points = calc_match_points_by_section(
                         data_i, data_j,
@@ -923,7 +861,6 @@ def run():
                         data_j["Match Total"] -= points
                         data_i["Match Pt"] += points
                         data_j["Match Pt"] -= points
-                    
                     # Extra (if exists)
                     if active_round['has_extra']:
                         points = calc_match_points_by_section(
@@ -937,7 +874,6 @@ def run():
                             data_j["Match Extra"] -= points
                             data_i["Match Pt"] += points
                             data_j["Match Pt"] -= points
-        
         # 最終的なトータルポイントの計算 - マッチポイントの再計算はしない
         for mid in player_data:
             d = player_data[mid]
@@ -954,15 +890,13 @@ def run():
                 player_name = data["Player"]
                 match_pt = data["Match Pt"]
                 st.text(f"{player_name}: {match_pt:+d} pt")
-                
             # 期待される値を表示
             expected = {
                 "荒巻": +20,
                 "吉井": +30,
                 "福澤": +40,
-                "清村": -90
+                "清村": -90,
             }
-            
             # 期待値との差異を確認
             found_mismatch = False
             for name, expected_pt in expected.items():
@@ -970,10 +904,8 @@ def run():
                     if data["Player"] == name and data["Match Pt"] != expected_pt:
                         st.warning(f"{name}のマッチポイントが期待値と異なります: 実際={data['Match Pt']:+d}pt, 期待={expected_pt:+d}pt")
                         found_mismatch = True
-            
             if not found_mismatch:
                 st.success("全プレイヤーのマッチポイントが期待値通りです！")
-                
         # 表示用のDataFrameを作成（プレイヤーをmember_idの昇順で並べ替え）
         df_columns = [
             "Player",
@@ -983,38 +915,16 @@ def run():
         if active_round['has_extra']:
             df_columns.append("Extra Score")
         df_columns.extend([
-            "Front GP", "Back GP"
+            "Front GP", "Back GP", "Extra GP", "Game Pt",
+            "Match Front", "Match Back", "Match Total", "Match Extra", "Match Pt",
+            "Putt Front", "Putt Back", "Putt Extra", "Total Pt"
         ])
-        if active_round['has_extra']:
-            df_columns.append("Extra GP")
-        df_columns.extend([
-            "Game Pt",
-            "Match Front", "Match Back", "Match Total"
-        ])
-        if active_round['has_extra']:
-            df_columns.append("Match Extra")
-        df_columns.extend([
-            "Match Pt",
-            "Putt Front", "Putt Back"
-        ])
-        if active_round['has_extra']:
-            df_columns.append("Putt Extra")
-        df_columns.extend([
-            "Put Pt",
-            "Total Pt"
-        ])
-        # Putt Extraがなければ追加
-        for mid in player_data:
-            if "Putt Extra" not in player_data[mid]:
-                player_data[mid]["Putt Extra"] = player_data[mid].get("extra_putt", 0)
-        # DataFrameの作成時にmember_idの昇順に従ってデータを整列させる
         df = pd.DataFrame(
             {col: player_data[mid].get(col, 0) for col in df_columns}  # dataにキーがない場合は0をデフォルト値とする
             for mid in player_ids  # ソートされたIDリストを使用
         )
         # 結果の表示
         st.write("### スコア詳細")
-        
         # カスタムCSSを追加して最初の列を固定表示に
         st.markdown("""
             <style>
@@ -1022,7 +932,6 @@ def run():
             [data-testid="stDataFrame"] table {
                 position: relative;
             }
-            
             [data-testid="stDataFrame"] table th:first-child,
             [data-testid="stDataFrame"] table td:first-child {
                 position: sticky;
@@ -1031,20 +940,17 @@ def run():
                 z-index: 1;
                 box-shadow: 2px 0px 3px rgba(0,0,0,0.1);
             }
-            
             /* テーブルヘッダーとプレイヤー列の交差部分 */
             [data-testid="stDataFrame"] table th:first-child {
                 z-index: 2;
                 background-color: white;
             }
-            
             /* スクロールバーを常に表示 */
             [data-testid="stDataFrame"] {
                 overflow-x: auto;
             }
             </style>
         """, unsafe_allow_html=True)
-        
         # DataFrame表示（スタイル定義は従来通り）
         st.dataframe(df.style.format({
             col: '{:+d}' if col.endswith((' Pt', 'Front', 'Back', 'Total', 'Extra')) 
@@ -1054,13 +960,13 @@ def run():
             for col in df.columns
             if col != 'Player'
         }), use_container_width=True)
-
         # マッチ対戦表の作成と表示
         st.write("### マッチ対戦表")
         # 星取表のCSSも追加
         st.markdown("""
             <style>
             /* マッチ対戦表のプレイヤー列を固定表示にする */
+            [data-testid="stDataFrame"] + div + div + div [data-testid="stDataFrame"] table th:first-child,
             [data-testid="stDataFrame"] + div + div [data-testid="stDataFrame"] table th:first-child,
             [data-testid="stDataFrame"] + div + div [data-testid="stDataFrame"] table td:first-child {
                 position: sticky;
@@ -1071,19 +977,15 @@ def run():
             }
             </style>
         """, unsafe_allow_html=True)
-        
         match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
-        
         # 表示スタイルを詳細なマッチ結果と揃える
         st.dataframe(
             match_matrix.style.map(color_points)  # color_points関数を適用して背景色を設定
                          .format(None)  # フォーマットはそのまま
         )
-        
         # 詳細なマッチ結果
         st.write("### 詳細なマッチ結果")
         match_results = create_detailed_match_results(player_data, handicaps, total_only_set)
-        
         # 詳細マッチ結果のCSS追加 - マルチインデックスヘッダー対応
         st.markdown("""
             <style>
@@ -1098,13 +1000,12 @@ def run():
             }
             </style>
         """, unsafe_allow_html=True)
-        
         # 各カラムの最大幅を設定（カラム名が長いため適切な幅に調整）
         custom_css = """
         <style>
         .detailed-match-results th {
             min-width: 180px !important; 
-            max-width: 180px !important;
+            max-width: 180px !important; 
             white-space: normal !important;
             height: auto !important;
             padding: 8px !important;
@@ -1112,7 +1013,6 @@ def run():
         </style>
         """
         st.markdown(custom_css, unsafe_allow_html=True)
-        
         # スタイリングとともにデータフレームを表示
         st.markdown('<div class="detailed-match-results">', unsafe_allow_html=True)
         st.dataframe(
@@ -1122,69 +1022,46 @@ def run():
             use_container_width=True
         )
         st.markdown('</div>', unsafe_allow_html=True)
-        
         # PDF出力ボタンを追加
         st.subheader("PDF出力")
         if st.button("スコア表をPDFで出力"):
             try:
-                # 結果表のデータフレームを作成
-                # player_idsはすでにソートされているので、これに合わせてデータを整列させる
+                # 画面表示と同じフォーマットをPDF出力に適用
+                pdf_df = df.copy()  # 画面表示用のDataFrameを使用
                 
-                # エキストラホールの有無に応じて出力カラムを設定
-                if active_round['has_extra']:
-                    # エキストラホールありの場合のカラム
-                    pdf_columns = [
-                        "Player", "Front Score", "Back Score", "Total Score", "Put Pt",
-                        "Extra Score", "Front GP", "Back GP", "Extra GP", "Game Pt",
-                        "Match Front", "Match Back", "Match Total", "Match Extra", "Match Pt",
-                        "Putt Front", "Putt Back", "Putt Extra", "Total Pt"
-                    ]
-                else:
-                    # エキストラホールなしの場合のカラム
-                    pdf_columns = [
-                        "Player", "Front Score", "Back Score", "Total Score", "Put Pt",
-                        "Front GP", "Back GP", "Game Pt",
-                        "Match Front", "Match Back", "Match Total", "Match Pt",
-                        "Putt Front", "Putt Back", "Total Pt"
-                    ]
+                # DataFrameの列順序が画面表示と同じになるようにする
+                for col in pdf_df.columns:
+                    if col.endswith((' Pt', 'Front', 'Back', 'Total', 'Extra')) and col not in ['Front Score', 'Back Score', 'Total Score', 'Extra Score', 'Putt Front', 'Putt Back', 'Putt Extra']:
+                        pdf_df[col] = pd.to_numeric(pdf_df[col], errors='coerce').fillna(0)
                 
-                # 指定の順序でデータフレームを構築
-                pdf_data = {}
-                for col in pdf_columns:
-                    if col == "Player":
-                        pdf_data[col] = [player_data[mid]["Player"] for mid in player_ids]
-                    else:
-                        pdf_data[col] = [player_data[mid].get(col, 0) for mid in player_ids]
-                
-                result_table = pd.DataFrame(pdf_data)
+                # PDF表示カラムを明示的に設定してデータの欠損や並び替えを防ぐ
+                pdf_df = pdf_df[df_columns]  # df_columnsは最初と同じ順序で使用
                 
                 # PDFを生成
-                pdf_buffer = generate_pdf(result_table, match_results, match_matrix, active_round)
+                pdf_buffer = generate_pdf(pdf_df, match_results, match_matrix, active_round)
                 
-                # ファイル名を設定
+                # ファイル名を設定してダウンロードボタンを表示
                 pdf_filename = get_pdf_filename(active_round)
-                
-                # ダウンロードリンクを表示
                 st.download_button(
                     label="PDFをダウンロード",
                     data=pdf_buffer,
                     file_name=pdf_filename,
                     mime="application/pdf"
                 )
-                
                 st.success("PDFが正常に生成されました。ダウンロードボタンをクリックしてPDFをダウンロードしてください。")
             except Exception as e:
                 st.error(f"PDFの生成中にエラーが発生しました: {str(e)}")
                 import traceback
-                st.error(traceback.format_exc())  # 詳細なエラー情報を表示
-        
+                st.error(traceback.format_exc())
         # ラウンドの確定ボタン
         if not active_round['finalized']:
             if st.button("このラウンドを確定する"):
                 try:
                     # 更新データの準備
                     update_data = {}
-                    for mid, data in player_data:
+                    # player_dataをitemsで正しく処理
+                    for mid in player_ids:  # player_idsは既に定義済み
+                        data = player_data[mid]
                         update_data[mid] = {
                             'game_pt': data['Game Pt'],
                             'match_pt': data['Match Pt'],
@@ -1216,7 +1093,6 @@ def run():
                         st.session_state.calculation_results = {}
                     st.session_state.calculation_results[round_id] = player_data
                     st.info("計算結果はセッションに保存されました。再試行することで保存できる可能性があります。")
-
     # ラウンド確定ボタンの後に過去データ再計算ボタンと計算ロジックテストボタンを追加
     col1, col2 = st.columns([0.5, 0.5])
     with col1:
@@ -1228,13 +1104,9 @@ def run():
                     st.success("過去データの再計算が完了しました")
                 else:
                     st.error("過去データの再計算に失敗しました")
-    
     with col2:
         if selected_round_str and st.button("このラウンドの計算ロジックをテスト", help="現在のロジックでこのラウンドのスコアを計算します"):
             test_calculation_logic(round_id)
-    
-    st.info("過去のすべてのラウンドのポイントを最新のロジックで再計算します。\n"
-            "時間がかかる場合があります。")
 
 if __name__ == "__main__":
     run()
