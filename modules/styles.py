@@ -21,7 +21,7 @@ def apply_fixed_first_column_style():
             background-color: white !important;
             z-index: 10 !important;
             box-shadow: 2px 0px 3px rgba(0,0,0,0.1) !important;
-            min-width: 100px !重要;
+            min-width: 100px !important;
         }
         
         /* ヘッダーとプレイヤー列の交差部分 */
@@ -58,9 +58,9 @@ def apply_fixed_first_column_style():
         
         /* スタイルの優先度を上げる */
         html body [data-testid="stDataFrame"] div[data-testid="stTable"] table td:first-of-type {
-            position: sticky !重要;
-            left: 0 !重要;
-            background-color: white !重要;
+            position: sticky !important;
+            left: 0 !important;
+            background-color: white !important;
         }
         </style>
     """, unsafe_allow_html=True)

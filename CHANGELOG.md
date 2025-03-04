@@ -1,5 +1,13 @@
 # 変更履歴
 
+## [2025-03-04]
+
+### 更新
+- Merge remote-tracking branch 'origin/main' into develop
+- Fix player column stickiness in result confirmation page
+- 06_結果確認.py を更新
+- 06_結果確認.py を更新
+
 ## [2025-03-03]
 
 ### 修正
@@ -10,6 +18,14 @@
 - 本番環境のエラーを修正2
 - 本番環境のエラーを修正
 - dataチェック機能を追加
+
+### 更新
+- Merge branch 'develop'
+- Merge branch 'develop'
+- Merge branch 'develop'
+- Merge branch 'develop'
+- Merge branch 'develop'
+- Merge branch 'develop'
 
 ## [2025-03-02]
 
@@ -31,6 +47,8 @@
 ## [2025-02-27]
 
 ### 更新
+- Merge branch 'develop'
+- Save local changes before merging
 - 修正した
 - Supabaseデータ検証機能の拡張：ラウンドIDごとの詳細検証を追加
 

@@ -180,6 +180,7 @@ if __name__ == "__main__":
 
     # サンプルデータ用の値を定義
     provided_date = None
+    provided_date_played = datetime.date.today()  # Define provided_date_played with today's date or any specific date
 
     new_round = Round(
         date = provided_date or provided_date_played,  # provided_dateがNoneの場合はdate_playedを利用

@@ -404,16 +404,25 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
 def calc_match_points_by_section(player_i, player_j, handicap_ij, handicap_ji, section, multiplier=1):
     """セクション（Front/Back/Total/Extra）ごとのマッチポイントを計算"""
     if section == "Front":
-        score_i = player_i["Front Score"] - handicap_ij//2
-        score_j = player_j["Front Score"] - handicap_ji//2
+        score_i = player_i["Front Score"] - handicap_ij
+        score_j = player_j["Front Score"] - handicap_ji
     elif section == "Back":
-        score_i = player_i["Back Score"] - (handicap_ij - handicap_ij//2)
-        score_j = player_j["Back Score"] - (handicap_ji - handicap_ji//2)
+        # スコアが0の場合（未入力の場合）はNoneを返して判定をスキップする
+        if player_i["Back Score"] == 0 or player_j["Back Score"] == 0:
+            return None
+        score_i = player_i["Back Score"] - handicap_ij
+        score_j = player_j["Back Score"] - handicap_ji
     elif section == "Total":
+        # バックスコアが0の場合（未入力の場合）はトータルの判定をスキップ
+        if player_i["Back Score"] == 0 or player_j["Back Score"] == 0:
+            return None
         # ハンディキャップは2倍だが、ポイントは各セクションと同じ10ポイント
         score_i = player_i["Total Score"] - handicap_ij * 2
         score_j = player_j["Total Score"] - handicap_ji * 2
     else:  # Extra
+        # スコアが0の場合（未入力の場合）はNoneを返して判定をスキップする
+        if player_i["Extra Score"] == 0 or player_j["Extra Score"] == 0:
+            return None
         score_i = player_i["Extra Score"] - handicap_ij
         score_j = player_j["Extra Score"] - handicap_ji
     
@@ -635,7 +644,7 @@ def run():
         [data-testid="stDataFrame"] > div > div > div > div > div table td:first-of-type {
             position: sticky !important;
             left: 0 !important;
-            background-color: white !important;
+            background-color: white !重要;
             z-index: 10 !important;
             box-shadow: 2px 0px 3px rgba(0,0,0,0.1) !important;
             min-width: 100px !important;
@@ -848,17 +857,18 @@ def run():
                 # total_onlyモードの場合は専用の処理
                 if pair_key in total_only_set:
                     # Total Onlyモード - Front/Backはスキップ、TotalとExtraだけ計算
-                    # Total
+                    # Total - バックスコアが入力されている場合のみ判定
                     points = calc_match_points_by_section(
                         data_i, data_j,
                         handicaps.get((pid_j, pid_i), 0),
                         handicaps.get((pid_i, pid_j), 0),
                         "Total"
                     )
-                    data_i["Match Total"] += points
-                    data_j["Match Total"] -= points
-                    data_i["Match Pt"] += points
-                    data_j["Match Pt"] -= points
+                    if points is not None:  # Noneでない場合のみポイントを加算
+                        data_i["Match Total"] += points
+                        data_j["Match Total"] -= points
+                        data_i["Match Pt"] += points
+                        data_j["Match Pt"] -= points
                     
                     # Extra (if exists)
                     if active_round['has_extra']:
@@ -868,10 +878,11 @@ def run():
                             handicaps.get((pid_i, pid_j), 0),
                             "Extra"
                         )
-                        data_i["Match Extra"] += points
-                        data_j["Match Extra"] -= points
-                        data_i["Match Pt"] += points
-                        data_j["Match Pt"] -= points
+                        if points is not None:  # Noneでない場合のみポイントを加算
+                            data_i["Match Extra"] += points
+                            data_j["Match Extra"] -= points
+                            data_i["Match Pt"] += points
+                            data_j["Match Pt"] -= points
                 else:
                     # 通常モード（Front, Back, Total, Extra別々に勝敗を決める）
                     # Front
@@ -881,10 +892,11 @@ def run():
                         handicaps.get((pid_i, pid_j), 0),
                         "Front"
                     )
-                    data_i["Match Front"] += points
-                    data_j["Match Front"] -= points
-                    data_i["Match Pt"] += points
-                    data_j["Match Pt"] -= points
+                    if points is not None:  # Noneでない場合のみポイントを加算
+                        data_i["Match Front"] += points
+                        data_j["Match Front"] -= points
+                        data_i["Match Pt"] += points
+                        data_j["Match Pt"] -= points
                     
                     # Back
                     points = calc_match_points_by_section(
@@ -893,22 +905,24 @@ def run():
                         handicaps.get((pid_i, pid_j), 0),
                         "Back"
                     )
-                    data_i["Match Back"] += points
-                    data_j["Match Back"] -= points
-                    data_i["Match Pt"] += points
-                    data_j["Match Pt"] -= points
+                    if points is not None:  # Noneでない場合のみポイントを加算
+                        data_i["Match Back"] += points
+                        data_j["Match Back"] -= points
+                        data_i["Match Pt"] += points
+                        data_j["Match Pt"] -= points
                     
-                    # Total - ポイントは10固定
+                    # Total - バックスコアが入力されている場合のみ判定
                     points = calc_match_points_by_section(
                         data_i, data_j,
                         handicaps.get((pid_j, pid_i), 0),
                         handicaps.get((pid_i, pid_j), 0),
                         "Total"
                     )
-                    data_i["Match Total"] += points
-                    data_j["Match Total"] -= points
-                    data_i["Match Pt"] += points
-                    data_j["Match Pt"] -= points
+                    if points is not None:  # Noneでない場合のみポイントを加算
+                        data_i["Match Total"] += points
+                        data_j["Match Total"] -= points
+                        data_i["Match Pt"] += points
+                        data_j["Match Pt"] -= points
                     
                     # Extra (if exists)
                     if active_round['has_extra']:
@@ -918,10 +932,11 @@ def run():
                             handicaps.get((pid_i, pid_j), 0),
                             "Extra"
                         )
-                        data_i["Match Extra"] += points
-                        data_j["Match Extra"] -= points
-                        data_i["Match Pt"] += points
-                        data_j["Match Pt"] -= points
+                        if points is not None:  # Noneでない場合のみポイントを加算
+                            data_i["Match Extra"] += points
+                            data_j["Match Extra"] -= points
+                            data_i["Match Pt"] += points
+                            data_j["Match Pt"] -= points
         
         # 最終的なトータルポイントの計算 - マッチポイントの再計算はしない
         for mid in player_data:
