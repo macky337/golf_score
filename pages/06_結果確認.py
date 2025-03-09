@@ -69,7 +69,7 @@ def run():
     with col2:
         if st.button("🏠 Home"):
             switch_page("Main")
-
+    
     with col1:
         st.markdown("""
             <style>
@@ -240,7 +240,7 @@ def run():
                 "Front Putt": sc.get('front_putt', 0),
                 "Back Putt": sc.get('back_putt', 0),
                 "Extra Putt": sc.get('extra_putt', 0),
-                "Putt Pt": sc.get('put_pt', 0),
+                "put_pt": sc.get('put_pt', 0),  # 修正：Putt Pt → put_pt
                 "Total Pt": sc.get('total_pt', 0),
             }
 
@@ -275,7 +275,7 @@ def run():
             "Front Score", "Back Score", "Total Score", "Extra Score",
             "Match Front", "Match Back", "Match Total", "Match Extra", "Match Pt",
             "Front GP", "Back GP", "Extra GP", "Game Pt",
-            "Front Putt", "Back Putt", "Extra Putt", "Putt Pt", "Total Pt"
+            "Front Putt", "Back Putt", "Extra Putt", "put_pt", "Total Pt"  # 修正：Putt Pt → put_pt
         ]
         df = pd.DataFrame(
             {col: player_data[mid].get(col, 0) for col in df_columns}
@@ -439,7 +439,7 @@ def run():
                         update_data[mid] = {
                             'game_pt': data['Game Pt'],
                             'match_pt': data['Match Pt'],
-                            'put_pt': data['Put Pt'],
+                            'put_pt': data['put_pt'],  # 修正：Put Pt → put_pt
                             'total_pt': data['Total Pt']
                         }
                     success, updates, failures = update_scores_batch(round_id, update_data)
