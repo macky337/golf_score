@@ -1,52 +1,40 @@
+import copy
 import pandas as pd
 from modules.score_calculator import calc_match_points
 
 def create_match_matrix(player_data, handicaps, total_only_set):
-    """マッチ対戦表（星取表）の作成"""
-    # member_idの昇順に並べ替え済みのプレイヤーIDリスト
-    player_ids = sorted(list(player_data.keys()))
-    
-    # player_idsの順序通りにDataFrameを作成
-    match_matrix = pd.DataFrame(
-        index=[player_data[mid]["Player"] for mid in player_ids],
-        columns=[player_data[mid]["Player"] for mid in player_ids]
-    )
-    
-    # 対角要素と初期値の設定
+    # 累積前の元データ（Front, Back, Extra, Total）のみを抽出して使用する
+    raw_data = {}
+    for pid, data in player_data.items():
+        raw_data[pid] = {
+            "Front Score": data["Front Score"],
+            "Back Score": data["Back Score"],
+            "Extra Score": data["Extra Score"],
+            "Total Score": data["Total Score"],
+        }
+    player_ids = sorted(list(raw_data.keys()))
+    # 表示用のプレイヤー名は元のplayer_dataから取得
+    players = [player_data[pid]["Player"] for pid in player_ids]
+    matrix = {player_data[pid]["Player"]: {} for pid in player_ids}
     for i in range(len(player_ids)):
-        name_i = player_data[player_ids[i]]["Player"]
         for j in range(len(player_ids)):
-            name_j = player_data[player_ids[j]]["Player"]
             if i == j:
-                match_matrix.loc[name_i, name_j] = "X"  # 自分対自分のマスには "X"
+                matrix[players[i]][players[i]] = ""
             else:
-                match_matrix.loc[name_i, name_j] = "0"  # 初期値 "0"
-    
-    # マッチポイントの計算と設定
-    for i in range(len(player_ids)):
-        for j in range(i + 1, len(player_ids)):
-            pid_i = player_ids[i]
-            pid_j = player_ids[j]
-            name_i = player_data[pid_i]["Player"]
-            name_j = player_data[pid_j]["Player"]
-            handicap_ij = handicaps.get((pid_j, pid_i), 0)
-            handicap_ji = handicaps.get((pid_i, pid_j), 0)
-            is_total_only = frozenset([pid_i, pid_j]) in total_only_set
-            
-            # マッチポイント計算
-            points_i, points_j = calc_match_points(
-                player_data[pid_i],
-                player_data[pid_j],
-                handicap_ij,
-                handicap_ji,
-                is_total_only
-            )
-            
-            # マトリックスに格納
-            match_matrix.loc[name_i, name_j] = f"{points_i:+d}"
-            match_matrix.loc[name_j, name_i] = f"{points_j:+d}"
-            
-    return match_matrix
+                pid_i = player_ids[i]
+                pid_j = player_ids[j]
+                if i < j:
+                    pair_key = frozenset([pid_i, pid_j])
+                    pts = calc_match_points(
+                        raw_data[pid_i], raw_data[pid_j],
+                        handicaps.get((pid_j, pid_i), 0),
+                        handicaps.get((pid_i, pid_j), 0),
+                        is_total_only=(pair_key in total_only_set)
+                    )
+                    # ptsは辞書なので、Total を使用
+                    matrix[player_data[pid_i]["Player"]][player_data[pid_j]["Player"]] = -pts["Total"]
+                    matrix[player_data[pid_j]["Player"]][player_data[pid_i]["Player"]] = pts["Total"]
+    return pd.DataFrame(matrix)
 
 def create_detailed_match_results(player_data, handicaps, total_only_set):
     """マッチ戦の詳細結果を作成（横：対戦カード、縦：プレイヤーのポイント）"""
@@ -72,7 +60,7 @@ def create_detailed_match_results(player_data, handicaps, total_only_set):
             matches.append(match_name)
             multi_columns.append((match_name, handicap_str))
     
-    # プレイヤーごとの結果を初期化（player_idsの順序通りに）
+    # プレイヤーごとの結果を初期化（player_idsの順序通りに）    
     for pid in player_ids:
         match_results[player_data[pid]["Player"]] = {match: "-" for match in matches}
     
@@ -88,7 +76,7 @@ def create_detailed_match_results(player_data, handicaps, total_only_set):
             handicap_ji = handicaps.get((pid_i, pid_j), 0)
             is_total_only = frozenset([pid_i, pid_j]) in total_only_set
             
-            points_i, points_j = calc_match_points(
+            points = calc_match_points(
                 data_i,
                 data_j,
                 handicap_ij,
@@ -96,8 +84,8 @@ def create_detailed_match_results(player_data, handicaps, total_only_set):
                 is_total_only
             )
             
-            match_results[data_i["Player"]][match_name] = f"{points_i:+d}" if points_i != 0 else "0"
-            match_results[data_j["Player"]][match_name] = f"{points_j:+d}" if points_j != 0 else "0"
+            match_results[data_i["Player"]][match_name] = f"{points['Total']:+d}" if points["Total"] != 0 else "0"
+            match_results[data_j["Player"]][match_name] = f"{-points['Total']:+d}" if points["Total"] != 0 else "0"
     
     # DataFrameを作成し、元のplayer_idsの順序を保持するためにインデックスを再整列
     df = pd.DataFrame.from_dict(match_results, orient='index')

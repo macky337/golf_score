@@ -71,50 +71,19 @@ def calc_putt_points(putt_scores, n):
     return points
 
 def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=False):
-    """1対1のマッチポイント計算（各セクション±10pt）"""
     front_pt = back_pt = total_pt = extra_pt = 0
-    
-    if is_total_only:
-        # Total Onlyモードではトータルスコアとエキストラスコアの比較のみ行う
-        total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
-        total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
-        if total_i < total_j:
-            total_pt = 10
-        elif total_i > total_j:
-            total_pt = -10
-        
-        # エキストラスコアがある場合は比較
-        if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
-            extra_i = calc_net_extra(data_i, handicap_ij, multiplier=1)
-            extra_j = calc_net_extra(data_j, handicap_ji, multiplier=1)
-            if extra_i < extra_j:
-                extra_pt = 10
-            elif extra_i > extra_j:
-                extra_pt = -10
-    else:
-        # 通常モード - 各セクションごとに比較
+    # バックスコアの入力が不足している場合（フロント９のみ入力）
+    if safe_get_score(data_i, "Back Score") <= 0 or safe_get_score(data_j, "Back Score") <= 0:
+        # Total Onlyモードの場合、判定すべきではないので全て0を返す
+        if is_total_only:
+            return {"Match Front": 0, "Match Back": 0, "Match Total": 0, "Match Extra": 0, "Total": 0}
+        # 通常モード：フロントのみ・エキストラのみで判定
         front_i = calc_net_score(data_i, "Front Score", handicap_ij, multiplier=1)
         front_j = calc_net_score(data_j, "Front Score", handicap_ji, multiplier=1)
         if front_i < front_j:
             front_pt = 10
         elif front_i > front_j:
             front_pt = -10
-        
-        if safe_get_score(data_i, "Back Score") > 0 and safe_get_score(data_j, "Back Score") > 0:
-            back_i = calc_net_score(data_i, "Back Score", handicap_ij, multiplier=1)
-            back_j = calc_net_score(data_j, "Back Score", handicap_ji, multiplier=1)
-            if back_i < back_j:
-                back_pt = 10
-            elif back_i > back_j:
-                back_pt = -10
-        
-        total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
-        total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
-        if total_i < total_j:
-            total_pt = 10
-        elif total_i > total_j:
-            total_pt = -10
-        
         if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
             extra_i = calc_net_extra(data_i, handicap_ij, multiplier=1)
             extra_j = calc_net_extra(data_j, handicap_ji, multiplier=1)
@@ -122,21 +91,54 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
                 extra_pt = 10
             elif extra_i > extra_j:
                 extra_pt = -10
-    
-    # スコア情報を更新
-    data_i["Match Front"] = front_pt
-    data_i["Match Back"] = back_pt
-    data_i["Match Total"] = total_pt
-    data_i["Match Extra"] = extra_pt
-    data_j["Match Front"] = -front_pt
-    data_j["Match Back"] = -back_pt
-    data_j["Match Total"] = -total_pt
-    data_j["Match Extra"] = -extra_pt
-    
-    total_points_i = front_pt + back_pt + total_pt + extra_pt
-    total_points_j = -(front_pt + back_pt + total_pt + extra_pt)
-    
-    return total_points_i, total_points_j
+        total_points = front_pt + extra_pt
+        return {"Match Front": front_pt, "Match Back": 0, "Match Total": front_pt, "Match Extra": extra_pt, "Total": total_points}
+    else:
+        # バックスコア入力がある場合
+        if is_total_only:
+            total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
+            total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
+            if total_i < total_j:
+                total_pt = 10
+            elif total_i > total_j:
+                total_pt = -10
+            if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
+                extra_i = calc_net_extra(data_i, handicap_ij, multiplier=1)
+                extra_j = calc_net_extra(data_j, handicap_ji, multiplier=1)
+                if extra_i < extra_j:
+                    extra_pt = 10
+                elif extra_i > extra_j:
+                    extra_pt = -10
+            total_points = total_pt + extra_pt
+            return {"Match Front": 0, "Match Back": 0, "Match Total": total_pt, "Match Extra": extra_pt, "Total": total_points}
+        else:
+            front_i = calc_net_score(data_i, "Front Score", handicap_ij, multiplier=1)
+            front_j = calc_net_score(data_j, "Front Score", handicap_ji, multiplier=1)
+            if front_i < front_j:
+                front_pt = 10
+            elif front_i > front_j:
+                front_pt = -10
+            back_i = calc_net_score(data_i, "Back Score", handicap_ij, multiplier=1)
+            back_j = calc_net_score(data_j, "Back Score", handicap_ji, multiplier=1)
+            if back_i < back_j:
+                back_pt = 10
+            elif back_i > back_j:
+                back_pt = -10
+            total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
+            total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
+            if total_i < total_j:
+                total_pt = 10
+            elif total_i > total_j:
+                total_pt = -10
+            if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
+                extra_i = calc_net_extra(data_i, handicap_ij, multiplier=1)
+                extra_j = calc_net_extra(data_j, handicap_ji, multiplier=1)
+                if extra_i < extra_j:
+                    extra_pt = 10
+                elif extra_i > extra_j:
+                    extra_pt = -10
+            total_points = front_pt + back_pt + total_pt + extra_pt
+            return {"Match Front": front_pt, "Match Back": back_pt, "Match Total": total_pt, "Match Extra": extra_pt, "Total": total_points}
 
 def calc_match_points_by_section(player_i, player_j, handicap_ij, handicap_ji, section, multiplier=1):
     """セクション（Front/Back/Total/Extra）ごとのマッチポイントを計算"""

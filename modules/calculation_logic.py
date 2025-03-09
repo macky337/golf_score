@@ -39,7 +39,7 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
         for mid in player_data:
             player_data[mid]["Game Pt"] = temp_game_pts[mid]
 
-    # Match Pt計算初期化
+    # Match Pt計算初期化（UI側に合わせてフィールド名を大文字にする）
     for mid in player_data:
         player_data[mid]["Match Front"] = 0
         player_data[mid]["Match Back"] = 0
@@ -56,19 +56,24 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
             data_j = player_data[pid_j]
             pair_key = frozenset([pid_i, pid_j])
 
-            handicap_ij = handicaps.get((pid_j, pid_i), 0)
-            handicap_ji = handicaps.get((pid_i, pid_j), 0)
+            handicap_ij_val = handicaps.get((pid_j, pid_i), 0)
+            handicap_ji_val = handicaps.get((pid_i, pid_j), 0)
 
             if pair_key in total_only_set:
-                # Total Onlyモード
-                total_points_i, total_points_j = calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=True)
-                data_i["Match Pt"] += total_points_i
-                data_j["Match Pt"] += total_points_j
+                pts = calc_match_points(data_i, data_j, handicap_ij_val, handicap_ji_val, is_total_only=True)
             else:
-                # 通常モード
-                total_points_i, total_points_j = calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=False)
-                data_i["Match Pt"] += total_points_i
-                data_j["Match Pt"] += total_points_j
+                pts = calc_match_points(data_i, data_j, handicap_ij_val, handicap_ji_val, is_total_only=False)
+            # 直接UI側のフィールド名に更新
+            data_i["Match Front"] += pts["Match Front"]
+            data_i["Match Back"] += pts["Match Back"]
+            data_i["Match Total"] += pts["Match Total"]
+            data_i["Match Extra"] += pts["Match Extra"]
+            data_j["Match Front"] -= pts["Match Front"]
+            data_j["Match Back"] -= pts["Match Back"]
+            data_j["Match Total"] -= pts["Match Total"]
+            data_j["Match Extra"] -= pts["Match Extra"]
+            data_i["Match Pt"] += pts["Total"]
+            data_j["Match Pt"] -= pts["Total"]
 
     for mid in player_data:
         d = player_data[mid]

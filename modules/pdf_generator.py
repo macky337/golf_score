@@ -48,13 +48,15 @@ def create_df_for_pdf(df):
                 try:
                     val = f"{int(round(val)):+d}" if isinstance(val, (int, float)) else str(val)
                 except ValueError:
-                    val = "0"  # 変換に失敗した場合は "0" を表示
+                    val = "0"
             # ゲーム点、パット得点、合計点
             elif col in ['Front GP', 'Back GP', 'Extra GP', 'Game Pt', 'Put Pt', 'Total Pt']:
                 val = f"{int(round(val)):+d}" if isinstance(val, (int, float)) and val != 0 else "0"
             else:
                 val = str(val)
-            
+            # もし空文字なら "×" に置換（対戦結果のセルなど）
+            if str(val).strip() == "":
+                val = "×"
             formatted_row.append(Paragraph(str(val), style))
         formatted_data.append(formatted_row)
     

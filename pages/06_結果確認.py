@@ -290,6 +290,8 @@ def run():
 
         # ★ Playerをインデックスに
         df.set_index("Player", inplace=True)
+        # 追加: DataFrame の object カラムを文字列に変換（Arrow互換を確保）
+        df = df.apply(lambda col: col.astype(str) if col.dtype == object else col)
 
         st.write("### スコア詳細")
         # --- CSSを定義 ---
@@ -345,6 +347,7 @@ def run():
         match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
         match_matrix_reset = match_matrix.reset_index()  # 行インデックスを列に変換
         match_matrix_reset.rename(columns={'index': 'Player'}, inplace=True)  # index → Player
+        match_matrix_reset = match_matrix_reset.apply(lambda col: col.astype(str) if col.dtype == object else col)
 
         st.markdown("""
             <style>
@@ -372,6 +375,7 @@ def run():
         match_results = create_detailed_match_results(player_data, handicaps, total_only_set)
         df_reset = match_results.reset_index()
         df_reset.rename(columns={'index': 'Player'}, inplace=True)
+        df_reset = df_reset.apply(lambda col: col.astype(str) if col.dtype == object else col)
 
         custom_css = """
         <style>
@@ -464,36 +468,6 @@ def run():
                         st.session_state.calculation_results = {}
                     st.session_state.calculation_results[round_id] = player_data
                     st.info("計算結果はセッションに保存されました。再試行することで保存できる可能性があります。")
-
-    col1, col2 = st.columns([0.5, 0.5])
-    with col1:
-        if st.button("過去のすべてのラウンドデータを再計算", help="過去の全ラウンドを現在のロジックで再計算します"):
-            with st.spinner("過去データを再計算中..."):
-                from modules.supabase_client import recalculate_all_past_rounds
-                success = recalculate_all_past_rounds()
-                if success:
-                    st.success("過去データの再計算が完了しました")
-                else:
-                    st.error("過去データの再計算に失敗しました")
-
-    with col2:
-        if selected_round_str and st.button("このラウンドの計算ロジックをテスト", help="現在のロジックでこのラウンドのスコアを計算します"):
-            test_calculation_logic(round_id)
-
-    # テストセクション
-    st.subheader("テスト")
-    player_i_front_score = st.number_input("Player I Front Score", value=40)
-    player_j_front_score = st.number_input("Player J Front Score", value=45)
-    handicap_ij = st.number_input("Handicap IJ", value=2)
-    handicap_ji = st.number_input("Handicap JI", value=-2)
-
-    if st.button("Calculate Match Points"):
-        from modules.score_calculator import calc_match_points_by_section
-        player_i = {"Front Score": player_i_front_score}
-        player_j = {"Front Score": player_j_front_score}
-        match_points = calc_match_points_by_section(player_i, player_j, handicap_ij, handicap_ji, "Front")
-        st.write(f"Match Points: {match_points}")
-
 
 if __name__ == "__main__":
     run()
