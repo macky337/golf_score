@@ -56,7 +56,7 @@ def test_calculation_logic(round_id):
             st.write(f"**{score.get('name', score.get('member_id'))}**")
             st.write(f"- Game Pt: {score['game_pt']}")
             st.write(f"- Match Pt: {score['match_pt']}")
-            st.write(f"- Put Pt: {score['put_pt']}")
+            st.write(f"- Putt Pt: {score['putt_pt']}")
             st.write(f"- Total Pt: {score['total_pt']}")
             st.write("---")
 
@@ -240,7 +240,7 @@ def run():
                 "Front Putt": sc.get('front_putt', 0),
                 "Back Putt": sc.get('back_putt', 0),
                 "Extra Putt": sc.get('extra_putt', 0),
-                "put_pt": sc.get('put_pt', 0),  # 修正：Putt Pt → put_pt
+                "putt_pt": sc.get('putt_pt', 0),  # キーを統一
                 "Total Pt": sc.get('total_pt', 0),
             }
 
@@ -265,6 +265,22 @@ def run():
 
         # ポイント計算ロジックの呼び出し
         player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
+        # 追加: 各カテゴリーのパットポイントを個別に計算し、合計してputt_ptに反映
+        from modules.score_calculator import calc_putt_points
+        front_scores = {mid: player_data[mid].get("Front Putt", 0) for mid in player_ids}
+        back_scores  = {mid: player_data[mid].get("Back Putt", 0)  for mid in player_ids}
+        extra_scores = {mid: player_data[mid].get("Extra Putt", 0) for mid in player_ids}
+        front_points = calc_putt_points(front_scores, len(player_ids))
+        back_points  = calc_putt_points(back_scores, len(player_ids))
+        extra_points = calc_putt_points(extra_scores, len(player_ids))
+        for mid in player_ids:
+            player_data[mid]["putt_pt"] = (front_points.get(mid, 0)
+                                           + back_points.get(mid, 0)
+                                           + extra_points.get(mid, 0))
+            # 追加: Total Pt の再計算 (Game Pt + Match Pt + putt_pt)
+            player_data[mid]["Total Pt"] = player_data[mid].get("Game Pt", 0) \
+                                           + player_data[mid].get("Match Pt", 0) \
+                                           + player_data[mid].get("putt_pt", 0)
 
         total_match_pts = sum(player_data[mid]["Match Pt"] for mid in player_ids)
         if abs(total_match_pts) > 0.01:
@@ -275,7 +291,7 @@ def run():
             "Front Score", "Back Score", "Total Score", "Extra Score",
             "Match Front", "Match Back", "Match Total", "Match Extra", "Match Pt",
             "Front GP", "Back GP", "Extra GP", "Game Pt",
-            "Front Putt", "Back Putt", "Extra Putt", "put_pt", "Total Pt"  # 修正：Putt Pt → put_pt
+            "Front Putt", "Back Putt", "Extra Putt", "putt_pt", "Total Pt"  # キー統一
         ]
         df = pd.DataFrame(
             {col: player_data[mid].get(col, 0) for col in df_columns}
@@ -439,7 +455,7 @@ def run():
                         update_data[mid] = {
                             'game_pt': data['Game Pt'],
                             'match_pt': data['Match Pt'],
-                            'put_pt': data['put_pt'],  # 修正：Put Pt → put_pt
+                            'put_pt': data['putt_pt'],  # データベースのカラム名に合わせて修正
                             'total_pt': data['Total Pt']
                         }
                     success, updates, failures = update_scores_batch(round_id, update_data)
