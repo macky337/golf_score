@@ -6,20 +6,35 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
     """
     n_players = len(player_ids)
 
-    front_putt = {mid: player_data[mid]["Putt Front"] for mid in player_data}
-    back_putt = {mid: player_data[mid]["Putt Back"] for mid in player_data}
-    extra_putt = {mid: player_data[mid].get("Putt Extra", 0) for mid in player_data} if active_round['has_extra'] else None
+    # パットスコアを常に辞書として取得、Extra Putt も含めて処理する
+    front_putt = {mid: player_data[mid]["Front Putt"] for mid in player_data}
+    back_putt = {mid: player_data[mid]["Back Putt"] for mid in player_data}
+    # Extra Puttは必ず辞書として作成し、実際の値に基づいて計算
+    extra_putt = {mid: player_data[mid].get("Extra Putt", 0) for mid in player_data}
+    
+    # 実際にExtra Puttのスコアがあるか確認
+    has_actual_extra = any(score > 0 for score in extra_putt.values())
 
     putt_front_points = calc_putt_points(front_putt, n_players)
     putt_back_points = calc_putt_points(back_putt, n_players)
-    putt_extra_points = calc_putt_points(extra_putt, n_players) if extra_putt else {mid: 0 for mid in player_data}
+    # Extra Puttが実際に値を持つ場合のみ計算
+    putt_extra_points = calc_putt_points(extra_putt, n_players) if has_actual_extra else {mid: 0 for mid in player_data}
+
+    # 計算結果をデバッグ出力
+    print("Front Putt:", front_putt)
+    print("Front Putt Points:", putt_front_points)
+    print("Back Putt:", back_putt)
+    print("Back Putt Points:", putt_back_points)
+    print("Extra Putt:", extra_putt)
+    print("Extra Putt Points:", putt_extra_points)
 
     for mid in player_data:
         data = player_data[mid]
         pf = putt_front_points.get(mid, 0)
         pb = putt_back_points.get(mid, 0)
         pe = putt_extra_points.get(mid, 0)
-        data["Put Pt"] = pf + pb + pe
+        # "Putt Pt" として正しいキーを使用
+        data["Putt Pt"] = pf + pb + pe 
 
     # Game Ptの計算
     temp_game_pts = {}
@@ -77,7 +92,8 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
 
     for mid in player_data:
         d = player_data[mid]
-        d["Total Pt"] = d["Game Pt"] + d["Match Pt"] + d["Put Pt"]
+        # Putt Pt を使って Total Pt を計算
+        d["Total Pt"] = d["Game Pt"] + d["Match Pt"] + d["Putt Pt"]
 
     return player_data
 

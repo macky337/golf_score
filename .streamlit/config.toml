@@ -2,13 +2,8 @@
 gatherUsageStats = false
 
 [theme]
-primaryColor = "#F63366"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F0F2F6"
-textColor = "#262730"
-font = "sans serif"
 
 [server]
-# 非表示にしたいページのリスト
-hidePages = ["handicap_calc_logic.py"]
+# 以下の設定を確認し、正しくページが非表示になるか確認する
 enableStaticServing = true
+hidePages = ["02_フロントスコア入力.py", "03_バックスコア入力.py"]

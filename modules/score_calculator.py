@@ -28,8 +28,22 @@ def calc_net_extra(data, handicap, multiplier=1):
     return extra - (handicap * multiplier)
 
 def calc_putt_points(putt_scores, n):
-    """パット戦の得点計算（4人 or 3人の場合）"""
-    if not putt_scores:  # スコアが空の場合
+    """
+    パット戦の得点計算（参加人数に応じたルール）
+    
+    ルール:
+    1. 各プレイヤーのパットスコア（例："Putt Front", "Putt Back", "Putt Extra" など）を収集し、参加者全体のスコアリストから最小値 (min_score) を特定する。
+    2. 最小スコアを出したプレイヤー（winners）のリストを作成する。
+    3. 【3人の場合】
+       - 勝者が1名の場合: 勝者に +20pt、残り2名に -10pt
+       - 勝者が2名の場合: 両勝者に +5pt、残り1名に -10pt
+    4. 【4人の場合】
+       - 勝者が1名の場合: 勝者に +30pt、残り3名に -10pt
+       - 勝者が2名の場合: 両勝者に +10pt、残り2名に -10pt
+       - 勝者が3名の場合: 勝者に +10pt、残り1名に -30pt
+    なお、すべてのプレイヤーが同じスコアの場合は全員0点とする。
+    """
+    if not putt_scores:
         return {}
     
     scores = list(putt_scores.values())
@@ -37,36 +51,40 @@ def calc_putt_points(putt_scores, n):
     winners = [m_id for m_id, score in putt_scores.items() if score == min_score]
     points = {m_id: 0 for m_id in putt_scores}
     
+    # すべてのプレイヤーが同じスコアの場合
+    if len(winners) == n:
+        return points
+    
     if n == 3:
         if len(winners) == 1:
-            points[winners[0]] = 20  # 最少が1名の場合は+20pt
+            points[winners[0]] = 20
             for m_id in putt_scores:
                 if m_id not in winners:
-                    points[m_id] = -10  # 残り2名は-10pt
+                    points[m_id] = -10
         elif len(winners) == 2:
             for m_id in putt_scores:
                 if m_id in winners:
-                    points[m_id] = 5  # 最少が2名の場合は+5pt
+                    points[m_id] = 5
                 else:
-                    points[m_id] = -10  # 残り1名は-10pt
+                    points[m_id] = -10
     elif n == 4:
         if len(winners) == 1:
-            points[winners[0]] = 30  # 最少が1名の場合は+30pt
+            points[winners[0]] = 30
             for m_id in putt_scores:
                 if m_id not in winners:
-                    points[m_id] = -10  # 残り3名は-10pt
+                    points[m_id] = -10
         elif len(winners) == 2:
             for m_id in putt_scores:
                 if m_id in winners:
-                    points[m_id] = 10  # 最少が2名の場合は+10pt
+                    points[m_id] = 10
                 else:
-                    points[m_id] = -10  # 残り2名は-10pt
+                    points[m_id] = -10
         elif len(winners) == 3:
             for m_id in putt_scores:
                 if m_id in winners:
-                    points[m_id] = 10  # 最少が3名の場合は+10pt
+                    points[m_id] = 10
                 else:
-                    points[m_id] = -30  # 残り1名は-30pt
+                    points[m_id] = -30
     
     return points
 

@@ -237,9 +237,10 @@ def run():
                 "Match Total": 0,
                 "Match Extra": 0,
                 "Match Pt": sc.get('match_pt', 0),
-                "Putt Front": sc['front_putt'] or 0,
-                "Putt Back": sc['back_putt'] or 0,
-                "Put Pt": sc.get('put_pt', 0),
+                "Front Putt": sc.get('front_putt', 0),
+                "Back Putt": sc.get('back_putt', 0),
+                "Extra Putt": sc.get('extra_putt', 0),
+                "Putt Pt": sc.get('put_pt', 0),
                 "Total Pt": sc.get('total_pt', 0),
             }
 
@@ -271,18 +272,11 @@ def run():
 
         df_columns = [
             "Player",
-            "Front Score", "Back Score", "Total Score",
-            "Put Pt",
-        ]
-        if active_round['has_extra']:
-            df_columns.append("Extra Score")
-
-        df_columns.extend([
-            "Front GP", "Back GP", "Extra GP", "Game Pt",
+            "Front Score", "Back Score", "Total Score", "Extra Score",
             "Match Front", "Match Back", "Match Total", "Match Extra", "Match Pt",
-            "Putt Front", "Putt Back", "Putt Extra", "Total Pt"
-        ])
-
+            "Front GP", "Back GP", "Extra GP", "Game Pt",
+            "Front Putt", "Back Putt", "Extra Putt", "Putt Pt", "Total Pt"
+        ]
         df = pd.DataFrame(
             {col: player_data[mid].get(col, 0) for col in df_columns}
             for mid in player_ids

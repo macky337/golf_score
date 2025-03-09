@@ -99,9 +99,17 @@ def generate_pdf(final_df, detailed_df, star_df, active_round):
     elements.append(Paragraph(f"{play_date} {course_name} スコア集計結果", main_title_style))
     elements.append(Spacer(1, 20))
     
-    final_df = final_df.reset_index()
+    # --- Reorder the score detail table columns for PDF詳細表 ---
+    final_df = final_df.reset_index().rename(columns={'index': 'Player'})
+    desired_order = [
+        "Player", "Front Score", "Back Score", "Total Score", "Extra Score",
+        "Match Front", "Match Back", "Match Total", "Match Extra", "Match Pt",
+        "Front GP", "Back GP", "Extra GP", "Game Pt",
+        "Front Putt", "Back Putt", "Extra Putt", "Putt Pt", "Total Pt"
+    ]
+    final_df = final_df[[col for col in desired_order if col in final_df.columns]]
     
-    for col in ['Match Front', 'Match Back', 'Match Total', 'Match Pt']:
+    for col in ['Match Front', 'Match Back', 'Match Total', 'Match Extra']:
         if col in final_df.columns:
             final_df[col] = pd.to_numeric(final_df[col], errors='coerce').fillna(0)
     
