@@ -41,7 +41,7 @@ def create_scores(round_id, selected_members, member_dict, retry=3):
                         'match_total': 0,
                         'match_extra': 0,
                         'match_pt': 0,
-                        'put_pt': 0,
+                        'putt_pt': 0,  # put_pt から putt_pt に修正（tを2つに）
                         'total_pt': 0
                     }
                     supabase.table('score').insert(score_data).execute()

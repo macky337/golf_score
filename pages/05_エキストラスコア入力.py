@@ -9,13 +9,13 @@ def run():
         st.title("エキストラスコア入力")
     with col2:
         if st.button("🏠 Home"):
-            switch_page("Main")
+            switch_page("main")
     
     # アクティブなラウンドIDをセッション状態から取得
     if "active_round_id" not in st.session_state:
         st.error("ラウンドが選択されていません。ホーム画面から選択してください。")
         if st.button("ホームに戻る"):
-            switch_page("Main")
+            switch_page("main")
         return
     
     round_id = st.session_state.active_round_id

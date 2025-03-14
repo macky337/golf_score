@@ -105,7 +105,7 @@ def restore_backup():
                     SELECT score_id, round_id, member_id, front_score, back_score, extra_score,
                            front_putt, back_putt, extra_putt, front_game_pt, back_game_pt,
                            extra_game_pt, match_front, match_back, match_total, match_extra,
-                           match_pt, put_pt, total_pt
+                           match_pt, putt_pt, total_pt
                     FROM score 
                     WHERE score_id = :score_id
                 """)
@@ -132,7 +132,7 @@ def restore_backup():
                                 match_total = :match_total,
                                 match_extra = :match_extra,
                                 match_pt = :match_pt,
-                                put_pt = :put_pt,
+                                putt_pt = :putt_pt,
                                 total_pt = :total_pt
                             WHERE score_id = :score_id
                         """),
@@ -154,7 +154,7 @@ def restore_backup():
                             "match_total": s.get("match_total", 0),
                             "match_extra": s.get("match_extra", 0),
                             "match_pt": s.get("match_pt", 0),
-                            "put_pt": s.get("put_pt", 0),
+                            "putt_pt": s.get("putt_pt", 0),
                             "total_pt": s.get("total_pt", 0)
                         }
                     )
@@ -167,13 +167,13 @@ def restore_backup():
                                 extra_score, front_putt, back_putt, extra_putt,
                                 front_game_pt, back_game_pt, extra_game_pt,
                                 match_front, match_back, match_total, match_extra,
-                                match_pt, put_pt, total_pt
+                                match_pt, putt_pt, total_pt
                             ) VALUES (
                                 :score_id, :round_id, :member_id, :front_score, :back_score,
                                 :extra_score, :front_putt, :back_putt, :extra_putt,
                                 :front_game_pt, :back_game_pt, :extra_game_pt,
                                 :match_front, :match_back, :match_total, :match_extra,
-                                :match_pt, :put_pt, :total_pt
+                                :match_pt, :putt_pt, :total_pt
                             )
                         """),
                         {
@@ -194,7 +194,7 @@ def restore_backup():
                             "match_total": s.get("match_total", 0),
                             "match_extra": s.get("match_extra", 0),
                             "match_pt": s.get("match_pt", 0),
-                            "put_pt": s.get("put_pt", 0),
+                            "putt_pt": s.get("putt_pt", 0),
                             "total_pt": s.get("total_pt", 0)
                         }
                     )

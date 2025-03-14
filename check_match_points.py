@@ -343,8 +343,8 @@ def main():
                 
                 # total_ptも更新
                 game_pt = (player_score.get('front_game_pt') or 0) + (player_score.get('back_game_pt') or 0) + (player_score.get('extra_game_pt') or 0)
-                put_pt = player_score.get('put_pt') or 0
-                total_pt = game_pt + player_total_pts + put_pt
+                putt_pt = player_score.get('putt_pt') or 0
+                total_pt = game_pt + player_total_pts + putt_pt
                 
                 supabase.table('score').update({
                     'total_pt': total_pt

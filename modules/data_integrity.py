@@ -105,7 +105,7 @@ def fix_missing_scores(round_id):
                 'back_game_pt': 0,
                 'extra_game_pt': 0,
                 'match_pt': 0,
-                'put_pt': 0,
+                'putt_pt': 0,
                 'total_pt': 0
             }
             supabase.table('score').insert(score_data).execute()
@@ -141,7 +141,7 @@ def verify_putt_points(round_id):
         extra_putts = {s['member_id']: s['extra_putt'] or 0 for s in scores if s['extra_putt']}
         
         # 実際に保存されているパットポイント
-        actual_putt_pts = {s['member_id']: s['put_pt'] or 0 for s in scores}
+        actual_putt_pts = {s['member_id']: s['putt_pt'] or 0 for s in scores}
         
         # パットポイントの計算（フロント）
         front_pts = recalculate_putt_points(front_putts, n_players)
@@ -176,21 +176,21 @@ def verify_putt_points(round_id):
                 "front_putt": front_putts[s['member_id']],
                 "back_putt": back_putts[s['member_id']],
                 "extra_putt": extra_putts.get(s['member_id'], 0) if extra_putts else 0,
-                "actual_put_pt": actual_putt_pts[s['member_id']],
-                "calculated_put_pt": total_pts[s['member_id']],
+                "actual_putt_pt": actual_putt_pts[s['member_id']],
+                "calculated_putt_pt": total_pts[s['member_id']],
                 "front_pt": front_pts.get(s['member_id'], 0),
                 "back_pt": back_pts.get(s['member_id'], 0),
                 "extra_pt": extra_pts.get(s['member_id'], 0) if extra_putts else 0
             }
             
             # 再計算した値と実際の値を比較
-            if abs(player_info["actual_put_pt"] - player_info["calculated_put_pt"]) > 0.01:
+            if abs(player_info["actual_putt_pt"] - player_info["calculated_putt_pt"]) > 0.01:
                 result["is_correct"] = False
                 result["differences"].append({
                     "player": player_info["name"],
-                    "actual": player_info["actual_put_pt"],
-                    "calculated": player_info["calculated_put_pt"],
-                    "diff": player_info["actual_put_pt"] - player_info["calculated_put_pt"]
+                    "actual": player_info["actual_putt_pt"],
+                    "calculated": player_info["calculated_putt_pt"],
+                    "diff": player_info["actual_putt_pt"] - player_info["calculated_putt_pt"]
                 })
             
             result["players"].append(player_info)

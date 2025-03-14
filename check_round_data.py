@@ -92,15 +92,10 @@ def main():
     for p in result["players"]:
         player_data.append({
             "名前": p["name"],
-            "フロントパット": p["front_putt"],
-            "バックパット": p["back_putt"],
-            "エキストラパット": p["extra_putt"],
-            "フロントPt": p["front_pt"],
-            "バックPt": p["back_pt"],
-            "エキストラPt": p["extra_pt"],
-            "計算合計": p["calculated_put_pt"],
-            "実際の値": p["actual_put_pt"],
-            "差分": p["calculated_put_pt"] - p["actual_put_pt"]
+            "パット数": p["front_putt"] + p["back_putt"] + p.get("extra_putt", 0),
+            "計算合計": p["calculated_putt_pt"],
+            "実際の値": p["actual_putt_pt"],
+            "差分": p["calculated_putt_pt"] - p["actual_putt_pt"]
         })
     
     df = pd.DataFrame(player_data)
@@ -130,7 +125,7 @@ def main():
                 # スコアデータを更新
                 for p in result["players"]:
                     supabase.table('score').update({
-                        'put_pt': p["calculated_put_pt"]
+                        'putt_pt': p["calculated_putt_pt"]
                     }).eq('member_id', p["member_id"]).eq('round_id', round_id).execute()
                 
                 st.success("パット戦のポイントを修正しました")

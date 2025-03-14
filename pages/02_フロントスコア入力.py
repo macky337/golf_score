@@ -143,7 +143,7 @@ def run():
         
         # バックスコア入力ページへのリンク
         if st.button("バックスコア入力へ", use_container_width=True):
-            switch_page("03_バックスコア入力")
+            switch_page("バックスコア入力")
 
 if __name__ == "__main__":
     run()

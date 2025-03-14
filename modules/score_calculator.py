@@ -99,16 +99,16 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
         front_i = calc_net_score(data_i, "Front Score", handicap_ij, multiplier=1)
         front_j = calc_net_score(data_j, "Front Score", handicap_ji, multiplier=1)
         if front_i < front_j:
-            front_pt = 10
+            front_pt = 10  # 5から10に修正
         elif front_i > front_j:
-            front_pt = -10
+            front_pt = -10  # -5から-10に修正
         if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
             extra_i = calc_net_extra(data_i, handicap_ij, multiplier=1)
             extra_j = calc_net_extra(data_j, handicap_ji, multiplier=1)
             if extra_i < extra_j:
-                extra_pt = 10
+                extra_pt = 10  # 5から10に修正
             elif extra_i > extra_j:
-                extra_pt = -10
+                extra_pt = -10  # -5から-10に修正
         total_points = front_pt + extra_pt
         return {"Match Front": front_pt, "Match Back": 0, "Match Total": front_pt, "Match Extra": extra_pt, "Total": total_points}
     else:
@@ -117,44 +117,44 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
             total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
             total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
             if total_i < total_j:
-                total_pt = 10
+                total_pt = 10  # 5から10に修正
             elif total_i > total_j:
-                total_pt = -10
+                total_pt = -10  # -5から-10に修正
             if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
                 extra_i = calc_net_extra(data_i, handicap_ij, multiplier=1)
                 extra_j = calc_net_extra(data_j, handicap_ji, multiplier=1)
                 if extra_i < extra_j:
-                    extra_pt = 10
+                    extra_pt = 10  # 5から10に修正
                 elif extra_i > extra_j:
-                    extra_pt = -10
+                    extra_pt = -10  # -5から-10に修正
             total_points = total_pt + extra_pt
             return {"Match Front": 0, "Match Back": 0, "Match Total": total_pt, "Match Extra": extra_pt, "Total": total_points}
         else:
             front_i = calc_net_score(data_i, "Front Score", handicap_ij, multiplier=1)
             front_j = calc_net_score(data_j, "Front Score", handicap_ji, multiplier=1)
             if front_i < front_j:
-                front_pt = 10
+                front_pt = 10  # 5から10に修正
             elif front_i > front_j:
-                front_pt = -10
+                front_pt = -10  # -5から-10に修正
             back_i = calc_net_score(data_i, "Back Score", handicap_ij, multiplier=1)
             back_j = calc_net_score(data_j, "Back Score", handicap_ji, multiplier=1)
             if back_i < back_j:
-                back_pt = 10
+                back_pt = 10  # 5から10に修正
             elif back_i > back_j:
-                back_pt = -10
+                back_pt = -10  # -5から-10に修正
             total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
             total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
             if total_i < total_j:
-                total_pt = 10
+                total_pt = 10  # 5から10に修正
             elif total_i > total_j:
-                total_pt = -10
+                total_pt = -10  # -5から-10に修正
             if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
                 extra_i = calc_net_extra(data_i, handicap_ij, multiplier=1)
                 extra_j = calc_net_extra(data_j, handicap_ji, multiplier=1)
                 if extra_i < extra_j:
-                    extra_pt = 10
+                    extra_pt = 10  # 5から10に修正
                 elif extra_i > extra_j:
-                    extra_pt = -10
+                    extra_pt = -10  # -5から-10に修正
             total_points = front_pt + back_pt + total_pt + extra_pt
             return {"Match Front": front_pt, "Match Back": back_pt, "Match Total": total_pt, "Match Extra": extra_pt, "Total": total_points}
 
@@ -181,8 +181,8 @@ def calc_match_points_by_section(player_i, player_j, handicap_ij, handicap_ji, s
     
     score_diff = score_i - score_j
     if score_diff < 0:
-        return 10
+        return 10  # 5から10に修正
     elif score_diff > 0:
-        return -10
+        return -10  # -5から-10に修正
     else:
         return 0

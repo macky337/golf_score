@@ -8,6 +8,7 @@ import os
 import pytz
 import time
 from dotenv import load_dotenv
+from modules.game_points import calculate_game_pt  # 必要な関数のみをインポート
 
 # config からの直接インポートを削除
 # from config import get_admin_password
@@ -168,7 +169,7 @@ def recalculate_scores(round_id):
                     elif net_extra > opp_net_extra:
                         total_match_points -= 5
             
-            # スコアの更新
+            # マッチポイントの更新
             supabase.table('score').update({
                 'match_pt': total_match_points
             }).eq('score_id', score['score_id']).execute()
@@ -176,46 +177,38 @@ def recalculate_scores(round_id):
         # プレイヤー数を確認
         player_count = len(scores)
         
-        # フロントのゲームポイント再計算
-        front_game_pts = {}
-        for score in scores:
-            front_game_pts[score['member_id']] = score['front_game_pt'] or 0
-        
+        # Game Ptの計算（手動入力された値を使用）
+        # 3人プレイの場合は再計算が必要
         if player_count == 3:
-            # 3人プレーの場合は再計算
             for score in scores:
-                other_pts = [pt for mid, pt in front_game_pts.items() if mid != score['member_id']]
-                score['front_game_pt'] = calculate_game_pt(front_game_pts[score['member_id']], other_pts)
-        
-        # バックのゲームポイント再計算
-        back_game_pts = {}
-        for score in scores:
-            back_game_pts[score['member_id']] = score['back_game_pt'] or 0
-        
-        if player_count == 3:
-            # 3人プレーの場合は再計算
+                temp_gp = (score['front_game_pt'] or 0) + (score['back_game_pt'] or 0) + (score['extra_game_pt'] or 0)
+                others_gp = [
+                    (s['front_game_pt'] or 0) + (s['back_game_pt'] or 0) + (s['extra_game_pt'] or 0)
+                    for s in scores if s['member_id'] != score['member_id']
+                ]
+                final_game_pt = calculate_game_pt(temp_gp, others_gp)
+                
+                # total_ptの計算（Game Pt + Match Pt + Putt Pt）
+                total_pt = final_game_pt + score['match_pt'] + (score['put_pt'] or 0)
+                
+                # Game PtとTotal Ptの更新
+                supabase.table('score').update({
+                    'game_pt': final_game_pt,
+                    'total_pt': total_pt
+                }).eq('score_id', score['score_id']).execute()
+        else:
+            # 4人の場合は各セクションの合計をそのまま使用
             for score in scores:
-                other_pts = [pt for mid, pt in back_game_pts.items() if mid != score['member_id']]
-                score['back_game_pt'] = calculate_game_pt(back_game_pts[score['member_id']], other_pts)
-        
-        # エキストラのゲームポイント再計算
-        extra_game_pts = {}
-        for score in scores:
-            extra_game_pts[score['member_id']] = score['extra_game_pt'] or 0
-        
-        if player_count == 3:
-            # 3人プレーの場合は再計算
-            for score in scores:
-                other_pts = [pt for mid, pt in extra_game_pts.items() if mid != score['member_id']]
-                score['extra_game_pt'] = calculate_game_pt(extra_game_pts[score['member_id']], other_pts)
-        
-        # スコアの更新
-        for score in scores:
-            supabase.table('score').update({
-                'front_game_pt': score['front_game_pt'],
-                'back_game_pt': score['back_game_pt'],
-                'extra_game_pt': score['extra_game_pt']
-            }).eq('score_id', score['score_id']).execute()
+                final_game_pt = (score['front_game_pt'] or 0) + (score['back_game_pt'] or 0) + (score['extra_game_pt'] or 0)
+                
+                # total_ptの計算（Game Pt + Match Pt + Putt Pt）
+                total_pt = final_game_pt + score['match_pt'] + (score['put_pt'] or 0)
+                
+                # Game PtとTotal Ptの更新
+                supabase.table('score').update({
+                    'game_pt': final_game_pt,
+                    'total_pt': total_pt
+                }).eq('score_id', score['score_id']).execute()
 
     except Exception as e:
         raise Exception(f"スコアの再計算中にエラーが発生しました: {str(e)}")

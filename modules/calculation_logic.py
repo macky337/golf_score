@@ -37,22 +37,78 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
         data["Putt Pt"] = pf + pb + pe 
 
     # Game Ptの計算
+    # スコアに基づいてゲームポイントを計算
+    front_scores = {pid: player_data[pid].get("Front Score", 0) for pid in player_ids}
+    back_scores = {pid: player_data[pid].get("Back Score", 0) for pid in player_ids}
+    extra_scores = {pid: player_data[pid].get("Extra Score", 0) for pid in player_ids}
+
+    # フロント9のゲームポイント計算
+    sorted_front = sorted(front_scores.items(), key=lambda x: (x[1], x[0]))
+    if n_players == 3:
+        # 3人プレイの場合のポイント配分
+        player_data[sorted_front[0][0]]["Front GP"] = 30
+        player_data[sorted_front[1][0]]["Front GP"] = 0
+        player_data[sorted_front[2][0]]["Front GP"] = -30
+    else:
+        # 4人プレイの場合のポイント配分
+        player_data[sorted_front[0][0]]["Front GP"] = 30
+        player_data[sorted_front[1][0]]["Front GP"] = 10
+        player_data[sorted_front[2][0]]["Front GP"] = -10
+        player_data[sorted_front[3][0]]["Front GP"] = -30
+
+    # バック9のゲームポイント計算
+    sorted_back = sorted(back_scores.items(), key=lambda x: (x[1], x[0]))
+    if n_players == 3:
+        # 3人プレイの場合のポイント配分
+        player_data[sorted_back[0][0]]["Back GP"] = 30
+        player_data[sorted_back[1][0]]["Back GP"] = 0
+        player_data[sorted_back[2][0]]["Back GP"] = -30
+    else:
+        # 4人プレイの場合のポイント配分
+        player_data[sorted_back[0][0]]["Back GP"] = 30
+        player_data[sorted_back[1][0]]["Back GP"] = 10
+        player_data[sorted_back[2][0]]["Back GP"] = -10
+        player_data[sorted_back[3][0]]["Back GP"] = -30
+
+    # エキストラホールのゲームポイント計算（エキストラホールがある場合）
+    if active_round.get('has_extra', False):
+        sorted_extra = sorted(extra_scores.items(), key=lambda x: (x[1], x[0]))
+        if n_players == 3:
+            # 3人プレイの場合のポイント配分
+            player_data[sorted_extra[0][0]]["Extra GP"] = 30
+            player_data[sorted_extra[1][0]]["Extra GP"] = 0
+            player_data[sorted_extra[2][0]]["Extra GP"] = -30
+        else:
+            # 4人プレイの場合のポイント配分
+            player_data[sorted_extra[0][0]]["Extra GP"] = 30
+            player_data[sorted_extra[1][0]]["Extra GP"] = 10
+            player_data[sorted_extra[2][0]]["Extra GP"] = -10
+            player_data[sorted_extra[3][0]]["Extra GP"] = -30
+
+    # temp_game_ptの計算（一時的な合計ポイント）
     temp_game_pts = {}
-    for mid in player_data:
+    for mid in player_ids:
         fgp = player_data[mid]["Front GP"]
         bgp = player_data[mid]["Back GP"]
-        egp = player_data[mid]["Extra GP"]
+        egp = player_data[mid].get("Extra GP", 0)
         temp_game_pts[mid] = fgp + bgp + egp
-        player_data[mid]["Temp Game Pt"] = temp_game_pts[mid]
+        player_data[mid]["temp_game_pt"] = temp_game_pts[mid]
 
-    if n_players == 3:
-        for mid in player_data:
+    print("Debug - Temp Game Points:", temp_game_pts)  # デバッグ出力
+
+    # total_game_ptとGame Ptの計算
+    for mid in player_ids:
+        if n_players == 3:
             my_total = temp_game_pts[mid]
             others_total = sum(temp_game_pts[oid] for oid in temp_game_pts if oid != mid)
-            player_data[mid]["Game Pt"] = my_total * 2 - others_total
-    else:
-        for mid in player_data:
+            total_game_pt = my_total * 2 - others_total
+            player_data[mid]["total_game_pt"] = total_game_pt
+            player_data[mid]["Game Pt"] = total_game_pt
+        else:  # 4人プレイの場合
+            player_data[mid]["total_game_pt"] = temp_game_pts[mid]
             player_data[mid]["Game Pt"] = temp_game_pts[mid]
+
+    print("Debug - Final Game Points:", {mid: player_data[mid]["Game Pt"] for mid in player_ids})  # デバッグ出力
 
     # Match Pt計算初期化（UI側に合わせてフィールド名を大文字にする）
     for mid in player_data:

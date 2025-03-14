@@ -43,7 +43,7 @@ def run():
     if front_scores_missing:
         st.warning("一部のフロントスコアがまだ入力されていません。先にフロントスコアを入力することをお勧めします。")
         if st.button("フロントスコア入力へ"):
-            switch_page("02_フロントスコア入力")
+            switch_page("フロントスコア入力")
     
     # プレイヤーごとのスコア入力フォーム
     st.write("### スコア入力")
@@ -154,10 +154,10 @@ def run():
             if st.button("エキストラスコア入力へ", use_container_width=True):
                 # ラウンドのhas_extraフラグを更新
                 supabase.table('rounds').update({'has_extra': True}).eq('round_id', round_id).execute()
-                switch_page("05_エキストラスコア入力")
+                switch_page("エキストラスコア入力")
         with col2:
             if st.button("結果確認へ", use_container_width=True):
-                switch_page("06_結果確認")
+                switch_page("結果確認")
 
 if __name__ == "__main__":
     run()

@@ -159,7 +159,7 @@ def update_scores_batch(round_id, scores_data):
                 update_payload = {}
                 
                 # デバッグ：更新するデータを表示
-                st.text(f"ID:{member_id} データ: game_pt={data['game_pt']}, match_pt={data['match_pt']}, put_pt={data['put_pt']}, total_pt={data['total_pt']}")
+                st.text(f"ID:{member_id} データ: game_pt={data['game_pt']}, match_pt={data['match_pt']}, putt_pt={data['putt_pt']}, total_pt={data['total_pt']}")
                 
                 # 確実に存在するフィールドのみ更新
                 if 'game_pt' in valid_fields and 'game_pt' in data:
@@ -168,8 +168,8 @@ def update_scores_batch(round_id, scores_data):
                 if 'match_pt' in valid_fields and 'match_pt' in data:
                     update_payload['match_pt'] = data['match_pt']
                 
-                if 'put_pt' in valid_fields and 'put_pt' in data:
-                    update_payload['put_pt'] = data['put_pt']
+                if 'putt_pt' in valid_fields and 'putt_pt' in data:
+                    update_payload['putt_pt'] = data['putt_pt']
                     
                 if 'total_pt' in valid_fields and 'total_pt' in data:
                     update_payload['total_pt'] = data['total_pt']
@@ -182,8 +182,8 @@ def update_scores_batch(round_id, scores_data):
                 if 'match_point' in valid_fields and 'match_pt' in data:
                     update_payload['match_point'] = data['match_pt']
                     
-                if 'putt_point' in valid_fields and 'put_pt' in data:
-                    update_payload['putt_point'] = data['put_pt']
+                if 'putt_point' in valid_fields and 'putt_pt' in data:
+                    update_payload['putt_point'] = data['putt_pt']
                     
                 if 'total_point' in valid_fields and 'total_pt' in data:
                     update_payload['total_point'] = data['total_pt']
@@ -286,7 +286,7 @@ def recalculate_all_past_rounds():
                     update_data[member_id] = {
                         'game_pt': score['game_pt'],
                         'match_pt': score['match_pt'],
-                        'put_pt': score['put_pt'],
+                        'putt_pt': score['putt_pt'],  # put_pt から putt_pt に修正
                         'total_pt': score['total_pt']
                     }
                 

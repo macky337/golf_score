@@ -1,93 +1,137 @@
-import copy
-import pprint
-from modules.calculation_logic import calculate_player_points
+import streamlit as st
+from modules.db import supabase
+from datetime import datetime, timedelta
+import time
 
-# 5ラウンド分のダミーデータ（ラウンド情報）
-dummy_rounds = [
-    {
-        "round_id": 1,
-        "has_extra": False,
-        "date_played": "2023-01-01",
-        "course_name": "コースA"
-    },
-    {
-        "round_id": 2,
-        "has_extra": True,
-        "date_played": "2023-02-01",
-        "course_name": "コースB"
-    },
-    {
-        "round_id": 3,
-        "has_extra": False,
-        "date_played": "2023-03-01",
-        "course_name": "コースC"
-    },
-    {
-        "round_id": 4,
-        "has_extra": True,
-        "date_played": "2023-04-01",
-        "course_name": "コースD"
-    },
-    {
-        "round_id": 5,
-        "has_extra": False,
-        "date_played": "2023-05-01",
-        "course_name": "コースE"
+# Streamlit警告設定は削除
+
+def create_test_round(player_count, has_extra=False, date_offset=0):
+    """テスト用のラウンドを作成する"""
+    # メンバー取得
+    members_result = supabase.table('member').select('*').limit(player_count).execute()
+    members = members_result.data
+    
+    if not members or len(members) < player_count:
+        print(f"必要な人数({player_count}人)のメンバーが見つかりません")
+        return None
+
+    # ラウンドを作成
+    date_played = (datetime.now() + timedelta(days=date_offset)).strftime("%Y-%m-%d")
+    round_data = {
+        'date': date_played,
+        'date_played': date_played,
+        'course_name': f'テストコース_{player_count}人プレイ{"_Extra" if has_extra else ""}',
+        'num_players': player_count,
+        'has_extra': has_extra,
+        'finalized': False
     }
-]
+    
+    try:
+        # ラウンドを作成
+        round_result = supabase.table('rounds').insert(round_data).execute()
+        if not round_result.data:
+            print("ラウンドの作成に失敗しました")
+            return None
+        
+        round_id = round_result.data[0]['round_id']
+        print(f"ラウンド作成成功 - ID: {round_id}")
+        
+        # スコアデータを作成
+        for i, member in enumerate(members[:player_count]):
+            score_data = {
+                'round_id': round_id,
+                'member_id': member['member_id'],
+                'front_score': 36 + i,
+                'back_score': 38 + i,
+                'front_putt': 13 + i,
+                'back_putt': 15 + i
+            }
+            
+            # 4人プレイの場合のゲームポイント
+            if player_count == 4:
+                if i == 0:
+                    score_data['front_game_pt'] = 30
+                    score_data['back_game_pt'] = 20
+                elif i == 1:
+                    score_data['front_game_pt'] = 10
+                    score_data['back_game_pt'] = -10
+                elif i == 2:
+                    score_data['front_game_pt'] = -10
+                    score_data['back_game_pt'] = -20
+                else:
+                    score_data['front_game_pt'] = -30
+                    score_data['back_game_pt'] = 10
+            # 3人プレイの場合のゲームポイント
+            else:
+                base_points = [40, 30, 20]
+                score_data['front_game_pt'] = base_points[i]
+                score_data['back_game_pt'] = base_points[i]
+            
+            # エキストラがある場合
+            if has_extra:
+                score_data['extra_score'] = 40 + i
+                score_data['extra_putt'] = 16 + i
+                if player_count == 4:
+                    extra_points = [30, 10, -10, -30]
+                    score_data['extra_game_pt'] = extra_points[i]
+                else:
+                    base_extra_points = [40, 30, 20]
+                    score_data['extra_game_pt'] = base_extra_points[i]
+            
+            # スコア追加
+            score_result = supabase.table('score').insert(score_data).execute()
+            print(f"スコア作成成功 - プレイヤー: {member['name']}")
+        
+        # ハンディキャップデータ作成
+        for i in range(player_count):
+            for j in range(i + 1, player_count):
+                handicap_data = {
+                    'round_id': round_id,
+                    'player_1_id': members[i]['member_id'],
+                    'player_2_id': members[j]['member_id'],
+                    'player_1_to_2': 0,
+                    'player_2_to_1': 0,
+                    'total_only': False
+                }
+                handicap_result = supabase.table('handicap_match').insert(handicap_data).execute()
+                print(f"ハンディキャップ作成成功 - {members[i]['name']} vs {members[j]['name']}")
+        
+        return round_id
+    
+    except Exception as e:
+        print(f"エラーが発生しました: {str(e)}")
+        return None
 
-# ダミーのプレイヤーデータ（4名の場合の例）
-dummy_player_data_template = {
-    1: {"Player": "Alice", "Front Score": 40, "Back Score": 45, "Extra Score": 0,
-        "Front GP": 10, "Back GP": 10, "Extra GP": 0, "match_pt": 0,
-        # 追加: パットスコア
-        "Putt Front": 0, "Putt Back": 0, "Putt Extra": 0},
-    2: {"Player": "Bob", "Front Score": 42, "Back Score": 44, "Extra Score": 0,
-        "Front GP": 8, "Back GP": 12, "Extra GP": 0, "match_pt": 0,
-        "Putt Front": 0, "Putt Back": 0, "Putt Extra": 0},
-    3: {"Player": "Charlie", "Front Score": 41, "Back Score": 46, "Extra Score": 0,
-        "Front GP": 9, "Back GP": 11, "Extra GP": 0, "match_pt": 0,
-        "Putt Front": 0, "Putt Back": 0, "Putt Extra": 0},
-    4: {"Player": "Diana", "Front Score": 43, "Back Score": 43, "Extra Score": 0,
-        "Front GP": 7, "Back GP": 13, "Extra GP": 0, "match_pt": 0,
-        "Putt Front": 0, "Putt Back": 0, "Putt Extra": 0},
-}
+def run_all_tests():
+    """テストケースを実行する"""
+    results = []
+    
+    try:
+        # テストケース1: 4人プレイ（エキストラあり）
+        test1_id = create_test_round(4, True, 0)
+        results.append(("テストケース1: 4人プレイ（エキストラあり）", test1_id))
+        time.sleep(1)  # APIレート制限を避けるため
+        
+        # テストケース2: 4人プレイ（エキストラなし）
+        test2_id = create_test_round(4, False, 1)
+        results.append(("テストケース2: 4人プレイ（エキストラなし）", test2_id))
+        time.sleep(1)
+        
+        # テストケース3: 3人プレイ（エキストラあり）
+        test3_id = create_test_round(3, True, 2)
+        results.append(("テストケース3: 3人プレイ（エキストラあり）", test3_id))
+        time.sleep(1)
+        
+        # テストケース4: 3人プレイ（エキストラなし）
+        test4_id = create_test_round(3, False, 3)
+        results.append(("テストケース4: 3人プレイ（エキストラなし）", test4_id))
+        
+        print("\n==== テスト結果 ====")
+        for name, round_id in results:
+            print(f"{name}: {'成功 - ID: ' + str(round_id) if round_id else '失敗'}")
+    
+    except Exception as e:
+        print(f"テスト実行中にエラーが発生しました: {str(e)}")
 
-# ダミーハンディキャップ（全ペア0）およびTotal Onlyペア（例として1対2のみ）
-dummy_hc = {
-    (2, 1): 0, (1, 2): 0,
-    (3, 1): 0, (1, 3): 0,
-    (4, 1): 0, (1, 4): 0,
-    (3, 2): 0, (2, 3): 0,
-    (4, 2): 0, (2, 4): 0,
-    (4, 3): 0, (3, 4): 0,
-}
-dummy_total_only_set = {frozenset([1, 2])}
-
-def run_dummy_tests():
-    for rnd in dummy_rounds:
-        # 各ラウンドごとにテンプレートをDeepCopy
-        player_data = copy.deepcopy(dummy_player_data_template)
-        player_ids = sorted(list(player_data.keys()))
-        active_round = rnd
-
-        # has_extra が True の場合、Extra Scoreにダミー値を設定
-        if active_round.get("has_extra"):
-            for pid in player_data:
-                player_data[pid]["Extra Score"] = 38
-        else:
-            for pid in player_data:
-                player_data[pid]["Extra Score"] = 0
-
-        # Total Scoreを計算
-        for pid, data in player_data.items():
-            data["Total Score"] = data["Front Score"] + data["Back Score"]
-
-        updated_data = calculate_player_points(player_data, player_ids, dummy_hc, dummy_total_only_set, active_round)
-
-        print("Round:", rnd["round_id"])
-        pprint.pprint(updated_data)
-        print("-----------------------------------------------------\n")
-
-if __name__ == '__main__':
-    run_dummy_tests()
+if __name__ == "__main__":
+    run_all_tests()
