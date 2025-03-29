@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 from modules.db import supabase
 from streamlit_extras.switch_page_button import switch_page
+from modules.calculation_logic import calculate_player_points
+from modules.round_results import save_round_results, get_round_results
+from modules.supabase_client import get_scores_with_fallback  # 追加: 必要な関数をインポート
 
 def run():
     col1, col2 = st.columns([0.8, 0.2])
@@ -122,6 +125,47 @@ def run():
             
             # データベース更新
             supabase.table('score').update(update_data).eq('round_id', round_id).eq('member_id', member_id).execute()
+            
+            # ▼▼▼ 追加: 計算結果をround_resultsに保存 ▼▼▼
+            try:
+                # 現在のround_idのすべてのスコアを取得
+                scores = get_scores_with_fallback(round_id)
+                if scores:
+                    # ハンディキャップ情報を取得
+                    handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
+                    handicaps_data = handicaps_result.data
+                    
+                    # ラウンド情報を取得
+                    round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
+                    active_round = round_result.data[0] if round_result.data else None
+                    
+                    # round_resultsを取得（存在する場合）
+                    round_results = get_round_results(round_id)
+                    
+                    # プレイヤーデータ初期化
+                    from modules.data_formatter import initialize_player_data
+                    player_data = initialize_player_data(scores, round_results)
+                    player_ids = sorted(list(player_data.keys()))
+                    
+                    # ハンディキャップ辞書作成
+                    handicaps = {}
+                    total_only_set = set()
+                    if handicaps_data:
+                        for h in handicaps_data:
+                            handicaps[(h['player_1_id'], h['player_2_id'])] = h['player_1_to_2']
+                            handicaps[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
+                            if 'total_only' in h and h['total_only']:
+                                total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
+                    
+                    # ポイント計算と保存
+                    updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
+                    save_result = save_round_results(round_id, updated_player_data)
+                    if save_result:
+                        st.info("計算結果をround_resultsテーブルに保存しました")
+                    else:
+                        st.warning("計算結果の保存に失敗しました")
+            except Exception as e:
+                st.warning(f"計算処理中にエラーが発生しました: {e}")
         
         # フォーム送信状態をリセット
         st.session_state.back_form_submitted = False

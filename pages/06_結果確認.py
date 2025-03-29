@@ -38,7 +38,11 @@ def initialize_player_data(scores, round_results):
         player_name = sc['member']['name'] if ('member' in sc and sc['member']) else f"Player {member_id}"
         # DB側のキーがスネークケースの場合
         round_result_data = round_results.get(member_id, {}) if round_results else {}
-
+        
+        # デバッグ用： キー名を表示
+        if member_id == 1 and round_result_data:  # ID=1のプレイヤーに対してのみ表示
+            st.write(f"DEBUG: round_result_data keys for member_id {member_id}: {list(round_result_data.keys())}")
+        
         player_data[member_id] = {
             "Player": player_name,
             "Front Score": sc.get('front_score', 0) or 0,
@@ -51,16 +55,16 @@ def initialize_player_data(scores, round_results):
             "Game Pt": ((sc.get('front_game_pt', 0) or 0)
                         + (sc.get('back_game_pt', 0) or 0)
                         + (sc.get('extra_game_pt', 0) or 0)),
-            # キー名を DB に合わせる
-            "Match Front": round_result_data.get("match_front", 0),
-            "Match Back":  round_result_data.get("match_back", 0),
-            "Match Total": round_result_data.get("match_total", 0),
-            "Match Extra": round_result_data.get("match_extra", 0),
-            "Match Pt":    round_result_data.get("match_pt", 0),
+            # キー名を DB のテーブル構造に合わせる（両方のケースを試す）
+            "Match Front": round_result_data.get("Match Front", round_result_data.get("match_front", 0)),
+            "Match Back":  round_result_data.get("Match Back", round_result_data.get("match_back", 0)),
+            "Match Total": round_result_data.get("Match Total", round_result_data.get("match_total", 0)),
+            "Match Extra": round_result_data.get("Match Extra", round_result_data.get("match_extra", 0)),
+            "Match Pt":    round_result_data.get("Match Pt", round_result_data.get("match_pt", 0)),
             "Putt Front": sc.get('front_putt', 0) or 0,
             "Putt Back": sc.get('back_putt', 0) or 0,
             "Putt Extra": sc.get('extra_putt', 0) or 0,
-            "Put Pt": round_result_data.get("putt_pt", 0),
+            "Putt Pt": round_result_data.get("Putt Pt", round_result_data.get("putt_pt", 0)),
             "Total Pt": sc.get('total_pt', 0) or 0
         }
     return player_data
@@ -168,6 +172,10 @@ def run():
 
     # round_results を取得（必ず実行）
     round_results = get_round_results(round_id)
+    # ▼▼▼ 追加: round_results を辞書形式に変換（メンバーIDをキーに設定） ▼▼▼
+    if isinstance(round_results, list):
+        round_results = { item.get('member_id'): item for item in round_results if item.get('member_id') is not None }
+
     # ▼▼▼ デバッグ用: round_results の中身を表示 ▼▼▼
     st.write("#### [Debug] round_results の中身")
     st.write(round_results)
@@ -177,6 +185,13 @@ def run():
     if not active_round:
         st.error("選択されたラウンドが見つかりません。")
         return
+
+    # ▼▼▼ 追加: IDが16 (2025-02-15 - 千葉よみうり)の場合のデータ検証 ▼▼▼
+    if round_id == 16:
+        st.write("### 検証: 2025-02-15 - 千葉よみうり (ID:16) のデータ")
+        st.write("【スコアデータ】", scores)
+        st.write("【round_results】", round_results)
+        st.write("【active_round】", active_round)
 
     # ハンディキャップ情報の取得
     handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
@@ -201,7 +216,7 @@ def run():
         "Front Score", "Back Score", "Total Score", "Extra Score",
         "Match Front", "Match Back", "Match Total", "Match Extra", "Match Pt",
         "Front GP", "Back GP", "Extra GP", "Game Pt",
-        "Front Putt", "Back Putt", "Extra Putt", "Put Pt",
+        "Front Putt", "Back Putt", "Extra Putt", "Putt Pt",
         "Total Pt"
     ]
 
@@ -225,7 +240,7 @@ def run():
             "Front Putt":  p_data["Putt Front"],
             "Back Putt":   p_data["Putt Back"],
             "Extra Putt":  p_data["Putt Extra"],
-            "Put Pt":      p_data["Put Pt"],
+            "Putt Pt":     p_data["Putt Pt"],
             "Total Pt":    p_data["Total Pt"],
         })
 
@@ -417,7 +432,7 @@ def test_calculation_logic(round_id: int):
             st.write(f"  - Extra Score: {data['Extra Score']}")
             st.write(f"  - Front GP: {data['Front GP']} / Back GP: {data['Back GP']} / Extra GP: {data['Extra GP']} => **Game Pt: {data['Game Pt']}**")
             st.write(f"  - Match Front: {data['Match Front']} / Match Back: {data['Match Back']} / Match Total: {data['Match Total']} / Match Extra: {data['Match Extra']} => **Match Pt: {data['Match Pt']}**")
-            st.write(f"  - Putt Front: {data['Putt Front']} / Putt Back: {data['Putt Back']} / Putt Extra: {data['Putt Extra']} => **Putt Pt: {data['Put Pt']}**")
+            st.write(f"  - Putt Front: {data['Putt Front']} / Putt Back: {data['Putt Back']} / Putt Extra: {data['Putt Extra']} => **Putt Pt: {data['Putt Pt']}**")
             st.write(f"  - **Total Pt: {data['Total Pt']}**")
             st.write("---")
     st.success("再計算のテスト表示が完了しました。")
