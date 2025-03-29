@@ -58,7 +58,7 @@ class Score(Base):
 class HandicapMatch(Base):
     __tablename__ = 'handicap_match'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    round_id = Column(Integer, ForeignKey('rounds.round_id'), nullable=False)  # 修正済み
+    round_id = Column(Integer, ForeignKey('rounds.round_id'), nullable=False)
     player_1_id = Column(Integer, ForeignKey('member.member_id'), nullable=False)
     player_2_id = Column(Integer, ForeignKey('member.member_id'), nullable=False)
     player_1_to_2 = Column(Integer, default=0)

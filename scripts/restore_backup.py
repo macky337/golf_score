@@ -53,10 +53,6 @@ def restore_data():
         remote_backup = load_json_file('backups/remote_main_backup_20250225_140525.json')
         local_backup = load_json_file('backups/golf_score_backup_20250225_140823.json')
         
-        print("\nDebug: Checking backup data structure...")
-        print("Local backup keys:", list(local_backup.keys()))
-        print("Remote backup keys:", list(remote_backup.keys()))
-        
         # Clear existing data first
         print("\nClearing existing data...")
         supabase.table('handicap_match').delete().neq('id', -1).execute()
@@ -68,95 +64,78 @@ def restore_data():
         rounds = local_backup.get('rounds', [])
         success_count = 0
         error_count = 0
-        valid_round_ids = set()  # Keep track of successfully restored round IDs
+        valid_round_ids = set()
         
         for round_data in rounds:
             try:
                 clean_round = {
                     'round_id': round_data.get('round_id'),
-                    'date': round_data.get('date_played'),  # Use date_played for both date fields
                     'date_played': round_data.get('date_played'),
                     'course_name': round_data.get('course_name'),
                     'num_players': round_data.get('num_players', 4),
                     'has_extra': round_data.get('has_extra', False),
-                    'finalized': round_data.get('finalized', False)
+                    'finalized': round_data.get('finalized', False),
+                    'created_at': round_data.get('created_at'),
+                    'updated_at': round_data.get('updated_at')
                 }
+                
+                # Remove None values
+                clean_round = {k: v for k, v in clean_round.items() if v is not None}
+                
                 supabase.table('rounds').insert(clean_round).execute()
                 success_count += 1
                 valid_round_ids.add(round_data.get('round_id'))
             except Exception as e:
                 error_count += 1
                 print(f"Error restoring round {round_data.get('round_id')}: {str(e)}")
-                if hasattr(e, 'details'):
-                    print(f"Error details: {e.details}")
         
         print(f"Rounds restoration complete: {success_count} successful, {error_count} failed")
         
-        # 2. Restore scores (only for valid rounds)
+        # 2. Restore scores
         print("\nRestoring scores table...")
         merged_scores = merge_score_data(remote_backup, local_backup)
         valid_scores = [score for score in merged_scores if score.get('round_id') in valid_round_ids]
-        print(f"Total merged scores: {len(merged_scores)}")
-        print(f"Valid scores (matching restored rounds): {len(valid_scores)}")
         
-        batch_size = 50
-        success_count = 0
-        error_count = 0
-        
-        for i in range(0, len(valid_scores), batch_size):
-            batch = valid_scores[i:i+batch_size]
+        for score in valid_scores:
             try:
-                # Clean up the data before insertion
-                clean_batch = []
-                for score in batch:
-                    clean_score = {
-                        'score_id': score.get('score_id'),
-                        'round_id': score.get('round_id'),
-                        'member_id': score.get('member_id'),
-                        'front_score': score.get('front_score', 0),
-                        'back_score': score.get('back_score', 0),
-                        'extra_score': score.get('extra_score', 0),
-                        'front_putt': score.get('front_putt', 0),
-                        'back_putt': score.get('back_putt', 0),
-                        'extra_putt': score.get('extra_putt', 0),
-                        'front_game_pt': score.get('front_game_pt', 0),
-                        'back_game_pt': score.get('back_game_pt', 0),
-                        'extra_game_pt': score.get('extra_game_pt', 0),
-                        'match_front': score.get('match_front', 0),
-                        'match_back': score.get('match_back', 0),
-                        'match_total': score.get('match_total', 0),
-                        'match_extra': score.get('match_extra', 0),
-                        'match_pt': score.get('match_pt', 0),
-                        'putt_pt': score.get('putt_pt', 0),
-                        'total_pt': score.get('total_pt', 0)
-                    }
-                    # Convert any None values to 0 for numeric fields
-                    for key in clean_score:
-                        if clean_score[key] is None:
-                            clean_score[key] = 0
-                    clean_batch.append(clean_score)
+                clean_score = {
+                    'score_id': score.get('score_id'),
+                    'round_id': score.get('round_id'),
+                    'member_id': score.get('member_id'),
+                    'front_score': score.get('front_score', 0),
+                    'back_score': score.get('back_score', 0),
+                    'extra_score': score.get('extra_score', 0),
+                    'front_putt': score.get('front_putt', 0),
+                    'back_putt': score.get('back_putt', 0),
+                    'extra_putt': score.get('extra_putt', 0),
+                    'front_game_pt': score.get('front_game_pt', 0),
+                    'back_game_pt': score.get('back_game_pt', 0),
+                    'extra_game_pt': score.get('extra_game_pt', 0),
+                    'match_front': score.get('match_front', 0),
+                    'match_back': score.get('match_back', 0),
+                    'match_total': score.get('match_total', 0),
+                    'match_extra': score.get('match_extra', 0),
+                    'match_pt': score.get('match_pt', 0),
+                    'putt_pt': score.get('putt_pt', 0),
+                    'total_pt': score.get('total_pt', 0),
+                    'created_at': score.get('created_at'),
+                    'updated_at': score.get('updated_at')
+                }
                 
-                result = supabase.table('score').insert(clean_batch).execute()
-                success_count += len(batch)
-                print(f"Restored scores {i+1} to {i+len(batch)}")
+                # Convert any None values to 0 for numeric fields and remove null timestamps
+                clean_score = {k: (0 if v is None and k not in ['created_at', 'updated_at'] else v) 
+                             for k, v in clean_score.items() 
+                             if v is not None or k not in ['created_at', 'updated_at']}
                 
+                result = supabase.table('score').insert(clean_score).execute()
+                print(f"Restored score {score.get('score_id')}")
             except Exception as e:
-                error_count += len(batch)
-                print(f"Error restoring scores {i+1} to {i+len(batch)}: {str(e)}")
-                if hasattr(e, 'details'):
-                    print(f"Error details: {e.details}")
+                print(f"Error restoring score {score.get('score_id')}: {str(e)}")
         
-        print(f"Score restoration complete: {success_count} successful, {error_count} failed")
-        
-        # 3. Restore handicap matches (only for valid rounds)
+        # 3. Restore handicap matches
         print("\nRestoring handicap_match table...")
         handicap_matches = local_backup.get('handicap_matches', [])
         valid_matches = [match for match in handicap_matches if match.get('round_id') in valid_round_ids]
-        print(f"Total handicap matches: {len(handicap_matches)}")
-        print(f"Valid handicap matches (matching restored rounds): {len(valid_matches)}")
-        
-        success_count = 0
-        error_count = 0
         
         for match in valid_matches:
             try:
@@ -167,18 +146,19 @@ def restore_data():
                     'player_2_id': match.get('player_2_id'),
                     'player_1_to_2': match.get('player_1_to_2', 0),
                     'player_2_to_1': match.get('player_2_to_1', 0),
-                    'total_only': match.get('total_only', False)
+                    'total_only': match.get('total_only', False),
+                    'created_at': match.get('created_at'),
+                    'updated_at': match.get('updated_at')
                 }
+                
+                # Remove None values
+                clean_match = {k: v for k, v in clean_match.items() if v is not None}
+                
                 supabase.table('handicap_match').insert(clean_match).execute()
-                success_count += 1
             except Exception as e:
-                error_count += 1
                 print(f"Error restoring handicap match {match.get('id')}: {str(e)}")
-                if hasattr(e, 'details'):
-                    print(f"Error details: {e.details}")
         
-        print(f"Handicap match restoration complete: {success_count} successful, {error_count} failed")
-        print("\nRestoration process completed!")
+        print("Restoration completed successfully!")
         
     except Exception as e:
         print(f"An error occurred during restoration: {str(e)}")

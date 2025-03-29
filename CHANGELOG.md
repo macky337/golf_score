@@ -1,5 +1,10 @@
 # 変更履歴
 
+## [2025-03-14]
+
+### 修正
+- match points calculation and database update logic
+
 ## [2025-03-09]
 
 ### 修正

@@ -1,4 +1,5 @@
 from modules.score_calculator import calc_putt_points, calc_match_points_by_section, calc_match_points
+from modules.round_results import save_round_results
 
 def calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round):
     """
@@ -150,6 +151,13 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
         d = player_data[mid]
         # Putt Pt を使って Total Pt を計算
         d["Total Pt"] = d["Game Pt"] + d["Match Pt"] + d["Putt Pt"]
+
+    # Save the calculated results to Supabase
+    round_id = active_round['round_id']
+    if save_round_results(round_id, player_data):
+        print(f"Successfully saved round results for round_id: {round_id}")
+    else:
+        print(f"Failed to save round results for round_id: {round_id}")
 
     return player_data
 
