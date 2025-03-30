@@ -131,99 +131,39 @@ def get_scores_with_fallback(round_id):
     
     return []
 
-def update_scores_batch(round_id, scores_data):
-    """複数のスコアを一括で更新し、全て成功するか失敗するかを保証"""
-    client = get_supabase_client()
+def update_scores_batch(round_id, update_data):
+    """スコアバッチ更新 - 複数メンバーのスコアを一度に更新"""
+    supabase = get_supabase_client()
     success_count = 0
-    updates = []
-    failures = []
+    failed_updates = []
     
-    # スコアテーブルの構造を確認
+    # 許可されるフィールド (score テーブルに存在するフィールドのみ)
+    allowed_fields = [
+        'front_score', 'back_score', 'extra_score',
+        'front_putt', 'back_putt', 'extra_putt', 
+        'front_game_pt', 'back_game_pt', 'extra_game_pt',
+        'total_score'
+    ]
+    
     try:
-        # まず、現在のスコアデータを取得して構造を確認する
-        current_scores = client.table("score").select("*").eq("round_id", round_id).execute()
-        if not current_scores.data:
-            st.error(f"ラウンドID {round_id} のスコアデータが見つかりません。")
-            return False, [], [{"error": "スコアデータが見つかりません"}]
+        for member_id, data in update_data.items():
+            # 不正なフィールドをフィルタリング
+            filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
             
-        # スキーマ情報を取得（実際のフィールド名を確認）
-        valid_fields = set()
-        if current_scores.data:
-            valid_fields = set(current_scores.data[0].keys())
-            st.info(f"スコアテーブルのフィールド: {valid_fields}")
-        
-        # 全ての更新を試みる
-        for member_id, data in scores_data.items():
             try:
-                # データの整合性を確保
-                update_payload = {}
-                
-                # デバッグ：更新するデータを表示
-                st.text(f"ID:{member_id} データ: game_pt={data['game_pt']}, match_pt={data['match_pt']}, putt_pt={data['putt_pt']}, total_pt={data['total_pt']}")
-                
-                # 確実に存在するフィールドのみ更新
-                if 'game_pt' in valid_fields and 'game_pt' in data:
-                    update_payload['game_pt'] = data['game_pt']
-                
-                if 'match_pt' in valid_fields and 'match_pt' in data:
-                    update_payload['match_pt'] = data['match_pt']
-                
-                if 'putt_pt' in valid_fields and 'putt_pt' in data:
-                    update_payload['putt_pt'] = data['putt_pt']
-                    
-                if 'total_pt' in valid_fields and 'total_pt' in data:
-                    update_payload['total_pt'] = data['total_pt']
-                
-                # 古いデータとの整合性を確保するためのフォールバック
-                # 古いバージョンでは異なるフィールド名を使用している可能性あり
-                if 'game_point' in valid_fields and 'game_pt' in data:
-                    update_payload['game_point'] = data['game_pt']
-                
-                if 'match_point' in valid_fields and 'match_pt' in data:
-                    update_payload['match_point'] = data['match_pt']
-                    
-                if 'putt_point' in valid_fields and 'putt_pt' in data:
-                    update_payload['putt_point'] = data['putt_pt']
-                    
-                if 'total_point' in valid_fields and 'total_pt' in data:
-                    update_payload['total_point'] = data['total_pt']
-                
-                # 更新データがあれば実行
-                if update_payload:
-                    result = client.table("score").update(update_payload) \
-                            .eq("round_id", round_id) \
-                            .eq("member_id", member_id).execute()
-                    
-                    if result.data:
-                        success_count += 1
-                        updates.append(result.data)
-                    else:
-                        failures.append({
-                            "member_id": member_id,
-                            "error": "更新は成功しましたが、データが返されませんでした"
-                        })
-                else:
-                    failures.append({
-                        "member_id": member_id,
-                        "error": "更新するデータフィールドが見つかりませんでした"
-                    })
-                    
+                result = supabase.table('score').update(filtered_data).eq('round_id', round_id).eq('member_id', member_id).execute()
+                success_count += 1
             except Exception as e:
-                failures.append({
-                    "member_id": member_id,
-                    "error": str(e)
+                failed_updates.append({
+                    'member_id': member_id,
+                    'data': filtered_data,
+                    'error': str(e)
                 })
         
-        # 全ての更新が成功したか確認
-        if success_count == len(scores_data) and not failures:
-            return True, updates, []
-        
-        # 部分的な成功の場合、エラーログを残す
-        return len(failures) == 0, updates, failures
-            
+        return (len(failed_updates) == 0, success_count, failed_updates)
     except Exception as e:
-        st.error(f"一括更新エラー: {str(e)}")
-        return False, updates, [{"error": str(e)}]
+        print(f"バッチ更新エラー: {e}")
+        return (False, success_count, failed_updates + [{'error': str(e)}])
 
 def recalculate_all_past_rounds():
     """

@@ -4,65 +4,39 @@ from modules.db import supabase
 from streamlit_extras.switch_page_button import switch_page
 from modules.models import get_course_list, get_or_create_course, get_course_by_id, get_members_list
 
-def create_scores(round_id, selected_members, member_dict, retry=3):
-    """スコアレコードを作成し、エラーが発生した場合は再試行"""
-    try:
-        # 最大のスコアIDを取得
-        max_score_id_result = supabase.table('score').select('score_id').order('score_id', desc=True).limit(1).execute()
-        next_score_id = 1
-        if max_score_id_result.data:
-            next_score_id = max_score_id_result.data[0]['score_id'] + 1
-
-        success_count = 0
-        failed_members = []
-        
-        for member_name in selected_members:
-            member_id = member_dict[member_name]
-            success = False
+def create_score_records(supabase, round_id, member_ids):
+    """選択されたメンバーのスコアレコードを作成"""
+    success = True
+    for member_id in member_ids:
+        try:
+            # メンバー情報を取得してプレイヤー名をログに表示
+            member_info = supabase.table('member').select('name').eq('member_id', member_id).execute()
+            player_name = member_info.data[0]['name'] if member_info.data else f"Player {member_id}"
             
-            # 複数回試行
-            for attempt in range(retry):
-                try:
-                    score_data = {
-                        'score_id': next_score_id,
-                        'round_id': round_id,
-                        'member_id': member_id,
-                        'front_score': 0,
-                        'back_score': 0,
-                        'extra_score': 0,
-                        'front_putt': 0,
-                        'back_putt': 0,
-                        'extra_putt': 0,
-                        'front_game_pt': 0,
-                        'back_game_pt': 0,
-                        'extra_game_pt': 0,
-                        'match_front': 0,
-                        'match_back': 0,
-                        'match_total': 0,
-                        'match_extra': 0,
-                        'match_pt': 0,
-                        'putt_pt': 0,  # put_pt から putt_pt に修正（tを2つに）
-                        'total_pt': 0
-                    }
-                    supabase.table('score').insert(score_data).execute()
-                    next_score_id += 1
-                    success_count += 1
-                    success = True
-                    break
-                except Exception as e:
-                    if attempt < retry - 1:
-                        # 1秒待ってリトライ
-                        import time
-                        time.sleep(1)
-                    else:
-                        failed_members.append((member_name, member_id, str(e)))
-                        
-            if not success:
-                st.warning(f"メンバー「{member_name}」のスコア作成に失敗しました")
-                
-        return success_count, failed_members
-    except Exception as e:
-        return 0, [(None, None, str(e))]
+            # スコアレコード作成 - score テーブルに存在するカラムのみを指定
+            score_data = {
+                'round_id': round_id,
+                'member_id': member_id,
+                'front_score': 0,
+                'back_score': 0,
+                'extra_score': 0,
+                'front_putt': 0,
+                'back_putt': 0,
+                'extra_putt': 0,
+                'front_game_pt': 0,
+                'back_game_pt': 0,
+                'extra_game_pt': 0
+                # match_back などのカラムは削除（round_resultsテーブル用のフィールド）
+            }
+            
+            # スコア追加
+            supabase.table('score').insert(score_data).execute()
+            print(f"{player_name} のスコアレコードを作成しました")
+        except Exception as e:
+            print(f"{player_name} のスコア作成エラー: {e}")
+            success = False
+    
+    return success
 
 def run():
     col1, col2 = st.columns([0.8, 0.2])
@@ -227,37 +201,12 @@ def run():
                 # アクティブなラウンドIDをセッション状態に保存
                 st.session_state.active_round_id = round_id
 
-                # スコアの作成（頑健な実装に置き換え）
-                success_count, failed_members = create_scores(round_id, selected_members, member_dict)
+                # スコアの作成（新しい実装に置き換え）
+                member_ids = [member_dict[name] for name in selected_members]
+                success = create_score_records(supabase, round_id, member_ids)
                 
-                if failed_members:
-                    st.warning(f"{len(selected_members) - success_count}名分のスコアデータ作成に失敗しました。")
-                    for name, member_id, error in failed_members:
-                        if name:
-                            st.error(f"{name}のスコア作成エラー: {error}")
-                        else:
-                            st.error(f"エラー: {error}")
-                    
-                    # セッションに失敗情報を保存
-                    if "failed_scores" not in st.session_state:
-                        st.session_state.failed_scores = {}
-                    
-                    st.session_state.failed_scores[round_id] = {
-                        "round_id": round_id,
-                        "failed_members": failed_members,
-                        "selected_members": selected_members,
-                        "member_dict": member_dict
-                    }
-                    
-                    # 失敗したメンバーのスコア作成を再試行するボタン
-                    if st.button("スコア作成を再試行"):
-                        success_count, failed_members = create_scores(round_id, 
-                                                                    [name for name, _, _ in failed_members], 
-                                                                    member_dict, 
-                                                                    retry=5)
-                        if not failed_members:
-                            st.success("すべてのスコアデータの作成に成功しました。")
-                            switch_page("フロントスコア入力")
+                if not success:
+                    st.warning("スコアデータ作成に失敗したメンバーがいます。")
                 
                 # ハンディキャップ設定の保存
                 max_handicap_id_result = supabase.table('handicap_match').select('id').order('id', desc=True).limit(1).execute()
@@ -278,7 +227,7 @@ def run():
                     supabase.table('handicap_match').insert(handicap_data).execute()
                     next_handicap_id += 1
 
-                if not failed_members:
+                if success:
                     st.success("ラウンド設定が完了しました。")
                     switch_page("フロントスコア入力")
 
