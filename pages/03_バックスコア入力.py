@@ -116,11 +116,15 @@ def run():
             back_putt = st.session_state[f"back_putt_{member_id}"]
             back_game_pt = st.session_state[f"back_game_pt_{member_id}"]
             
+            # front_score を取得して合計する
+            front_score = score.get('front_score', 0) or 0
+            
             # 更新データを作成
             update_data = {
                 'back_score': back_score,
                 'back_putt': back_putt,
-                'back_game_pt': back_game_pt
+                'back_game_pt': back_game_pt,
+                'total_score': front_score + back_score  # total_score を計算して保存
             }
             
             # データベース更新

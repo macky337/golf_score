@@ -13,11 +13,10 @@ def main():
         tables_to_check = [
             "rounds", 
             "score", 
-            "members", 
             "handicap_match", 
             "round_results",
             "courses",  # 追加: コーステーブル
-            "member"    # 追加: メンバーテーブル (members ではなく)
+            "member"    # 追加: メンバーテーブル
         ]
         
         print("\n=== Supabaseテーブル情報 ===\n")

@@ -7,7 +7,9 @@ def main():
     try:
         # 既知のテーブルに対してクエリを実行し、存在確認と構造を取得
         known_tables = [
-            "rounds", "score", "members", "handicap_match", "round_results", 
+            "rounds", "score", 
+            # "members" テーブルは削除済み
+            "handicap_match", "round_results", 
             # 追加指定されたテーブル
             "courses", "member",
             # 追加の可能性のあるテーブル

@@ -1,575 +1,283 @@
 #!/usr/bin/env python3
 """
-スコアデータを復旧するスクリプト
-バックアップファイルからゲームポイントとパットデータを読み込み、
-現在のスコアデータに適用し、マッチポイントとパットポイントを再計算します。
+バックアップからゲームポイントをリストアするスクリプト
 """
 
-import json
 import os
 import sys
-from collections import Counter
+import json
+from datetime import datetime
 
-# インポートパスを修正
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# モジュールのインポートパスを追加
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from modules.db import supabase
+from modules.supabase_client import get_supabase_client
 
-# バックアップファイルのパス
-BACKUP_FILES = [
-    # ゲームポイントデータを含むバックアップ
-    os.path.join(os.path.dirname(os.path.dirname(__file__)), "backups", "main_backup_20250225_140419.json"),
-    # パットデータを含むバックアップ
-    os.path.join(os.path.dirname(os.path.dirname(__file__)), "backups", "golf_score_backup_20250219_231345.json"),
-    # その他のバックアップ
-    os.path.join(os.path.dirname(os.path.dirname(__file__)), "backups", "remote_main_backup_20250225_140525.json")
-]
-
-def load_backup_data(file_path):
-    """バックアップファイルからデータを読み込む"""
+def main():
+    """バックアップからゲームポイント情報をリストアするスクリプト"""
+    print("===== ゲームポイント復元ツール =====")
+    
+    # バックアップファイルパス
+    backup_path = r"C:\Users\user\Documents\GitHub\golf_score\backups\remote_main_backup_20250225_140525.json"
+    
+    # バックアップファイルの存在確認
+    if not os.path.exists(backup_path):
+        print(f"エラー: バックアップファイル '{backup_path}' が見つかりません")
+        return
+    
+    print(f"バックアップファイル '{backup_path}' を読み込み中...")
+    
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return data
-    except Exception as e:
-        print(f"バックアップファイルの読み込み中にエラーが発生しました: {str(e)}")
-        return None
-
-def print_data_sample(backup_data, data_type="all"):
-    """バックアップデータのサンプルを表示"""
-    if 'scores' in backup_data and backup_data['scores']:
-        sample_score = backup_data['scores'][0]
-        print(f"{data_type}データのサンプル:")
-        if data_type == "all" or data_type == "putt":
-            print(f"  front_putt: {sample_score.get('front_putt')}")
-            print(f"  back_putt: {sample_score.get('back_putt')}")
-            print(f"  extra_putt: {sample_score.get('extra_putt')}")
-        if data_type == "all" or data_type == "game":
-            print(f"  front_game_pt: {sample_score.get('front_game_pt')}")
-            print(f"  back_game_pt: {sample_score.get('back_game_pt')}")
-            print(f"  extra_game_pt: {sample_score.get('extra_game_pt')}")
-
-def find_backup_with_data(data_type="game"):
-    """指定されたデータタイプ（ゲームポイント or パットデータ）を含むバックアップを見つける"""
-    for backup_file in BACKUP_FILES:
-        if os.path.exists(backup_file):
-            backup_data = load_backup_data(backup_file)
-            if backup_data and 'scores' in backup_data and backup_data['scores']:
-                sample_score = backup_data['scores'][0]
-                
-                if data_type == "game":
-                    # ゲームポイントデータがあるかチェック
-                    has_game_data = (sample_score.get('front_game_pt') is not None or 
-                                    sample_score.get('back_game_pt') is not None or 
-                                    sample_score.get('extra_game_pt') is not None)
-                    if has_game_data:
-                        print(f"ゲームポイントデータが見つかりました: {backup_file}")
-                        print_data_sample(backup_data, "game")
-                        return backup_file, backup_data
-                
-                elif data_type == "putt":
-                    # パットデータがあるかチェック
-                    has_putt_data = (sample_score.get('front_putt') is not None or 
-                                    sample_score.get('back_putt') is not None or 
-                                    sample_score.get('extra_putt') is not None)
-                    if has_putt_data:
-                        print(f"パットデータが見つかりました: {backup_file}")
-                        print_data_sample(backup_data, "putt")
-                        return backup_file, backup_data
-    
-    return None, None
-
-def update_scores_from_backup(backup_data, update_type="all"):
-    """バックアップからスコアデータを更新する"""
-    if not backup_data or 'scores' not in backup_data:
-        print("バックアップデータにスコア情報がありません。")
-        return False
-    
-    score_updates = 0
-    game_pt_updates = 0
-    putt_updates = 0
-    errors = 0
-    
-    for score in backup_data['scores']:
-        try:
-            # スコアIDに基づいて更新
-            score_id = score['score_id']
-            update_data = {}
-            
-            if update_type == "all" or update_type == "game":
-                # ゲームポイントデータ
-                front_game_pt = score.get('front_game_pt')
-                back_game_pt = score.get('back_game_pt')
-                extra_game_pt = score.get('extra_game_pt')
-                
-                has_game_data = False
-                
-                if front_game_pt is not None:
-                    update_data['front_game_pt'] = front_game_pt
-                    has_game_data = True
-                if back_game_pt is not None:
-                    update_data['back_game_pt'] = back_game_pt
-                    has_game_data = True
-                if extra_game_pt is not None:
-                    update_data['extra_game_pt'] = extra_game_pt
-                    has_game_data = True
-                
-                if has_game_data:
-                    game_pt_updates += 1
-            
-            if update_type == "all" or update_type == "putt":
-                # パットデータ
-                front_putt = score.get('front_putt')
-                back_putt = score.get('back_putt')
-                extra_putt = score.get('extra_putt')
-                
-                has_putt_data = False
-                
-                if front_putt is not None:
-                    update_data['front_putt'] = front_putt
-                    has_putt_data = True
-                if back_putt is not None:
-                    update_data['back_putt'] = back_putt
-                    has_putt_data = True
-                if extra_putt is not None:
-                    update_data['extra_putt'] = extra_putt
-                    has_putt_data = True
-                    
-                if has_putt_data:
-                    putt_updates += 1
-            
-            # 更新するデータがある場合のみ実行
-            if update_data:
-                supabase.table('score').update(update_data).eq('score_id', score_id).execute()
-                score_updates += 1
-                
-                # 詳細ログ
-                game_info = f"front_game_pt: {update_data.get('front_game_pt')}, back_game_pt: {update_data.get('back_game_pt')}, extra_game_pt: {update_data.get('extra_game_pt')}" if 'front_game_pt' in update_data else "なし"
-                putt_info = f"front_putt: {update_data.get('front_putt')}, back_putt: {update_data.get('back_putt')}, extra_putt: {update_data.get('extra_putt')}" if 'front_putt' in update_data else "なし"
-                print(f"スコアID: {score_id} を更新しました (ゲームポイント: {game_info}, パットデータ: {putt_info})")
+        # バックアップファイルからデータ読み込み
+        with open(backup_path, 'r', encoding='utf-8') as f:
+            backup_data = json.load(f)
         
-        except Exception as e:
-            print(f"スコアID: {score['score_id']} の更新中にエラーが発生しました: {str(e)}")
-            errors += 1
-    
-    print(f"合計 {score_updates} 件のスコアを更新しました（ゲームポイントあり: {game_pt_updates}件, パットデータあり: {putt_updates}件）。エラー数: {errors}")
-    return score_updates > 0
-
-def recalculate_match_points(round_id):
-    """ラウンドのマッチポイントを再計算する"""
-    try:
-        # ラウンドのスコアデータを取得
-        scores_result = supabase.table('score').select('*').eq('round_id', round_id).execute()
-        scores = scores_result.data
-        
-        # ハンディキャップデータを取得
-        handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
-        handicaps = handicaps_result.data
-        
-        # ハンディキャップをペアごとにマッピング
-        handicap_map = {}
-        total_only_pairs = set()
-        for h in handicaps:
-            handicap_map[(h['player_1_id'], h['player_2_id'])] = h['player_1_to_2']
-            handicap_map[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
-            if h['total_only']:
-                total_only_pairs.add(frozenset([h['player_1_id'], h['player_2_id']]))
-
-        # スコアの計算
-        for score in scores:
-            front_total = score['front_score']
-            back_total = score['back_score']
-            extra_total = score['extra_score'] if score['extra_score'] is not None else 0
+        # バックアップファイルの構造を分析
+        print("バックアップファイル構造を分析中...")
+        if isinstance(backup_data, dict):
+            # トップレベルのキーを確認
+            top_keys = list(backup_data.keys())
+            print(f"バックアップには次のセクションが含まれています: {top_keys}")
             
-            # マッチポイントの初期化
-            front_match_points = 0
-            back_match_points = 0
-            total_match_points = 0
-            extra_match_points = 0
+            # スコアデータの可能なキー名のリスト
+            possible_score_keys = ['score', 'scores', 'scoreData', 'score_data']
             
-            # 他のプレイヤーとの対戦結果を計算
-            for opponent in scores:
-                if score['member_id'] == opponent['member_id']:
-                    continue
+            # スコアデータを検索
+            score_data = None
+            score_key = None
+            
+            for key in possible_score_keys:
+                if key in backup_data:
+                    score_data = backup_data[key]
+                    score_key = key
+                    break
+            
+            # スコアデータが見つからない場合、トップレベルのすべてのキーを調査
+            if score_data is None:
+                for key, value in backup_data.items():
+                    if isinstance(value, list) and len(value) > 0:
+                        # 最初のアイテムにスコア関連のキーがあるか確認
+                        first_item = value[0]
+                        if isinstance(first_item, dict) and any(k in first_item for k in ['score_id', 'round_id', 'front_score', 'back_score']):
+                            score_data = value
+                            score_key = key
+                            print(f"スコアデータが '{key}' キーの下に見つかりました")
+                            break
+            
+            if score_data is None:
+                # ファイルの完全な内容を表示（最初の100文字だけ）
+                print("\nバックアップファイルの内容一部:")
+                file_content = json.dumps(backup_data)[:100] + "..."
+                print(file_content)
                 
-                pair = frozenset([score['member_id'], opponent['member_id']])
-                is_total_only = pair in total_only_pairs
+                print("\nエラー: バックアップからスコアデータを特定できませんでした。")
+                print("バックアップファイルを手動で確認して、キー名を指定してください。")
                 
-                # ハンディキャップを取得
-                handicap = handicap_map.get((score['member_id'], opponent['member_id']), 0)
+                # 手動でキーを入力させる
+                manual_key = input("スコアデータのキー名を入力してください (キャンセルする場合は Enter): ")
+                if not manual_key:
+                    return
                 
-                # ネットスコアの計算
-                net_front = front_total - (0 if is_total_only else handicap//2)
-                net_back = back_total - (0 if is_total_only else (handicap - handicap//2))
-                net_extra = extra_total - handicap if extra_total is not None and extra_total > 0 else 0
+                if manual_key in backup_data:
+                    score_data = backup_data[manual_key]
+                    score_key = manual_key
+                else:
+                    print(f"指定されたキー '{manual_key}' がバックアップに存在しません。")
+                    return
                 
-                opp_handicap = handicap_map.get((opponent['member_id'], score['member_id']), 0)
-                opp_net_front = opponent['front_score'] - (0 if is_total_only else opp_handicap//2)
-                opp_net_back = opponent['back_score'] - (0 if is_total_only else (opp_handicap - opp_handicap//2))
-                opp_net_extra = opponent['extra_score'] - opp_handicap if opponent['extra_score'] is not None and opponent['extra_score'] > 0 else 0
-                
-                # マッチポイントの計算
-                if not is_total_only:
-                    # Front 9
-                    if net_front < opp_net_front:
-                        front_match_points += 5
-                    elif net_front > opp_net_front:
-                        front_match_points -= 5
-                    
-                    # Back 9
-                    if net_back < opp_net_back:
-                        back_match_points += 5
-                    elif net_back > opp_net_back:
-                        back_match_points -= 5
-                
-                # Total
-                net_total = front_total + back_total - handicap
-                opp_net_total = opponent['front_score'] + opponent['back_score'] - opp_handicap
-                if net_total < opp_net_total:
-                    total_match_points += 10
-                elif net_total > opp_net_total:
-                    total_match_points -= 10
-                
-                # Extra holes（もしあれば）
-                if extra_total is not None and extra_total > 0 and opponent['extra_score'] is not None and opponent['extra_score'] > 0:
-                    if net_extra < opp_net_extra:
-                        extra_match_points += 5
-                    elif net_extra > opp_net_extra:
-                        extra_match_points -= 5
+        elif isinstance(backup_data, list):
+            # リスト形式のバックアップ
+            print("バックアップはリスト形式です。最初の数件を確認します...")
+            # 最初の数アイテムを表示
+            sample_items = backup_data[:3] if len(backup_data) >= 3 else backup_data
+            for item in sample_items:
+                print(f"サンプルアイテム: {json.dumps(item)[:100]}...")
             
-            # マッチポイント合計
-            match_pt = front_match_points + back_match_points + total_match_points + extra_match_points
-            
-            # スコアの更新
-            supabase.table('score').update({
-                'match_front': front_match_points,
-                'match_back': back_match_points,
-                'match_total': total_match_points,
-                'match_extra': extra_match_points,
-                'match_pt': match_pt
-            }).eq('score_id', score['score_id']).execute()
-            
-        return True
-
-    except Exception as e:
-        print(f"マッチポイントの再計算中にエラーが発生しました: {str(e)}")
-        return False
-
-def calculate_put_points(round_id):
-    """ラウンドのパットポイントを計算する
-    
-    パット戦の得点計算（4人 or 3人の場合）
-    
-    4人の場合:
-      - 1名のみが最少 → 最少者+30pt、残り3名-10pt
-      - 2名同点最少 → 最少2名+10pt、残り2名-10pt
-      - 3名同点最少 → 最少3名+10pt、残り1名-30pt
-      - 全員同点 → 0pt
-      
-    3人の場合:
-      - 1名のみが最少 → 最少者+20pt、残り2名-10pt
-      - 2名同点最少 → 最少2名+5pt、残り1名-10pt
-      - 全員同点 → 0pt
-    """
-    try:
-        # スコアデータを取得
-        scores_result = supabase.table('score').select('*').eq('round_id', round_id).execute()
-        scores = scores_result.data
-        
-        if not scores:
-            print(f"ラウンドID: {round_id} のスコアデータが見つかりません")
-            return False
-        
-        # プレイヤー数を確認
-        player_count = len(scores)
-        if player_count < 3:
-            print(f"ラウンドID: {round_id} のプレイヤー数が少なすぎます: {player_count}人")
-            return False
-            
-        print(f"ラウンドID: {round_id} のパットデータ:")
-        
-        # ラウンド内の全プレイヤーのパットデータを集計
-        putt_data = {}
-        for score in scores:
-            member_id = score['member_id']
-            front_putt = score.get('front_putt') or 0
-            back_putt = score.get('back_putt') or 0
-            extra_putt = score.get('extra_putt') or 0
-            total_putt = front_putt + back_putt + extra_putt
-            
-            putt_data[member_id] = {
-                'score_id': score['score_id'],
-                'total_putt': total_putt,
-                'front_putt': front_putt,
-                'back_putt': back_putt,
-                'extra_putt': extra_putt
-            }
-            print(f"  プレイヤーID: {member_id} - front: {front_putt}, back: {back_putt}, extra: {extra_putt}, 合計: {total_putt}")
-        
-        # パット数の少ない順にソート
-        sorted_putts = sorted(putt_data.items(), key=lambda x: x[1]['total_putt'])
-        
-        # パット数の出現回数をカウント
-        putt_counts = Counter(item[1]['total_putt'] for item in sorted_putts)
-        
-        # 最少のパット数と、それを出したプレーヤー数を取得
-        min_putt = sorted_putts[0][1]['total_putt']
-        num_min_putters = putt_counts[min_putt]
-        
-        print(f"  最少パット数: {min_putt}, 最少達成人数: {num_min_putters}")
-        
-        # プレイヤー数に応じてポイントを計算
-        put_points = {}
-        
-        if player_count == 4:
-            # 4人の場合
-            if num_min_putters == 1:
-                # 1名のみが最少
-                for member_id, data in putt_data.items():
-                    if data['total_putt'] == min_putt:
-                        put_points[member_id] = 30  # 最少者+30pt
-                    else:
-                        put_points[member_id] = -10  # 残り3名-10pt
-            
-            elif num_min_putters == 2:
-                # 2名同点最少
-                for member_id, data in putt_data.items():
-                    if data['total_putt'] == min_putt:
-                        put_points[member_id] = 10  # 最少2名+10pt
-                    else:
-                        put_points[member_id] = -10  # 残り2名-10pt
-            
-            elif num_min_putters == 3:
-                # 3名同点最少
-                for member_id, data in putt_data.items():
-                    if data['total_putt'] == min_putt:
-                        put_points[member_id] = 10  # 最少3名+10pt
-                    else:
-                        put_points[member_id] = -30  # 残り1名-30pt
-            
-            else:  # num_min_putters == 4
-                # 全員同点
-                for member_id in putt_data.keys():
-                    put_points[member_id] = 0  # 全員0pt
-        
-        elif player_count == 3:
-            # 3人の場合
-            if num_min_putters == 1:
-                # 1名のみが最少
-                for member_id, data in putt_data.items():
-                    if data['total_putt'] == min_putt:
-                        put_points[member_id] = 20  # 最少者+20pt
-                    else:
-                        put_points[member_id] = -10  # 残り2名-10pt
-            
-            elif num_min_putters == 2:
-                # 2名同点最少
-                for member_id, data in putt_data.items():
-                    if data['total_putt'] == min_putt:
-                        put_points[member_id] = 5  # 最少2名+5pt
-                    else:
-                        put_points[member_id] = -10  # 残り1名-10pt
-            
-            else:  # num_min_putters == 3
-                # 全員同点
-                for member_id in putt_data.keys():
-                    put_points[member_id] = 0  # 全員0pt
-        
+            # スコアデータと思われる場合
+            if len(backup_data) > 0 and isinstance(backup_data[0], dict) and any(k in backup_data[0] for k in ['score_id', 'round_id']):
+                score_data = backup_data
+                score_key = "root_list"
+                print("バックアップ全体がスコアデータのリストと判断されました")
+            else:
+                print("エラー: バックアップデータの構造がサポートされていません。")
+                return
         else:
-            # 5人以上の場合は例外的なケースとして、独自のルールを適用するか、無視する
-            print(f"  注意: 5人以上のルール未定義のため、パットポイントは0となります。")
-            for member_id in putt_data.keys():
-                put_points[member_id] = 0
+            print("エラー: バックアップデータの形式が不正です")
+            return
         
-        # 計算されたポイントをデータベースに保存
-        for member_id, pt in put_points.items():
-            score_id = putt_data[member_id]['score_id']
-            print(f"  プレイヤーID: {member_id} - スコアID: {score_id} - パット数: {putt_data[member_id]['total_putt']} - ポイント: {pt}")
-            
-            # スコア更新
-            supabase.table('score').update({
-                'put_pt': pt
-            }).eq('score_id', score_id).execute()
+        if not score_data:
+            print("エラー: バックアップにスコアデータが含まれていません")
+            return
         
-        return True
-    
+        if not isinstance(score_data, list):
+            print(f"エラー: '{score_key}' の値がリスト形式ではありません")
+            return
+        
+        print(f"バックアップから {len(score_data)} 件のスコアレコードを読み込みました")
+        
+        # Supabaseクライアント初期化
+        supabase = get_supabase_client()
+        
+        # リストア対象のラウンド一覧を取得
+        round_ids = set()
+        for item in score_data:
+            if isinstance(item, dict) and 'round_id' in item:
+                round_ids.add(item['round_id'])
+        
+        if not round_ids:
+            print("バックアップからラウンドIDが見つかりません。")
+            return
+        
+        print(f"バックアップにはラウンドID {sorted(round_ids)} のデータが含まれています")
+        
+        # リストア対象のラウンドを選択
+        selected_round_ids = select_rounds_to_restore(supabase, round_ids)
+        if not selected_round_ids:
+            print("リストア対象のラウンドが選択されませんでした。処理を中止します")
+            return
+        
+        # データリストア処理
+        print(f"\n選択された {len(selected_round_ids)} ラウンドのゲームポイントを復元します...")
+        restore_stats = restore_game_points(supabase, score_data, selected_round_ids)
+        
+        # リストア統計表示
+        print("\n===== 復元結果サマリー =====")
+        print(f"処理したラウンド: {len(restore_stats['processed_rounds'])}")
+        print(f"更新したスコア数: {restore_stats['updated_records']}")
+        print(f"エラー件数: {restore_stats['errors']}")
+        
+        if restore_stats['skipped_records'] > 0:
+            print(f"スキップしたレコード: {restore_stats['skipped_records']} (バックアップと現在の値が一致)")
+        
+        print("\n処理が完了しました")
+        
+    except json.JSONDecodeError:
+        print("エラー: バックアップファイルのJSON解析に失敗しました")
     except Exception as e:
-        print(f"パットポイントの計算中にエラーが発生しました: {str(e)}")
-        return False
+        print(f"エラー: {e}")
+        import traceback
+        print(traceback.format_exc())
 
-def recalculate_total_points():
-    """すべての確定済みラウンドに対してポイント再計算"""
+def select_rounds_to_restore(supabase, round_ids):
+    """リストア対象のラウンドを選択"""
+    # ラウンド情報を取得
+    round_info = {}
+    for round_id in round_ids:
+        try:
+            round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
+            if round_result.data:
+                round_info[round_id] = round_result.data[0]
+        except Exception as e:
+            print(f"ラウンドID {round_id} の情報取得に失敗: {e}")
+    
+    # ラウンド選択メニュー表示
+    print("\nリストア対象のラウンドを選択してください:")
+    print("0: すべてのラウンド")
+    
+    sorted_round_ids = sorted(round_info.keys())
+    for i, round_id in enumerate(sorted_round_ids):
+        info = round_info.get(round_id, {})
+        date = info.get('date_played', '不明')
+        course = info.get('course_name', '不明')
+        print(f"{i+1}: ID:{round_id} - {date} {course}")
+    
+    # 選択入力受付
+    choice = input("\n数字を入力してください (複数選択はカンマ区切り、例: 1,3,4): ")
+    
+    if choice == "0":
+        return sorted_round_ids
+    
+    selected_indices = []
     try:
-        # 確定済みのラウンドを取得
-        rounds_result = supabase.table('rounds').select('round_id').eq('finalized', True).execute()
+        # カンマ区切りの入力を処理
+        for part in choice.split(','):
+            if part.strip():
+                index = int(part.strip()) - 1
+                if 0 <= index < len(sorted_round_ids):
+                    selected_indices.append(index)
+                else:
+                    print(f"警告: {index+1} は有効な選択肢ではありません")
+    except ValueError:
+        print("無効な入力です。処理を中止します")
+        return []
+    
+    if not selected_indices:
+        print("有効なラウンドが選択されませんでした")
+        return []
+    
+    selected_round_ids = [sorted_round_ids[i] for i in selected_indices]
+    return selected_round_ids
+
+def restore_game_points(supabase, score_data, round_ids):
+    """選択されたラウンドのゲームポイントをリストア"""
+    stats = {
+        "processed_rounds": set(),
+        "updated_records": 0,
+        "skipped_records": 0,
+        "errors": 0
+    }
+    
+    # 各ラウンドごとに処理
+    for round_id in round_ids:
+        print(f"\n--- ラウンドID {round_id} の処理 ---")
         
-        if not rounds_result.data:
-            print("確定済みのラウンドが見つかりません。")
-            return False
-        
-        round_ids = [r['round_id'] for r in rounds_result.data]
-        rounds_updated = 0
-        
-        for round_id in round_ids:
-            try:
-                print(f"ラウンドID: {round_id} のマッチポイントを再計算中...")
-                # マッチポイントの再計算
-                recalculate_match_points(round_id)
-                
-                print(f"ラウンドID: {round_id} のパットポイントを再計算中...")
-                # パットポイントの計算
-                calculate_put_points(round_id)
-                
-                # スコアデータを取得
-                scores_result = supabase.table('score').select('*').eq('round_id', round_id).execute()
-                scores = scores_result.data
-                
-                for score in scores:
-                    # Game Ptの計算
-                    front_game_pt = score.get('front_game_pt') or 0
-                    back_game_pt = score.get('back_game_pt') or 0
-                    extra_game_pt = score.get('extra_game_pt') or 0
-                    game_pt_sum = front_game_pt + back_game_pt + extra_game_pt
-                    
-                    # Match Ptを取得
-                    match_pt = score.get('match_pt') or 0
-                    
-                    # Put Ptを取得
-                    put_pt = score.get('put_pt') or 0
-                    
-                    # Total Ptの再計算
-                    total_pt = game_pt_sum + match_pt + put_pt
-                    
-                    print(f"  スコアID: {score['score_id']} - ゲーム: {game_pt_sum}, マッチ: {match_pt}, パット: {put_pt}, 合計: {total_pt}")
-                    
-                    # 更新データ - game_ptカラムは存在しないのでtotal_ptのみ更新
-                    update_data = {
-                        'total_pt': total_pt
-                    }
-                    
-                    # スコアの更新
-                    supabase.table('score').update(update_data).eq('score_id', score['score_id']).execute()
-                
-                rounds_updated += 1
-                print(f"ラウンドID: {round_id} のポイントを再計算しました")
+        # 現在のスコアデータを取得
+        try:
+            current_scores_result = supabase.table('score').select('*').eq('round_id', round_id).execute()
+            current_scores = {s['member_id']: s for s in current_scores_result.data} if current_scores_result.data else {}
             
-            except Exception as e:
-                print(f"ラウンドID: {round_id} の再計算中にエラーが発生しました: {str(e)}")
-        
-        print(f"合計 {rounds_updated} 件のラウンドのポイントを再計算しました。")
-        return rounds_updated > 0
-    
-    except Exception as e:
-        print(f"ポイント再計算中にエラーが発生しました: {str(e)}")
-        return False
-
-def get_available_backups():
-    """利用可能なバックアップファイルを一覧表示"""
-    backups_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "backups")
-    json_files = [f for f in os.listdir(backups_dir) if f.endswith('.json')]
-    
-    print("利用可能なバックアップファイル:")
-    for i, file in enumerate(json_files, 1):
-        file_path = os.path.join(backups_dir, file)
-        mod_time = os.path.getmtime(file_path)
-        size = os.path.getsize(file_path) / 1024
-        print(f"{i}. {file} (更新: {mod_time}, サイズ: {size:.2f} KB)")
-    
-    return json_files
-
-def verify_game_points():
-    """ゲームポイントが正しく復元されたかを検証"""
-    try:
-        # いくつかのラウンドからサンプルスコアを取得
-        rounds_result = supabase.table('rounds').select('round_id').limit(5).execute()
-        
-        if not rounds_result.data:
-            print("ラウンドデータが見つかりません")
-            return False
-        
-        for r in rounds_result.data:
-            round_id = r['round_id']
-            scores_result = supabase.table('score').select('*').eq('round_id', round_id).execute()
-            scores = scores_result.data
+            if not current_scores:
+                print(f"現在のデータベースにラウンドID {round_id} のスコアデータが見つかりません")
+                continue
             
-            print(f"\nラウンドID: {round_id} のゲームポイントとパットデータ:")
-            for s in scores:
-                print(f"  スコアID: {s['score_id']}, プレイヤーID: {s['member_id']}")
-                print(f"    front_game_pt: {s.get('front_game_pt')}")
-                print(f"    back_game_pt: {s.get('back_game_pt')}")
-                print(f"    extra_game_pt: {s.get('extra_game_pt')}")
-                print(f"    front_putt: {s.get('front_putt')}")
-                print(f"    back_putt: {s.get('back_putt')}")
-                print(f"    extra_putt: {s.get('extra_putt')}")
-                print(f"    match_pt: {s.get('match_pt')}")
-                print(f"    put_pt: {s.get('put_pt')}")
-                print(f"    total_pt: {s.get('total_pt')}")
-        
-        return True
-    except Exception as e:
-        print(f"データ検証中にエラーが発生しました: {str(e)}")
-        return False
-
-def restore_scores_from_backup():
-    """バックアップからスコアデータを復元する"""
-    print("スコアデータの復旧を開始します...")
+            # バックアップからスコアデータを抽出
+            backup_scores = [s for s in score_data if s.get('round_id') == round_id]
+            
+            if not backup_scores:
+                print(f"バックアップにラウンドID {round_id} のデータが見つかりません")
+                continue
+            
+            # バックアップデータに基づいて更新
+            for backup_score in backup_scores:
+                member_id = backup_score.get('member_id')
+                if member_id in current_scores:
+                    current = current_scores[member_id]
+                    
+                    # 更新するフィールド
+                    update_data = {}
+                    
+                    # front_game_pt, back_game_pt, extra_game_ptをチェック・更新
+                    if 'front_game_pt' in backup_score and backup_score['front_game_pt'] != current.get('front_game_pt'):
+                        update_data['front_game_pt'] = backup_score['front_game_pt']
+                    
+                    if 'back_game_pt' in backup_score and backup_score['back_game_pt'] != current.get('back_game_pt'):
+                        update_data['back_game_pt'] = backup_score['back_game_pt']
+                    
+                    if 'extra_game_pt' in backup_score and backup_score['extra_game_pt'] != current.get('extra_game_pt'):
+                        update_data['extra_game_pt'] = backup_score['extra_game_pt']
+                    
+                    # 更新が必要な場合
+                    if update_data:
+                        try:
+                            print(f"メンバーID {member_id} のゲームポイントを更新します: {update_data}")
+                            supabase.table('score').update(update_data).eq('score_id', current['score_id']).execute()
+                            stats["updated_records"] += 1
+                        except Exception as e:
+                            print(f"更新エラー (メンバー {member_id}): {e}")
+                            stats["errors"] += 1
+                    else:
+                        print(f"メンバーID {member_id} のゲームポイントは一致しています。更新不要")
+                        stats["skipped_records"] += 1
+                else:
+                    print(f"メンバーID {member_id} は現在のデータに存在しません")
+            
+            stats["processed_rounds"].add(round_id)
+            
+        except Exception as e:
+            print(f"ラウンドID {round_id} の処理中にエラー発生: {e}")
+            stats["errors"] += 1
     
-    # 1. ゲームポイントデータの復元（main_backup_20250225_140419.json から）
-    game_backup_file, game_backup_data = None, None
-    for backup_file in BACKUP_FILES:
-        if "main_backup_20250225_140419.json" in backup_file and os.path.exists(backup_file):
-            print(f"ゲームポイント復旧用のバックアップファイルを見つけました: {backup_file}")
-            game_backup_data = load_backup_data(backup_file)
-            game_backup_file = backup_file
-            break
-    
-    if not game_backup_file:
-        print("指定されたゲームポイントバックアップファイルが見つかりません。別のバックアップを検索します。")
-        game_backup_file, game_backup_data = find_backup_with_data("game")
-    
-    if not game_backup_data:
-        print("ゲームポイントデータを含むバックアップが見つかりませんでした。")
-        return False
-    
-    # 2. パットデータの復元（既存のファイルから）
-    putt_backup_file, putt_backup_data = find_backup_with_data("putt")
-    
-    if not putt_backup_data:
-        print("パットデータを含むバックアップが見つかりませんでした。")
-        # パットデータが見つからなくてもゲームポイントだけでも復旧を続行
-    
-    # 3. ゲームポイントデータの復旧
-    print(f"\nゲームポイントデータの復旧を開始します（ソース: {game_backup_file}）...")
-    if not update_scores_from_backup(game_backup_data, "game"):
-        print("ゲームポイントデータの復旧に失敗しました。")
-        return False
-    
-    # 4. パットデータの復旧（あれば）
-    if putt_backup_data:
-        print(f"\nパットデータの復旧を開始します（ソース: {putt_backup_file}）...")
-        update_scores_from_backup(putt_backup_data, "putt")
-    
-    # 5. ポイントの再計算
-    print("\n各種ポイントを再計算中...")
-    if not recalculate_total_points():
-        print("ポイント再計算に失敗しました。")
-        return False
-    
-    print("\nスコアデータの復旧が完了しました。")
-    return True
+    return stats
 
 if __name__ == "__main__":
-    print("スコアデータ復旧スクリプトを実行します...")
-    
-    try:
-        if restore_scores_from_backup():
-            print("\n復旧処理が正常に完了しました。")
-            print("\n復旧後のデータを検証します...")
-            verify_game_points()
-            sys.exit(0)
-        else:
-            print("\n復旧処理中にエラーが発生しました。")
-            sys.exit(1)
-    except Exception as e:
-        print(f"\n予期せぬエラーが発生しました: {str(e)}")
-        sys.exit(1)
+    main()
