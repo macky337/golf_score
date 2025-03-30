@@ -7,6 +7,19 @@ from modules.models import get_course_list, get_or_create_course, get_course_by_
 def create_score_records(supabase, round_id, member_ids):
     """選択されたメンバーのスコアレコードを作成"""
     success = True
+    
+    # 最大のscore_idを取得して、新しいIDを作成
+    try:
+        max_id_result = supabase.table('score').select('score_id').order('score_id', desc=True).limit(1).execute()
+        next_score_id = 1
+        if max_id_result.data:
+            next_score_id = max_id_result.data[0]['score_id'] + 1
+        
+        print(f"次のスコアIDから開始: {next_score_id}")
+    except Exception as e:
+        print(f"スコアID取得エラー: {e}")
+        return False
+    
     for member_id in member_ids:
         try:
             # メンバー情報を取得してプレイヤー名をログに表示
@@ -15,6 +28,7 @@ def create_score_records(supabase, round_id, member_ids):
             
             # スコアレコード作成 - score テーブルに存在するカラムのみを指定
             score_data = {
+                'score_id': next_score_id,  # 新しいスコアIDを明示的に指定
                 'round_id': round_id,
                 'member_id': member_id,
                 'front_score': 0,
@@ -25,13 +39,17 @@ def create_score_records(supabase, round_id, member_ids):
                 'extra_putt': 0,
                 'front_game_pt': 0,
                 'back_game_pt': 0,
-                'extra_game_pt': 0
-                # match_back などのカラムは削除（round_resultsテーブル用のフィールド）
+                'extra_game_pt': 0,
+                'total_score': 0  # total_scoreも初期化
             }
             
             # スコア追加
             supabase.table('score').insert(score_data).execute()
-            print(f"{player_name} のスコアレコードを作成しました")
+            print(f"{player_name} のスコアレコードを作成しました (ID: {next_score_id})")
+            
+            # 次のスコアIDに進む
+            next_score_id += 1
+            
         except Exception as e:
             print(f"{player_name} のスコア作成エラー: {e}")
             success = False
