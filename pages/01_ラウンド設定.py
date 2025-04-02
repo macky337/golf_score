@@ -3,6 +3,7 @@ import datetime
 from modules.db import supabase
 from streamlit_extras.switch_page_button import switch_page
 from modules.models import get_course_list, get_or_create_course, get_course_by_id, get_members_list
+from modules.rounds_manager import delete_round
 
 def create_score_records(supabase, round_id, member_ids):
     """選択されたメンバーのスコアレコードを作成"""
@@ -251,6 +252,18 @@ def run():
 
             except Exception as e:
                 st.error(f"ラウンド設定の保存中にエラーが発生しました: {str(e)}")
+
+    # 削除ボタンが押された場合
+    if st.button("選択したラウンドを削除", key="delete_round_btn"):
+        if selected_round_id:
+            success, message = delete_round(selected_round_id)
+            if success:
+                st.success(message)
+                st.experimental_rerun()  # 画面を再読み込み
+            else:
+                st.error(message)
+        else:
+            st.warning("削除するラウンドを選択してください")
 
 if __name__ == "__main__": 
     run()

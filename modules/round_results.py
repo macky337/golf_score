@@ -3,83 +3,129 @@ from modules.supabase_client import get_supabase_client
 import streamlit as st
 import time
 import traceback
+import os
+from supabase import create_client, Client
+
+# Supabase接続情報
+url = os.environ.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(url, key)
+
+def get_table_columns(table_name):
+    """テーブルの実際のカラム名を取得する"""
+    try:
+        response = supabase.table(table_name).select('*').limit(1).execute()
+        if response.data:
+            return set(response.data[0].keys())
+        else:
+            print(f"警告: {table_name}テーブルにデータがないため、カラム情報を取得できません")
+            # 一般的なカラム名を返す (予想されるカラム)
+            if table_name == 'round_results':
+                return {'id', 'round_id', 'member_id', 'match_front', 'match_back', 'match_total', 
+                        'match_extra', 'match_pt', 'putt_pt', 'temp_game_pt', 'total_game_pt', 
+                        'created_at', 'updated_at', 'total_pt'}
+            elif table_name == 'score':
+                return {'score_id', 'round_id', 'member_id', 'front_score', 'back_score', 'extra_score',
+                        'front_putt', 'back_putt', 'extra_putt', 'front_game_pt', 'back_game_pt', 
+                        'extra_game_pt', 'created_at'}
+            return set()
+    except Exception as e:
+        print(f"スキーマ情報取得エラー ({table_name}): {e}")
+        return set()
 
 def save_round_results(round_id, player_data):
-    """ラウンド結果をround_resultsテーブルに保存する"""
-    supabase = get_supabase_client()
-    
-    print(f"ラウンドID {round_id} の結果を保存処理を開始します...")
-    
+    """ラウンド結果をround_resultsテーブルとscoreテーブルに保存"""
     try:
-        # 有効なメンバーIDのリスト取得
-        member_result = supabase.table('member').select('member_id').execute()
-        valid_member_ids = set([m['member_id'] for m in member_result.data])
-        print(f"有効なメンバーID: {valid_member_ids}")
+        # テーブルカラムの確認
+        round_results_columns = get_table_columns('round_results')
+        score_columns = get_table_columns('score')
         
-        # スコアテーブル確認（メンバーIDが存在するか）
-        score_result = supabase.table('score').select('member_id').eq('round_id', round_id).execute()
-        if not score_result.data:
-            print(f"ラウンドID {round_id} のスコアデータが見つかりません")
+        print(f"round_results カラム: {round_results_columns}")
+        print(f"score カラム: {score_columns}")
         
-        # 既存のround_resultsデータを取得
-        existing_results = supabase.table('round_results').select('*').eq('round_id', round_id).execute()
-        existing_count = len(existing_results.data) if existing_results.data else 0
-        print(f"既存のround_resultsデータ: {existing_count} 件")
+        # まずround_resultsテーブルの既存データを削除（上書き）
+        try:
+            supabase.table('round_results').delete().eq('round_id', round_id).execute()
+            print(f"既存のround_resultsデータを削除しました (round_id: {round_id})")
+        except Exception as e:
+            print(f"既存データの削除エラー（続行します）: {e}")
         
-        # 既存データをメンバーIDでインデックス化
-        existing_by_member = {r['member_id']: r for r in existing_results.data} if existing_results.data else {}
-        
-        # プレイヤーデータをsupabase形式に変換して保存
-        records_to_upsert = []
-        
-        for member_id, data in player_data.items():
-            if member_id not in valid_member_ids:
-                continue  # 無効なメンバーIDはスキップ
-            
-            # PascalCase → snake_case に変換
-            record = {
-                'round_id': round_id,
-                'member_id': member_id,
-                'match_front': data.get('Match Front', 0),
-                'match_back': data.get('Match Back', 0),
-                'match_total': data.get('Match Total', 0),
-                'match_extra': data.get('Match Extra', 0),
-                'match_pt': data.get('Match Pt', 0),
-                'putt_pt': data.get('Putt Pt', 0),
-                'total_game_pt': data.get('Game Pt', 0),
-                'total_pt': data.get('Total Pt', 0),  # この行が正しく処理されているか確認
-            }
-            
-            # 既存レコードがある場合はID付与（更新用）
-            if member_id in existing_by_member:
-                record['id'] = existing_by_member[member_id]['id']
-            
-            records_to_upsert.append(record)
-        
-        # 保存処理
-        if records_to_upsert:
-            print(f"{len(records_to_upsert)}件のレコードをround_resultsテーブルに挿入します...")
-            
-            # デバッグ: 最初の1件の内容を表示
-            if records_to_upsert:
-                print(f"最初のレコード例: {records_to_upsert[0]}")
-                print(f"Total Pt: {player_data[records_to_upsert[0]['member_id']].get('Total Pt')}")
-            
+        # プレイヤーごとにデータを保存
+        for player_id, data in player_data.items():
             try:
-                # 既存レコードの更新と新規レコードの挿入を一括で行う
-                result = supabase.table('round_results').upsert(records_to_upsert).execute()
-                print(f"保存完了: {len(result.data) if hasattr(result, 'data') and result.data else '不明'} 件")
-                return True
+                # round_resultsテーブルに保存するデータ
+                # スキーマに合わせて正しいカラム名のみ使用
+                result_data = {
+                    'round_id': round_id,
+                    'member_id': player_id,  # メンバーIDを使用
+                    'match_front': data.get('Match Front', 0),
+                    'match_back': data.get('Match Back', 0),
+                    'match_total': data.get('Match Total', 0),
+                    'match_extra': data.get('Match Extra', 0),
+                    'match_pt': data.get('Match Pt', 0),
+                    'putt_pt': data.get('Putt Pt', 0),
+                    'temp_game_pt': data.get('temp_game_pt', 0),
+                    'total_game_pt': data.get('total_game_pt', data.get('Game Pt', 0)),
+                    'total_pt': data.get('Total Pt', 0)
+                }
+                
+                # データ挿入を試みる
+                response = supabase.table('round_results').insert(result_data).execute()
+                print(f"Round results saved for player {player_id}")
+                
             except Exception as e:
-                print(f"レコード挿入中にエラーが発生しました: {e}")
-                return False
-        else:
-            print("保存するレコードがありません")
-            return False
-    
+                print(f"Error saving round results for player {player_id}: {e}")
+            
+            # scoreテーブルのデータを保存するために既存データを確認
+            try:
+                # 既存のスコアレコードを確認
+                existing_score = supabase.table('score').select('score_id').eq('round_id', round_id).eq('member_id', player_id).execute()
+                
+                if existing_score.data:
+                    # 既存のレコードがある場合、そのscore_idを使用
+                    score_id = existing_score.data[0]['score_id']
+                    print(f"既存のスコアレコードを更新します (ID: {score_id})")
+                else:
+                    # 既存のレコードがない場合、最大のscore_idを取得して新しいIDを生成
+                    max_id_result = supabase.table('score').select('score_id').order('score_id', desc=True).limit(1).execute()
+                    score_id = 1
+                    if max_id_result.data:
+                        score_id = max_id_result.data[0]['score_id'] + 1
+                    print(f"新しいスコアレコードを作成します (ID: {score_id})")
+                
+                # スコアデータを作成（必ず'score_id'を含める）
+                score_data = {
+                    'score_id': score_id,  # 重要: scoreテーブルのプライマリキー
+                    'round_id': round_id,
+                    'member_id': player_id,
+                    'front_score': data.get('Front Score', 0),
+                    'back_score': data.get('Back Score', 0),
+                    'extra_score': data.get('Extra Score', 0),
+                    'front_game_pt': data.get('Front GP', 0),
+                    'back_game_pt': data.get('Back GP', 0),
+                    'extra_game_pt': data.get('Extra GP', 0),
+                    'front_putt': data.get('Front Putt', data.get('Putt Front', 0)), 
+                    'back_putt': data.get('Back Putt', data.get('Putt Back', 0)),
+                    'extra_putt': data.get('Extra Putt', data.get('Putt Extra', 0)),
+                    'total_score': data.get('Front Score', 0) + data.get('Back Score', 0)
+                }
+                
+                # スコアの挿入または更新
+                if existing_score.data:
+                    # 既存のレコードを更新
+                    score_response = supabase.table('score').update(score_data).eq('score_id', score_id).execute()
+                else:
+                    # 新しいレコードを挿入
+                    score_response = supabase.table('score').insert(score_data).execute()
+                
+                print(f"Score data saved for player {player_id}")
+                
+            except Exception as score_e:
+                print(f"Score data save error for player {player_id}: {score_e}")
+        
+        return True
     except Exception as e:
-        print(f"ラウンドID {round_id} のデータ保存に一部失敗しました")
-        print(f"エラー: {e}")
+        print(f"Error saving round results: {e}")
         return False
 
 def get_round_results(round_id: int) -> dict:
@@ -90,22 +136,36 @@ def get_round_results(round_id: int) -> dict:
     try:
         response = supabase.table('round_results').select('*').eq('round_id', round_id).execute()
         results = {}
+        
+        # レスポンスデータの確認
+        print(f"Round results response data: {response}")
+        
         if response.data:
             for record in response.data:
-                results[record['member_id']] = {
+                # スキーマにmember_idが存在することがわかったので、明示的に使用
+                member_id = record.get('member_id')
+                
+                # member_idが取得できなかった場合はスキップ
+                if member_id is None:
+                    print(f"Warning: Could not find member_id in record: {record}")
+                    continue
+                
+                # Game Ptにはtotal_game_ptを使用（game_ptは存在しない）
+                results[member_id] = {
                     'Match Front': record.get('match_front', 0),
                     'Match Back': record.get('match_back', 0),
                     'Match Total': record.get('match_total', 0),
                     'Match Extra': record.get('match_extra', 0),
                     'Match Pt': record.get('match_pt', 0),
                     'Putt Pt': record.get('putt_pt', 0),
-                    'Game Pt': record.get('total_game_pt', 0),  # ここが正しく設定されているか確認
+                    'Game Pt': record.get('total_game_pt', 0),  # game_ptはなくtotal_game_ptを使用
                     'Total Pt': record.get('total_pt', 0)       
                 }
         return results
     except Exception as e:
         error_message = f"Error getting round results: {e}"
         print(error_message)
+        print(f"Exception details: {traceback.format_exc()}")
         try:
             st.error(error_message)
         except:
@@ -125,7 +185,10 @@ def test_round_results():
         print("最新のラウンドを取得中...")
         try:
             rounds_result = supabase.table('rounds').select('*').order('date_played', desc=True).limit(1).execute()
+            
+            # rounds テーブルのデータ構造を確認
             if rounds_result.data:
+                print(f"Rounds table structure: {rounds_result.data[0].keys()}")
                 latest_round = rounds_result.data[0]
                 print(f"テスト用ラウンドID: {latest_round['round_id']} ({latest_round['date_played']} - {latest_round['course_name']})")
             else:
@@ -134,6 +197,16 @@ def test_round_results():
         except Exception as e:
             print(f"ラウンド取得エラー: {e}")
             return
+        
+        # round_results テーブルの列名を確認
+        try:
+            columns_info = supabase.table('round_results').select('*').limit(1).execute()
+            if columns_info.data:
+                print(f"Round_results table columns: {columns_info.data[0].keys()}")
+            else:
+                print("Round_results テーブルにデータがありません")
+        except Exception as e:
+            print(f"テーブル構造確認エラー: {e}")
         
         # round_resultsデータを取得
         print("\nround_resultsデータを取得中...")
@@ -144,8 +217,8 @@ def test_round_results():
             
             # round_resultsテーブルの構造を確認
             print("\nround_resultsのデータ構造:")
-            for member_id, data in list(round_results.items())[:3]:  # 最初の3件のみ表示
-                print(f"メンバーID: {member_id}")
+            for player_id, data in list(round_results.items())[:3]:  # 最初の3件のみ表示
+                print(f"プレイヤーID: {player_id}")
                 for key, value in data.items():
                     print(f"  {key}: {value}")
                 print("  -----------")

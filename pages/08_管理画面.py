@@ -245,13 +245,16 @@ def show_score_editor():
             if st.button("ラウンドを削除", disabled=not confirm_delete, type="primary"):
                 try:
                     # 関連データの削除（順序が重要）
-                    # 1. ハンディキャップマッチデータの削除
+                    # 1. round_resultsテーブルからデータを削除（これが追加部分）
+                    supabase.table('round_results').delete().eq('round_id', round_id).execute()
+                    
+                    # 2. ハンディキャップマッチデータの削除
                     supabase.table('handicap_match').delete().eq('round_id', round_id).execute()
                     
-                    # 2. スコアデータの削除
+                    # 3. スコアデータの削除
                     supabase.table('score').delete().eq('round_id', round_id).execute()
                     
-                    # 3. ラウンドデータの削除
+                    # 4. ラウンドデータの削除
                     supabase.table('rounds').delete().eq('round_id', round_id).execute()
                     
                     st.success(f"ラウンドID: {round_id} を削除しました")

@@ -38,40 +38,74 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
     back_scores = {pid: player_data[pid].get("Back Score", 0) for pid in player_ids}
     extra_scores = {pid: player_data[pid].get("Extra Score", 0) for pid in player_ids}
 
-    sorted_front = sorted(front_scores.items(), key=lambda x: (x[1], x[0]))
-    if len(player_ids) == 3:
-        player_data[sorted_front[0][0]]["Front GP"] = 30
-        player_data[sorted_front[1][0]]["Front GP"] = 0
-        player_data[sorted_front[2][0]]["Front GP"] = -30
-    else:
-        player_data[sorted_front[0][0]]["Front GP"] = 30
-        player_data[sorted_front[1][0]]["Front GP"] = 10
-        player_data[sorted_front[2][0]]["Front GP"] = -10
-        player_data[sorted_front[3][0]]["Front GP"] = -30
-
-    sorted_back = sorted(back_scores.items(), key=lambda x: (x[1], x[0]))
-    if len(player_ids) == 3:
-        player_data[sorted_back[0][0]]["Back GP"] = 30
-        player_data[sorted_back[1][0]]["Back GP"] = 0
-        player_data[sorted_back[2][0]]["Back GP"] = -30
-    else:
-        player_data[sorted_back[0][0]]["Back GP"] = 30
-        player_data[sorted_back[1][0]]["Back GP"] = 10
-        player_data[sorted_back[2][0]]["Back GP"] = -10
-        player_data[sorted_back[3][0]]["Back GP"] = -30
-
-    if active_round.get('has_extra', False):
-        sorted_extra = sorted(extra_scores.items(), key=lambda x: (x[1], x[0]))
-        if len(player_ids) == 3:
-            player_data[sorted_extra[0][0]]["Extra GP"] = 30
-            player_data[sorted_extra[1][0]]["Extra GP"] = 0
-            player_data[sorted_extra[2][0]]["Extra GP"] = -30
+    # Supabaseから取得したFront GPを使用する（存在する場合）
+    for pid in player_ids:
+        # 既存の"Front GP"があればそのまま使用する条件を追加
+        if "Front GP" in player_data[pid]:
+            # 既存値をそのまま維持
+            pass
+        elif "Front Game Pt" in player_data[pid]:
+            player_data[pid]["Front GP"] = player_data[pid]["Front Game Pt"]
+        elif "front_game_pt" in player_data[pid]:
+            player_data[pid]["Front GP"] = player_data[pid]["front_game_pt"]
         else:
-            player_data[sorted_extra[0][0]]["Extra GP"] = 30
-            player_data[sorted_extra[1][0]]["Extra GP"] = 10
-            player_data[sorted_extra[2][0]]["Extra GP"] = -10
-            player_data[sorted_extra[3][0]]["Extra GP"] = -30
+            sorted_front = sorted(front_scores.items(), key=lambda x: (x[1], x[0]))
+            if len(player_ids) == 3:
+                player_data[sorted_front[0][0]]["Front GP"] = 30
+                player_data[sorted_front[1][0]]["Front GP"] = 0
+                player_data[sorted_front[2][0]]["Front GP"] = -30
+            else:
+                player_data[sorted_front[0][0]]["Front GP"] = 30
+                player_data[sorted_front[1][0]]["Front GP"] = 10
+                player_data[sorted_front[2][0]]["Front GP"] = -10
+                player_data[sorted_front[3][0]]["Front GP"] = -30
 
+    # Back GPも同様に処理
+    for pid in player_ids:
+        # 既存の"Back GP"があればそのまま使用する条件を追加
+        if "Back GP" in player_data[pid]:
+            # 既存値をそのまま維持
+            pass
+        elif "Back Game Pt" in player_data[pid]:
+            player_data[pid]["Back GP"] = player_data[pid]["Back Game Pt"]
+        elif "back_game_pt" in player_data[pid]:
+            player_data[pid]["Back GP"] = player_data[pid]["back_game_pt"]
+        else:
+            sorted_back = sorted(back_scores.items(), key=lambda x: (x[1], x[0]))
+            if len(player_ids) == 3:
+                player_data[sorted_back[0][0]]["Back GP"] = 30
+                player_data[sorted_back[1][0]]["Back GP"] = 0
+                player_data[sorted_back[2][0]]["Back GP"] = -30
+            else:
+                player_data[sorted_back[0][0]]["Back GP"] = 30
+                player_data[sorted_back[1][0]]["Back GP"] = 10
+                player_data[sorted_back[2][0]]["Back GP"] = -10
+                player_data[sorted_back[3][0]]["Back GP"] = -30
+
+    # Extra GPも同様に処理
+    if active_round.get('has_extra', False):
+        for pid in player_ids:
+            # 既存の"Extra GP"があればそのまま使用する条件を追加
+            if "Extra GP" in player_data[pid]:
+                # 既存値をそのまま維持
+                pass
+            elif "Extra Game Pt" in player_data[pid]:
+                player_data[pid]["Extra GP"] = player_data[pid]["Extra Game Pt"]
+            elif "extra_game_pt" in player_data[pid]:
+                player_data[pid]["Extra GP"] = player_data[pid]["extra_game_pt"]
+            else:
+                sorted_extra = sorted(extra_scores.items(), key=lambda x: (x[1], x[0]))
+                if len(player_ids) == 3:
+                    player_data[sorted_extra[0][0]]["Extra GP"] = 30
+                    player_data[sorted_extra[1][0]]["Extra GP"] = 0
+                    player_data[sorted_extra[2][0]]["Extra GP"] = -30
+                else:
+                    player_data[sorted_extra[0][0]]["Extra GP"] = 30
+                    player_data[sorted_extra[1][0]]["Extra GP"] = 10
+                    player_data[sorted_extra[2][0]]["Extra GP"] = -10
+                    player_data[sorted_extra[3][0]]["Extra GP"] = -30
+
+    # temp_game_ptsの計算を行う
     temp_game_pts = {}
     for mid in player_ids:
         fgp = player_data[mid]["Front GP"]
@@ -82,14 +116,49 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
 
     print("Debug - Temp Game Points:", temp_game_pts)
 
-    for mid in player_ids:
-        if len(player_ids) == 3:
-            my_total = temp_game_pts[mid]
-            others_total = sum(temp_game_pts[oid] for oid in temp_game_pts if oid != mid)
-            total_game_pt = my_total * 2 - others_total
+    # 3人プレイでの特殊計算
+    if len(player_ids) == 3:
+        # 3人プレイ用の新しい計算
+        for mid in player_ids:
+            # フロント、バック、エクストラの個別ポイントを取得
+            front_gp = player_data[mid]["Front GP"]
+            back_gp = player_data[mid].get("Back GP", 0)
+            extra_gp = player_data[mid].get("Extra GP", 0)
+            
+            # 他のプレイヤーのフロント、バック、エクストラの合計を取得
+            others_front_gp = sum(player_data[oid]["Front GP"] for oid in player_ids if oid != mid)
+            others_back_gp = sum(player_data[oid].get("Back GP", 0) for oid in player_ids if oid != mid)
+            others_extra_gp = sum(player_data[oid].get("Extra GP", 0) for oid in player_ids if oid != mid)
+            
+            # セクションごとのゲームポイント計算
+            front_game_pt = front_gp * 2 - others_front_gp
+            back_game_pt = back_gp * 2 - others_back_gp
+            extra_game_pt = extra_gp * 2 - others_extra_gp
+            
+            # 各セクションのポイント計算結果をデバッグ出力
+            print(f"Player {mid} - Front: {front_gp}*2-{others_front_gp}={front_game_pt}")
+            print(f"Player {mid} - Back: {back_gp}*2-{others_back_gp}={back_game_pt}")
+            if extra_gp != 0 or others_extra_gp != 0:
+                print(f"Player {mid} - Extra: {extra_gp}*2-{others_extra_gp}={extra_game_pt}")
+            
+            # 合計ゲームポイント
+            total_game_pt = front_game_pt + back_game_pt + extra_game_pt
+            
+            # 元のキーを保存しながら新しい計算値を使用
+            if "total_game_pt" in player_data[mid]:
+                old_total = player_data[mid]["total_game_pt"]
+                print(f"Player {mid} - 元のtotal_game_pt: {old_total}, 新計算値: {total_game_pt}")
+                # 値が異なる場合は警告を表示
+                if abs(old_total - total_game_pt) > 0.1:  # 誤差を許容
+                    print(f"警告: Player {mid}のゲームポイントが異なります (旧:{old_total} vs 新:{total_game_pt})")
+            
             player_data[mid]["total_game_pt"] = total_game_pt
             player_data[mid]["Game Pt"] = total_game_pt
-        else:
+            
+            print(f"Player {mid} - 最終Game Pt: {total_game_pt}")
+    else:
+        # 4人プレイは単純合計のまま
+        for mid in player_ids:
             player_data[mid]["total_game_pt"] = temp_game_pts[mid]
             player_data[mid]["Game Pt"] = temp_game_pts[mid]
 
@@ -133,13 +202,15 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
         d["Total Pt"] = d["Game Pt"] + d["Match Pt"] + d["Putt Pt"]
 
     round_id = active_round.get('round_id')
-    is_test_round = round_id > 900  # テスト用IDは通常900以上と仮定
+    is_test_round = round_id > 900 or active_round.get('is_test', False)  # テストフラグも確認
     
-    if not is_test_round and round_id:
+    if round_id and not is_test_round:  # テストモードではデータを保存しない
         if save_round_results(round_id, player_data):
-            print(f"Successfully saved round results for round_id: {round_id}")
+            print(f"Successfully saved round results and scores for round_id: {round_id}")
         else:
-            print(f"Failed to save round results for round_id: {round_id}")
+            print(f"Failed to save data for round_id: {round_id}")
+    elif is_test_round:
+        print("テストモード: データベースへの保存をスキップします")
 
     return player_data
 
