@@ -1,5 +1,10 @@
 # 変更履歴
 
+## [2025-04-04]
+
+### 更新
+- Resolve conflicts after stash pop
+
 ## [2025-04-02]
 
 ### 更新
