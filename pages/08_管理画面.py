@@ -9,6 +9,10 @@ import pytz
 import time
 from dotenv import load_dotenv
 from modules.game_points import calculate_game_pt  # 必要な関数のみをインポート
+from modules.calculation_logic import calculate_player_points
+from modules.round_results import save_round_results, get_round_results
+# 追加: 必要なクライアント関数をインポート
+from modules.supabase_client import get_supabase_client
 
 # config からの直接インポートを削除
 # from config import get_admin_password
@@ -81,7 +85,7 @@ def run():
     ])
 
     with tab1:
-        show_score_editor()
+        score_edit_tab()
     
     with tab2:
         show_handicap_editor()
@@ -748,6 +752,248 @@ def get_backups_from_supabase():
     """Supabaseからバックアップ一覧を取得"""
     result = supabase.table('backups').select('*').order('created_at.desc').execute()
     return result.data
+
+def score_edit_tab():
+    """スコア修正タブの表示と処理"""
+    st.header("スコア修正")
+    
+    # ラウンド選択
+    supabase = get_supabase_client()
+    rounds_result = supabase.table('rounds').select('round_id', 'date_played', 'course_name').order('date_played', desc=True).execute()
+    
+    if not rounds_result.data:
+        st.warning("ラウンドデータがありません。")
+        return
+    
+    # セッションから事前選択されたラウンドIDを取得（結果確認画面から遷移した場合）
+    preselected_round_id = st.session_state.get("admin_selected_round_id", None)
+    default_index = 0
+    
+    round_options = []
+    for i, r in enumerate(rounds_result.data):
+        round_options.append((r['round_id'], f"{r['date_played']} - {r['course_name']} (ID: {r['round_id']})"))
+        if r['round_id'] == preselected_round_id:
+            default_index = i
+    
+    selected_round = st.selectbox(
+        "修正するラウンドを選択", 
+        options=round_options,
+        format_func=lambda x: x[1],
+        index=default_index
+    )
+    
+    if not selected_round:
+        st.info("ラウンドを選択してください。")
+        return
+    
+    round_id, round_name = selected_round
+    
+    # 選択されたラウンドのスコア情報を取得
+    scores_result = supabase.table('score').select('*, member:member_id(name)').eq('round_id', round_id).execute()
+    
+    if not scores_result.data:
+        st.warning("選択されたラウンドにスコアデータがありません。")
+        return
+    
+    # ラウンド情報を取得（確定状態の表示用）
+    round_info = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
+    if round_info.data:
+        is_finalized = round_info.data[0].get('finalized', False)
+        has_extra = round_info.data[0].get('has_extra', False)
+        
+        if is_finalized:
+            st.success("このラウンドは確定済みです。スコア修正後、自動的に結果が再計算されます。")
+        else:
+            st.warning("このラウンドはまだ確定されていません。結果確認画面から確定できます。")
+    
+    scores = sorted(scores_result.data, key=lambda s: s.get('member_id', 0))
+    
+    # スコア編集用フォーム
+    with st.form("score_edit_form"):
+        edited_scores = {}
+        
+        # プレイヤーごとのタブを作成
+        player_tabs = st.tabs([s['member']['name'] if s.get('member') else f"Player {s['member_id']}" for s in scores])
+        
+        for i, (tab, score) in enumerate(zip(player_tabs, scores)):
+            with tab:
+                member_id = score['member_id']
+                edited_scores[member_id] = {"id": member_id}
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.subheader("フロント")
+                    edited_scores[member_id]["front_score"] = st.number_input(
+                        "フロントスコア", 
+                        min_value=0, 
+                        max_value=100, 
+                        value=score.get('front_score', 0) or 0,
+                        key=f"front_score_{member_id}"
+                    )
+                    edited_scores[member_id]["front_putt"] = st.number_input(
+                        "フロントパット", 
+                        min_value=0, 
+                        max_value=50, 
+                        value=score.get('front_putt', 0) or 0,
+                        key=f"front_putt_{member_id}"
+                    )
+                    edited_scores[member_id]["front_game_pt"] = st.number_input(
+                        "フロントゲームポイント", 
+                        min_value=-50, 
+                        max_value=50, 
+                        value=score.get('front_game_pt', 0) or 0,
+                        key=f"front_game_pt_{member_id}"
+                    )
+                
+                with col2:
+                    st.subheader("バック")
+                    edited_scores[member_id]["back_score"] = st.number_input(
+                        "バックスコア", 
+                        min_value=0, 
+                        max_value=100, 
+                        value=score.get('back_score', 0) or 0,
+                        key=f"back_score_{member_id}"
+                    )
+                    edited_scores[member_id]["back_putt"] = st.number_input(
+                        "バックパット", 
+                        min_value=0, 
+                        max_value=50, 
+                        value=score.get('back_putt', 0) or 0,
+                        key=f"back_putt_{member_id}"
+                    )
+                    edited_scores[member_id]["back_game_pt"] = st.number_input(
+                        "バックゲームポイント", 
+                        min_value=-50, 
+                        max_value=50, 
+                        value=score.get('back_game_pt', 0) or 0,
+                        key=f"back_game_pt_{member_id}"
+                    )
+                
+                if has_extra:
+                    with col3:
+                        st.subheader("エキストラ")
+                        edited_scores[member_id]["extra_score"] = st.number_input(
+                            "エキストラスコア", 
+                            min_value=0, 
+                            max_value=100, 
+                            value=score.get('extra_score', 0) or 0,
+                            key=f"extra_score_{member_id}"
+                        )
+                        edited_scores[member_id]["extra_putt"] = st.number_input(
+                            "エキストラパット", 
+                            min_value=0, 
+                            max_value=50, 
+                            value=score.get('extra_putt', 0) or 0,
+                            key=f"extra_putt_{member_id}"
+                        )
+                        edited_scores[member_id]["extra_game_pt"] = st.number_input(
+                            "エキストラゲームポイント", 
+                            min_value=-50, 
+                            max_value=50, 
+                            value=score.get('extra_game_pt', 0) or 0,
+                            key=f"extra_game_pt_{member_id}"
+                        )
+        
+        submit = st.form_submit_button("スコアを保存して再計算する", use_container_width=True, type="primary")
+        
+        if submit:
+            success_count = 0
+            failure_count = 0
+            
+            # 各プレイヤーのスコアを更新
+            for member_id, data in edited_scores.items():
+                try:
+                    # total_score を計算して追加
+                    data["total_score"] = data.get("front_score", 0) + data.get("back_score", 0)
+                    
+                    # score_id を取得するためのクエリ
+                    score_id_result = supabase.table('score').select('score_id').eq('round_id', round_id).eq('member_id', member_id).execute()
+                    if score_id_result.data:
+                        score_id = score_id_result.data[0]['score_id']
+                        
+                        # スコアを更新
+                        supabase.table('score').update(data).eq('score_id', score_id).execute()
+                        success_count += 1
+                    else:
+                        st.error(f"プレイヤーID {member_id} のスコアIDが見つかりません。")
+                        failure_count += 1
+                except Exception as e:
+                    st.error(f"プレイヤーID {member_id} のスコア更新エラー: {str(e)}")
+                    failure_count += 1
+            
+            if success_count > 0:
+                st.success(f"{success_count}人のプレイヤーのスコアを更新しました。")
+                
+                # スコア更新後、ラウンド結果を再計算
+                try:
+                    # 最新のスコアデータを取得
+                    updated_scores = get_scores_with_fallback(round_id)
+                    
+                    # ハンディキャップ情報を取得
+                    handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
+                    handicaps_data = handicaps_result.data or []
+                    
+                    # ラウンド情報を取得
+                    round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
+                    active_round = round_result.data[0] if round_result.data else {}
+                    
+                    # 現在のラウンド結果を取得
+                    round_results = get_round_results(round_id)
+                    if isinstance(round_results, list):
+                        round_results = {item.get('member_id'): item for item in round_results if item.get('member_id') is not None}
+                    
+                    # プレイヤーデータの初期化
+                    from modules.data_formatter import initialize_player_data
+                    player_data = initialize_player_data(updated_scores, round_results)
+                    player_ids = sorted(list(player_data.keys()))
+                    
+                    # ハンディキャップマップを作成
+                    handicaps = {}
+                    total_only_set = set()
+                    for h in handicaps_data:
+                        handicaps[(h['player_1_id'], h['player_2_id'])] = h['player_1_to_2']
+                        handicaps[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
+                        if 'total_only' in h and h['total_only']:
+                            total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
+                    
+                    # ポイント再計算
+                    updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
+                    
+                    # 計算結果をDBに保存
+                    save_success = save_round_results(round_id, updated_player_data)
+                    
+                    if save_success:
+                        st.success("ラウンド結果の再計算と保存が完了しました。")
+                        
+                        # Score テーブルにも最終ポイントを更新
+                        for mid in player_ids:
+                            data = updated_player_data[mid]
+                            score_update = {
+                                'front_game_pt': data.get('Front GP', 0),
+                                'back_game_pt': data.get('Back GP', 0),
+                                'extra_game_pt': data.get('Extra GP', 0) if has_extra else 0,
+                                'total_pt': data.get('Total Pt', 0)
+                            }
+                            # score_id を取得して更新
+                            score_id_result = supabase.table('score').select('score_id').eq('round_id', round_id).eq('member_id', mid).execute()
+                            if score_id_result.data:
+                                score_id = score_id_result.data[0]['score_id']
+                                supabase.table('score').update(score_update).eq('score_id', score_id).execute()
+                    else:
+                        st.error("ラウンド結果の保存に失敗しました。")
+                except Exception as e:
+                    st.error(f"ラウンド結果の再計算中にエラーが発生しました: {str(e)}")
+                    import traceback
+                    st.error(traceback.format_exc())
+            
+            if failure_count > 0:
+                st.warning(f"{failure_count}人のプレイヤーのスコア更新に失敗しました。")
+                
+            # 結果確認画面への遷移ボタン
+            if st.button("結果確認画面へ移動", use_container_width=True):
+                st.session_state.active_round_id = round_id
+                switch_page("結果確認")
 
 if __name__ == "__main__":
     run()

@@ -5,14 +5,14 @@ from streamlit_extras.switch_page_button import switch_page
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
 from modules.supabase_client import get_scores_with_fallback  # 追加: バックスコア入力と同様に必要な関数をインポート
+from components.navigation import show_navigation  # ナビゲーションコンポーネントを追加
 
 def run():
-    col1, col2 = st.columns([0.8, 0.2])
-    with col1:
-        st.title("フロントスコア入力")
-    with col2:
-        if st.button("🏠 Home"):
-            switch_page("main")
+    # ナビゲーションバーを表示（ページ間の移動を容易にする）
+    show_navigation(active_page="フロントスコア入力")
+    
+    # タイトル表示
+    st.title("フロントスコア入力")
     
     # アクティブなラウンドIDをセッション状態から取得
     if "active_round_id" not in st.session_state:
@@ -190,8 +190,22 @@ def run():
         st.dataframe(scores_table, use_container_width=True)
         
         # バックスコア入力ページへのリンク
-        if st.button("バックスコア入力へ", use_container_width=True):
-            switch_page("バックスコア入力")
+        st.markdown("### 次のステップ")
+        st.info("フロントスコアの入力が完了しました。バックスコア入力へ進みましょう。")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("バックスコア入力へ", use_container_width=True):
+                # セッション状態を明示的に保存
+                st.session_state.active_round_id = round_id
+                # Streamlitキャッシュをクリア
+                st.cache_data.clear()
+                # パス指定を変更
+                switch_page("バックスコア入力")
+        
+        with col2:
+            if st.button("ホームへ戻る", use_container_width=True):
+                switch_page("main")
 
 if __name__ == "__main__":
     run()

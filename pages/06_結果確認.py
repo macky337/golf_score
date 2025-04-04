@@ -39,10 +39,6 @@ def initialize_player_data(scores, round_results):
         # DB側のキーがスネークケースの場合
         round_result_data = round_results.get(member_id, {}) if round_results else {}
         
-        # デバッグ用： キー名を表示
-        if member_id == 1 and round_result_data:  # ID=1のプレイヤーに対してのみ表示
-            st.write(f"DEBUG: round_result_data keys for member_id {member_id}: {list(round_result_data.keys())}")
-        
         player_data[member_id] = {
             "Player": player_name,
             "Front Score": sc.get('front_score', 0) or 0,
@@ -108,7 +104,7 @@ def run():
         }
         /* ヘッダー行のスタイル */
         [data-testid="stDataFrame"] table thead th {
-            position: sticky !important;
+            position: sticky !重要;
             top: 0 !important;
             background-color: #f0f2f6 !important;
             z-index: 20 !important;
@@ -151,6 +147,36 @@ def run():
         return
 
     round_id = int(selected_round_str.split("ID: ")[1].rstrip(")"))
+
+    # ラウンド情報を取得
+    round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
+    active_round = round_result.data[0] if round_result.data else None
+    if not active_round:
+        st.error("選択されたラウンドが見つかりません。")
+        return
+    
+    # ラウンドが確定済みかどうかを表示
+    if active_round['finalized']:
+        st.info("このラウンドは確定済みです。スコア修正が必要な場合は管理画面から行ってください。")
+    else:
+        st.warning("このラウンドはまだ確定されていません。各スコア入力画面からスコアを修正できます。")
+        # スコア入力へのリンクボタンを追加
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("フロントスコア修正", use_container_width=True):
+                st.session_state.active_round_id = round_id
+                switch_page("フロントスコア入力")
+        with col2:
+            if st.button("バックスコア修正", use_container_width=True):
+                st.session_state.active_round_id = round_id
+                switch_page("バックスコア入力")
+        with col3:
+            has_extra = active_round.get('has_extra', False)
+            if has_extra:
+                if st.button("エキストラスコア修正", use_container_width=True):
+                    st.session_state.active_round_id = round_id
+                    st.session_state.has_extra = True
+                    switch_page("エキストラスコア入力")
 
     # スコア取得
     try:
@@ -302,8 +328,14 @@ def run():
             import traceback
             st.error(traceback.format_exc())
 
+    # ラウンド確定ボタン
     if not active_round['finalized']:
-        if st.button("このラウンドを確定する"):
+        st.markdown("---")
+        st.subheader("ラウンド確定")
+        st.warning("⚠️ 確定すると、以降はスコア入力画面からの修正ができなくなります。")
+        st.info("確定後にスコアの修正が必要な場合は、管理画面のスコア修正タブから行ってください。")
+        
+        if st.button("このラウンドを確定する", type="primary"):
             try:
                 updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
                 if save_round_results(round_id, updated_player_data):
@@ -318,10 +350,12 @@ def run():
                         }
                     success, updates, failures = update_scores_batch(round_id, update_data)
                     if success:
-                        st.success("ラウンドを確定しました")
+                        # Finalizedフラグを更新
                         supabase.table('rounds').update({'finalized': True}).eq('round_id', round_id).execute()
-                        if updates:
-                            st.rerun()
+                        st.success("🎉 ラウンドを確定しました！")
+                        st.info("今後スコアの修正が必要な場合は、管理画面のスコア修正タブから行ってください。")
+                        # 画面を再読み込み
+                        st.rerun()
                     else:
                         st.warning(f"一部のスコア更新に成功しましたが、{len(failures)}件の失敗がありました。")
                         for failure in failures:
@@ -338,6 +372,12 @@ def run():
                     st.session_state.calculation_results = {}
                 st.session_state.calculation_results[round_id] = player_data
                 st.info("計算結果はセッションに保存されました。再試行してください。")
+    else:
+        # 確定済みのラウンドの場合、管理画面へのリンクを表示
+        st.markdown("---")
+        if st.button("管理画面でスコアを修正する", use_container_width=True):
+            st.session_state.admin_selected_round_id = round_id
+            switch_page("管理画面")
 
     st.markdown("---")
 
