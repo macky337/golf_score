@@ -571,8 +571,153 @@ def show_member_manager():
             else:
                 st.warning("名前を入力してください")
 
-def show_backup_restore():
-    """バックアップ・リストア機能のUI（Supabase版）"""
+def backup_database(session):
+    """データベースのバックアップを作成"""
+    backup_data = {
+        'rounds': [],
+        'scores': [],
+        'members': [],
+        'handicap_matches': []
+    }
+
+    # ラウンドデータのバックアップ
+    rounds = session.query(Round).all()
+    for r in rounds:
+        backup_data['rounds'].append({
+            'round_id': r.round_id,
+            'date_played': r.date_played.isoformat(),
+            'course_name': r.course_name,
+            'has_extra': r.has_extra,
+            'finalized': r.finalized
+        })
+
+    # スコアデータのバックアップ
+    scores = session.query(Score).all()
+    for s in scores:
+        backup_data['scores'].append({
+            'score_id': s.score_id,
+            'round_id': s.round_id,
+            'member_id': s.member_id,
+            'front_score': s.front_score,
+            'back_score': s.back_score,
+            'extra_score': s.extra_score,
+            'front_putt': s.front_putt,
+            'back_putt': s.back_putt,
+            'extra_putt': s.extra_putt
+            # ...その他のスコア関連フィールド...
+        })
+
+    # メンバーデータのバックアップ
+    members = session.query(Member).all()
+    for m in members:
+        backup_data['members'].append({
+            'member_id': m.member_id,
+            'name': m.name
+        })
+
+    # ハンディキャップデータのバックアップ
+    handicaps = session.query(HandicapMatch).all()
+    for h in handicaps:
+        backup_data['handicap_matches'].append({
+            'id': h.id,
+            'round_id': h.round_id,
+            'player_1_id': h.player_1_id,
+            'player_2_id': h.player_2_id,
+            'player_1_to_2': h.player_1_to_2,
+            'player_2_to_1': h.player_2_to_1,
+            'total_only': h.total_only
+        })
+
+    return backup_data
+
+def save_backup(backup_data):
+    """バックアップデータをJSONファイルとして保存"""
+    # 日本のタイムゾーンを設定
+    jst = pytz.timezone('Asia/Tokyo')
+    timestamp = datetime.datetime.now(jst).strftime("%Y%m%d_%H%M%S")
+    
+    backup_dir = "backups"
+    if not os.path.exists(backup_dir):
+        os.makedirs(backup_dir)
+    
+    filename = f"{backup_dir}/golf_score_backup_{timestamp}.json"
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(backup_data, f, ensure_ascii=False, indent=2)
+    return filename
+
+def restore_database(session, backup_file):
+    """データベースをバックアップから復元"""
+    try:
+        # バックアップファイルの読み込み
+        with open(backup_file, 'r', encoding='utf-8') as f:
+            backup_data = json.load(f)
+
+        # 既存のデータを全て削除
+        session.query(Score).delete()
+        session.query(HandicapMatch).delete()
+        session.query(Round).delete()
+        session.query(Member).delete()
+        session.commit()
+
+        # メンバーの復元
+        for member_data in backup_data['members']:
+            member = Member(
+                member_id=member_data['member_id'],
+                name=member_data['name']
+            )
+            session.add(member)
+        session.commit()
+
+        # ラウンドの復元
+        for round_data in backup_data['rounds']:
+            round = Round(
+                round_id=round_data['round_id'],
+                date_played=datetime.datetime.fromisoformat(round_data['date_played']).date(),
+                course_name=round_data['course_name'],
+                has_extra=round_data['has_extra'],
+                finalized=round_data['finalized']
+            )
+            session.add(round)
+        session.commit()
+
+        # スコアの復元
+        for score_data in backup_data['scores']:
+            score = Score(
+                score_id=score_data['score_id'],
+                round_id=score_data['round_id'],
+                member_id=score_data['member_id'],
+                front_score=score_data['front_score'],
+                back_score=score_data['back_score'],
+                extra_score=score_data['extra_score'],
+                front_putt=score_data['front_putt'],
+                back_putt=score_data['back_putt'],
+                extra_putt=score_data['extra_putt']
+            )
+            session.add(score)
+        session.commit()
+
+        # ハンディキャップの復元
+        for handicap_data in backup_data['handicap_matches']:
+            handicap = HandicapMatch(
+                id=handicap_data['id'],
+                round_id=handicap_data['round_id'],
+                player_1_id=handicap_data['player_1_id'],
+                player_2_id=handicap_data['player_2_id'],
+                player_1_to_2=handicap_data['player_1_to_2'],
+                player_2_to_1=handicap_data['player_2_to_1'],
+                total_only=handicap_data['total_only']
+            )
+            session.add(handicap)
+        session.commit()
+
+        return True
+    except Exception as e:
+        st.error(f"リストア中にエラーが発生しました: {str(e)}")
+        session.rollback()
+        return False
+
+def show_backup_restore(session):
+    """バックアップ・リストア機能のUI"""
     st.subheader("データバックアップ・リストア")
 
     col1, col2 = st.columns(2)

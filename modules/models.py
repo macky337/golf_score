@@ -1,14 +1,11 @@
 import datetime
-from sqlalchemy import Column, Integer, Float, String, ForeignKey, Date, Boolean, func
+import pytz
+from sqlalchemy import Column, Integer, Float, String, ForeignKey, Date, Boolean, DateTime, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from supabase import create_client
-import os
-from dotenv import load_dotenv
 
-load_dotenv()
-
-Base = declarative_base()
+# JSTタイムゾーンを設定
+jst = pytz.timezone('Asia/Tokyo')
 
 class Round(Base):
     __tablename__ = 'rounds'
@@ -20,6 +17,8 @@ class Round(Base):
     num_players = Column(Integer, nullable=False)
     has_extra = Column(Boolean, default=False)
     finalized = Column(Boolean, default=False)
+    # 日本時間で現在時間を設定
+    created_at = Column(DateTime, default=datetime.datetime.now, nullable=False)
     # ラウンドとスコアのリレーションシップ
     scores = relationship("Score", back_populates="round")
 
@@ -27,6 +26,7 @@ class Member(Base):
     __tablename__ = 'member'
     member_id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, unique=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.now, nullable=False)
     # メンバーとスコアのリレーションシップ
     scores = relationship("Score", back_populates="member")
 
@@ -51,6 +51,7 @@ class Score(Base):
     match_pt = Column(Float, default=0)
     put_pt = Column(Float, default=0)
     total_pt = Column(Float, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.now, nullable=False)
     # Round と Member とのリレーションシップを定義
     round = relationship("Round", back_populates="scores")
     member = relationship("Member", back_populates="scores")
@@ -64,6 +65,7 @@ class HandicapMatch(Base):
     player_1_to_2 = Column(Integer, default=0)
     player_2_to_1 = Column(Integer, default=0)
     total_only = Column(Boolean, default=False)  # total スコアのみで判定するフラグ
+    created_at = Column(DateTime, default=datetime.datetime.now, nullable=False)
 
     # リレーションシップを追加
     player_1 = relationship("Member", foreign_keys=[player_1_id])
