@@ -165,6 +165,51 @@ def update_scores_batch(round_id, update_data):
         print(f"バッチ更新エラー: {e}")
         return (False, success_count, failed_updates + [{'error': str(e)}])
 
+def update_score_total_pts():
+    """
+    すべての確定済みスコアのtotal_pt値を再計算して更新する
+    DBのround_resultsテーブルを更新
+    """
+    try:
+        supabase = get_supabase_client()
+        
+        # 確定済みのラウンドに紐づくround_resultsを全て取得
+        results_query = supabase.table('round_results').select(
+            'id, round_id, member_id, match_pt, putt_pt, total_game_pt, total_pt'
+        ).execute()
+        
+        results = results_query.data
+        updates_count = 0
+        
+        for result in results:
+            # Noneの場合は0として扱う
+            total_game_pt = result.get('total_game_pt', 0) or 0
+            match_pt = result.get('match_pt', 0) or 0
+            putt_pt = result.get('putt_pt', 0) or 0
+            
+            # 再計算したtotal_pt
+            calculated_total = total_game_pt + match_pt + putt_pt
+            
+            # 現在のtotal_ptと再計算した値を比較し、異なる場合のみ更新
+            if abs(calculated_total - (result.get('total_pt', 0) or 0)) > 0.01:
+                supabase.table('round_results').update({
+                    'total_pt': calculated_total
+                }).eq('id', result['id']).execute()
+                updates_count += 1
+        
+        return {
+            'success': True,
+            'updates_count': updates_count,
+            'total_results': len(results)
+        }
+    
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e),
+            'updates_count': 0
+        }
+
 def recalculate_all_past_rounds():
     """
     過去のすべてのラウンドデータを最新のロジックで再計算して更新する
@@ -215,34 +260,55 @@ def recalculate_all_past_rounds():
                     stats["skipped"] += 1
                     continue
                     
+                # round_resultsを取得
+                round_results_query = client.table('round_results').select('*').eq('round_id', round_id).execute()
+                round_results = round_results_query.data
+                
                 # バッチ処理で06_結果確認.pyと同じロジックで計算
                 from pages.handicap_calc_logic import process_round_scores
                 updated_scores = process_round_scores(scores, handicaps_result.data, round_data)
                 
-                # 計算されたスコアを一括で保存
-                update_data = {}
+                # 計算されたスコアをround_resultsに保存
+                update_count = 0
                 for score in updated_scores:
                     member_id = score['member_id']
-                    update_data[member_id] = {
-                        'game_pt': score['game_pt'],
-                        'match_pt': score['match_pt'],
-                        'putt_pt': score['putt_pt'],  # put_pt から putt_pt に修正
-                        'total_pt': score['total_pt']
-                    }
+                    
+                    # 既存のround_resultsレコードを検索
+                    existing_result = next((r for r in round_results if r['member_id'] == member_id), None)
+                    
+                    if existing_result:
+                        # 既存レコードを更新
+                        try:
+                            client.table('round_results').update({
+                                'total_game_pt': score['game_pt'],
+                                'match_pt': score['match_pt'],
+                                'putt_pt': score['putt_pt'],
+                                'total_pt': score['total_pt']
+                            }).eq('id', existing_result['id']).execute()
+                            update_count += 1
+                        except Exception as update_err:
+                            st.error(f"レコード更新エラー: {update_err}")
+                    else:
+                        # 新規レコードを作成
+                        try:
+                            client.table('round_results').insert({
+                                'round_id': round_id,
+                                'member_id': member_id,
+                                'total_game_pt': score['game_pt'],
+                                'match_pt': score['match_pt'],
+                                'putt_pt': score['putt_pt'],
+                                'total_pt': score['total_pt']
+                            }).execute()
+                            update_count += 1
+                        except Exception as insert_err:
+                            st.error(f"レコード作成エラー: {insert_err}")
                 
-                # デバッグ情報を表示
-                st.text(f"ラウンド ID {round_id}: {len(update_data)}名分のデータを更新します")
-                
-                # 一括更新
-                success, updates, failures = update_scores_batch(round_id, update_data)
-                if success:
+                if update_count > 0:
                     stats["success"] += 1
-                    status_text.text(f"ラウンド ID {round_id}: 更新成功 ({len(updates)}件)")
+                    status_text.text(f"ラウンド ID {round_id}: 更新成功 ({update_count}件)")
                 else:
                     stats["failed"] += 1
-                    status_text.text(f"ラウンド ID {round_id}: 一部更新失敗 ({len(failures)}件)")
-                    for failure in failures:
-                        st.error(f"  - 失敗: {failure.get('error', 'Unknown error')}")
+                    status_text.text(f"ラウンド ID {round_id}: 更新失敗")
                 
             except Exception as e:
                 stats["failed"] += 1
