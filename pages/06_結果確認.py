@@ -206,22 +206,11 @@ def run():
     if isinstance(round_results, list):
         round_results = { item.get('member_id'): item for item in round_results if item.get('member_id') is not None }
 
-    # ▼▼▼ デバッグ用: round_results の中身を表示 ▼▼▼
-    st.write("#### [Debug] round_results の中身")
-    st.write(round_results)
-
     round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
     active_round = round_result.data[0] if round_result.data else None
     if not active_round:
         st.error("選択されたラウンドが見つかりません。")
         return
-
-    # ▼▼▼ 追加: IDが16 (2025-02-15 - 千葉よみうり)の場合のデータ検証 ▼▼▼
-    if round_id == 16:
-        st.write("### 検証: 2025-02-15 - 千葉よみうり (ID:16) のデータ")
-        st.write("【スコアデータ】", scores)
-        st.write("【round_results】", round_results)
-        st.write("【active_round】", active_round)
 
     # ハンディキャップ情報の取得
     handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
@@ -230,11 +219,10 @@ def run():
     # プレイヤーデータの初期化（scores と round_results を合体）
     player_data = initialize_player_data(scores, round_results)
     player_ids = sorted(list(player_data.keys()))
-
-    # ハンディキャップ辞書作成
-    handicaps = {}
-    total_only_set = set()
     if handicaps_data:
+        # ハンディキャップ辞書作成
+        handicaps = {}
+        total_only_set = set()
         for h in handicaps_data:
             handicaps[(h['player_1_id'], h['player_2_id'])] = h['player_1_to_2']
             handicaps[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
@@ -249,7 +237,6 @@ def run():
         "Front Putt", "Back Putt", "Extra Putt", "Putt Pt",
         "Total Pt"
     ]
-
     score_data_list = []
     for pid, p_data in player_data.items():
         score_data_list.append({
@@ -273,14 +260,12 @@ def run():
             "Putt Pt":     p_data["Putt Pt"],
             "Total Pt":    p_data["Total Pt"],
         })
-
+    # Arrow変換エラー回避のため、全体を文字列型に変換
     df = pd.DataFrame(score_data_list)
     df.set_index("Player", inplace=True)
-
-    # Arrow変換エラー回避のため、全体を文字列型に変換
+    # ±表示カラムは表示用として保持（ここでは既に文字列になっています）
     df = df.astype(str)
 
-    # ±表示カラムは表示用として保持（ここでは既に文字列になっています）
     st.write("### スコア詳細")
     st.dataframe(df, use_container_width=True)
 
@@ -288,7 +273,6 @@ def run():
     match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
     match_matrix_reset = match_matrix.reset_index()
     match_matrix_reset.rename(columns={'index': 'Player'}, inplace=True)
-    # こちらも文字列変換（必要なら）
     match_matrix_reset = match_matrix_reset.astype(str)
     st.dataframe(
         match_matrix_reset.style.map(color_points).format(None),
@@ -334,7 +318,6 @@ def run():
         st.subheader("ラウンド確定")
         st.warning("⚠️ 確定すると、以降はスコア入力画面からの修正ができなくなります。")
         st.info("確定後にスコアの修正が必要な場合は、管理画面のスコア修正タブから行ってください。")
-        
         if st.button("このラウンドを確定する", type="primary"):
             try:
                 updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
@@ -380,7 +363,6 @@ def run():
             switch_page("管理画面")
 
     st.markdown("---")
-
     if st.button("過去のラウンドデータを再計算して保存"):
         recalculate_and_save_results()
 
@@ -400,20 +382,17 @@ def recalculate_and_save_results():
     for round_data in all_rounds:
         round_id = round_data['round_id']
         st.info(f"ラウンドID {round_id} の再計算を開始します...")
-
         try:
             scores = get_scores_with_fallback(round_id)
             if not scores:
                 st.warning(f"ラウンドID {round_id} のスコアデータが見つかりません。")
                 continue
-
+            round_results = get_round_results(round_id)
             handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
             handicaps_data = handicaps_result.data
 
-            round_results = get_round_results(round_id)
             player_data = initialize_player_data(scores, round_results)
             player_ids = sorted(list(player_data.keys()))
-
             handicaps = {}
             total_only_set = set()
             if handicaps_data:
@@ -422,6 +401,7 @@ def recalculate_and_save_results():
                     handicaps[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
                     if 'total_only' in h and h['total_only']:
                         total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
+
             updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, round_data)
             if save_round_results(round_id, updated_player_data):
                 st.success(f"ラウンドID {round_id} の計算結果を保存しました。")
@@ -443,19 +423,14 @@ def test_calculation_logic(round_id: int):
         st.error("スコア取得エラー: {}".format(e))
         return
 
-    handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
-    handicaps_data = handicaps_result.data if handicaps_result.data else []
-
     round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
     active_round = round_result.data[0] if round_result.data else {}
     round_results = get_round_results(round_id)
-
-    st.write("#### [Debug] round_results in test_calculation_logic")
-    st.write(round_results)
+    handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
+    handicaps_data = handicaps_result.data if handicaps_result.data else []
 
     player_data = initialize_player_data(scores, round_results)
     player_ids = sorted(player_data.keys())
-
     handicaps = {}
     total_only_set = set()
     for h in handicaps_data:
@@ -463,6 +438,7 @@ def test_calculation_logic(round_id: int):
         handicaps[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
         if 'total_only' in h and h['total_only']:
             total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
+
     updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
 
     with st.expander("計算結果の詳細を表示"):
