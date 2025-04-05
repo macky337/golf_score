@@ -788,6 +788,36 @@ def score_edit_tab():
     
     round_id, round_name = selected_round
     
+    # ここにラウンド削除機能を追加
+    with st.expander("⚠️ ラウンドの削除"):
+        st.warning("このラウンドのデータをすべて削除します。この操作は取り消せません。")
+        
+        # 削除の確認チェックボックス
+        confirm_delete = st.checkbox("このラウンドを削除することを確認しました", key="confirm_delete_round")
+        
+        if st.button("ラウンドを削除", disabled=not confirm_delete, type="primary", key="delete_round_button"):
+            try:
+                # 関連データの削除（順序が重要）
+                # 1. round_resultsテーブルからデータを削除
+                supabase.table('round_results').delete().eq('round_id', round_id).execute()
+                
+                # 2. ハンディキャップマッチデータの削除
+                supabase.table('handicap_match').delete().eq('round_id', round_id).execute()
+                
+                # 3. スコアデータの削除
+                supabase.table('score').delete().eq('round_id', round_id).execute()
+                
+                # 4. ラウンドデータの削除
+                supabase.table('rounds').delete().eq('round_id', round_id).execute()
+                
+                st.success(f"ラウンドID: {round_id} を削除しました")
+                st.rerun()  # 画面を再読み込み
+                
+            except Exception as e:
+                st.error(f"ラウンドの削除中にエラーが発生しました: {str(e)}")
+                if hasattr(e, 'details'):
+                    st.error(f"エラーの詳細: {e.details}")
+    
     # 選択されたラウンドのスコア情報を取得
     scores_result = supabase.table('score').select('*, member:member_id(name)').eq('round_id', round_id).execute()
     
