@@ -92,8 +92,8 @@ def run():
             with col3:
                 st.number_input(
                     "バックゲームポイント",
-                    min_value=-50,
-                    max_value=50,
+                    min_value=-300,
+                    max_value=300,
                     key=f"back_game_pt_{member_id}"
                 )
             
