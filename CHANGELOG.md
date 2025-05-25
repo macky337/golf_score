@@ -3,6 +3,7 @@
 ## [2025-05-25]
 
 ### 修正
+- requirements.txtを修正2
 - requirements.txtを修正
 - requirements.txtを修正
 
