@@ -3,6 +3,7 @@
 ## [2025-05-25]
 
 ### 修正
+- requirements.txtを6
 - requirements.txtを5
 - requirements.txtを更43
 - requirements.txtを更新3
