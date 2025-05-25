@@ -3,6 +3,7 @@
 ## [2025-05-25]
 
 ### 修正
+- requirements.txtを更新3
 - requirements.txtを更新2
 - requirements.txtを更新
 - Procfileを移動
