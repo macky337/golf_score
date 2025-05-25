@@ -4,6 +4,7 @@
 
 ### 修正
 - requirements.txtを修正
+- requirements.txtを修正
 
 ## [2025-04-06]
 
