@@ -4,6 +4,7 @@
 
 ### 修正
 - requirements.txtを6
+- requirements.txtを6
 - requirements.txtを5
 - requirements.txtを更43
 - requirements.txtを更新3

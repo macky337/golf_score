@@ -253,6 +253,16 @@ def run():
             except Exception as e:
                 st.error(f"ラウンド設定の保存中にエラーが発生しました: {str(e)}")
 
+    # 削除対象のラウンド選択
+    st.write("### ラウンド削除")
+    rounds_list = supabase.table('rounds').select('round_id').order('round_id', desc=True).execute().data
+    round_ids = [r['round_id'] for r in rounds_list]
+    selected_round_id = st.selectbox(
+        "削除するラウンドIDを選択",
+        options=round_ids,
+        key="selected_round_id"
+    )
+
     # 削除ボタンが押された場合
     if st.button("選択したラウンドを削除", key="delete_round_btn"):
         if selected_round_id:
