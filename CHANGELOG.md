@@ -3,6 +3,7 @@
 ## [2025-05-25]
 
 ### 修正
+- requirements.txtを更新
 - Procfileを移動
 - config.tomlを修正
 - requirements.txtを修正2
