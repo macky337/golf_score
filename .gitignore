@@ -11,3 +11,22 @@ config.py
 backups/*.json
 !backups/.gitkeep
 .streamlit/secrets.toml
+
+# Virtual environment
+.venv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# OS 一時ファイル
+.DS_Store
+Thumbs.db
+
+# ログ／テンポラリ
+*.log
+*.tmp
+
+# IDE／エディタ設定
+.vscode/
+.idea/
