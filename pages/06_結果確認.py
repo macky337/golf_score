@@ -278,7 +278,8 @@ def run():
     match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
     match_matrix_reset = match_matrix.reset_index()
     match_matrix_reset.rename(columns={'index': 'Player'}, inplace=True)
-    # スタイリングを除外し、Plain DataFrame を表示
+    # Arrow 変換エラー回避のため、全データを文字列化
+    match_matrix_reset = match_matrix_reset.astype(str)
     st.dataframe(
         match_matrix_reset,
         use_container_width=True,
@@ -289,6 +290,8 @@ def run():
     match_results = create_detailed_match_results(player_data, handicaps, total_only_set)
     df_reset = match_results.reset_index()
     df_reset.rename(columns={'index': 'Player'}, inplace=True)
+    # 全データを文字列化して Arrow 互換性を確保
+    df_reset = df_reset.astype(str)
     # スタイリングを除外し、Plain DataFrame を表示
     st.dataframe(
         df_reset,
