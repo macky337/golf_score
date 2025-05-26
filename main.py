@@ -56,22 +56,18 @@ def main():
     
     with col1:
         st.markdown("### 📝 スコア入力")
-        st.markdown("""
-        - [ラウンド設定](ラウンド設定)
-        - [フロントスコア入力](フロントスコア入力)
-        - [バックスコア入力](バックスコア入力)
-        - [エキストラスコア入力](エキストラスコア入力)
-        """)
+        if st.button("ラウンド設定", key="nav_main_round_settings"): switch_page("ラウンド設定")
+        if st.button("フロントスコア入力", key="nav_main_front"): switch_page("フロントスコア入力")
+        if st.button("バックスコア入力", key="nav_main_back"): switch_page("バックスコア入力")
+        if st.button("エキストラスコア入力", key="nav_main_extra"): switch_page("エキストラスコア入力")
         
     with col2:
         st.markdown("### 📊 集計・確認")
-        st.markdown("""
-        - [結果確認](結果確認)
-        - [ポイント集計](ポイント集計)
-        - [管理画面](管理画面)
-        - [メンバー登録](メンバー登録)
-        - [コース管理](コース管理)
-        """)
+        if st.button("結果確認", key="nav_main_results"): switch_page("結果確認")
+        if st.button("ポイント集計", key="nav_main_points"): switch_page("ポイント集計")
+        if st.button("管理画面", key="nav_main_admin"): switch_page("管理画面")
+        if st.button("メンバー登録", key="nav_main_members"): switch_page("メンバー登録")
+        if st.button("コース管理", key="nav_main_courses"): switch_page("コース管理")
     
     # 使い方ガイド
     with st.expander("💡 使い方ガイド"):
