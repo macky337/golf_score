@@ -7,5 +7,8 @@ def switch_page(page_name: str):
         st.set_query_params(page=page_name)
     else:
         st.experimental_set_query_params(page=page_name)
-    # 処理を停止してページ切替を反映
-    st.stop()
+    # ページ切替後に再実行
+    if hasattr(st, "experimental_rerun"):
+        st.experimental_rerun()
+    else:
+        st.stop()

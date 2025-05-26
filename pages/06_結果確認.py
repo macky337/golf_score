@@ -273,9 +273,9 @@ def run():
     match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
     match_matrix_reset = match_matrix.reset_index()
     match_matrix_reset.rename(columns={'index': 'Player'}, inplace=True)
-    match_matrix_reset = match_matrix_reset.astype(str)
+    # スタイリングを除外し、Plain DataFrame を表示
     st.dataframe(
-        match_matrix_reset.style.map(color_points).format(None),
+        match_matrix_reset,
         use_container_width=True,
         hide_index=True
     )
@@ -284,9 +284,9 @@ def run():
     match_results = create_detailed_match_results(player_data, handicaps, total_only_set)
     df_reset = match_results.reset_index()
     df_reset.rename(columns={'index': 'Player'}, inplace=True)
-    df_reset = df_reset.astype(str)
+    # スタイリングを除外し、Plain DataFrame を表示
     st.dataframe(
-        df_reset.style.apply(highlight_total_only, axis=1).map(color_points).format(None),
+        df_reset,
         use_container_width=True,
         hide_index=True
     )
