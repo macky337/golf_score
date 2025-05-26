@@ -4,6 +4,16 @@ import streamlit.components.v1 as components
 # 相対パス解決用のベースタグを挿入
 components.html("<base href='/' />", height=0)
 
+# パスベースのアクセスをクエリパラメータ方式にリダイレクト
+components.html("""
+<script>
+  if (location.pathname !== '/') {
+    const page = decodeURIComponent(location.pathname.slice(1));
+    location.replace('/?page=' + page);
+  }
+</script>
+""", height=0)
+
 import pandas as pd
 import os
 from reportlab.pdfbase import pdfmetrics
