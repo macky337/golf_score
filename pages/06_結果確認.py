@@ -1,4 +1,9 @@
 import streamlit as st
+import streamlit.components.v1 as components
+
+# 相対パス解決用のベースタグを挿入
+components.html("<base href='/' />", height=0)
+
 import pandas as pd
 import os
 from reportlab.pdfbase import pdfmetrics
