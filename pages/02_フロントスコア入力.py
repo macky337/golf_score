@@ -197,7 +197,6 @@ def run():
         # バックスコア入力ページへのリンク
         st.markdown("### 次のステップ")
         st.info("フロントスコアの入力が完了しました。バックスコア入力へ進みましょう。")
-        
         col1, col2 = st.columns(2)
         with col1:
             if st.button("バックスコア入力へ", use_container_width=True, key="to_back_score"):
@@ -205,8 +204,8 @@ def run():
                 st.session_state.active_round_id = round_id
                 # Streamlitキャッシュをクリア
                 st.cache_data.clear()
-                # ファイル名ベースでページ遷移
-                switch_page("03_バックスコア入力")
+                # シンプルなページ名で遷移
+                switch_page("バックスコア入力")
         with col2:
             if st.button("ホームへ戻る", use_container_width=True):
                 switch_page("main")

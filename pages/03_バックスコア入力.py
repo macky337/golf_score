@@ -47,8 +47,7 @@ def run():
             switch_page("フロントスコア入力")    # セッション状態の初期化（フォーム実行前に必ず実行）
     for score in scores_data:
         member_id = score['member_id']
-        
-        # データベースから取得した値を確実にセッション状態に設定
+          # データベースから取得した値を確実にセッション状態に設定
         score_values = {
             'back_score': score.get('back_score'),
             'back_putt': score.get('back_putt'),
@@ -58,11 +57,13 @@ def run():
         for field, db_value in score_values.items():
             session_key = f"{field}_{member_id}"
             
-            # 常にデータベースの値を優先（nullの場合は0、-300の異常値も0に）
-            if db_value is not None and db_value != -300:
-                st.session_state[session_key] = db_value
-            else:
-                st.session_state[session_key] = 0
+            # 入力中に再読み込みされた場合はセッション状態を優先
+            if session_key not in st.session_state:
+                # データベース値が有効な場合はそれを使用（nullまたは-300の場合は0を使用）
+                if db_value is not None and db_value != -300:
+                    st.session_state[session_key] = db_value
+                else:
+                    st.session_state[session_key] = 0
     
     # プレイヤーごとのスコア入力フォーム
     st.write("### スコア入力")
@@ -111,111 +112,122 @@ def run():
         
         if submitted:
             st.session_state.back_form_submitted = True
-    
-    # 入力内容の確認と保存
+      # 入力内容の確認と保存
     if st.session_state.back_form_submitted:
         st.success("スコアを保存しました！")
         
-        # スコア情報を更新
-        for score in scores_data:
-            member_id = score['member_id']
-            back_score = st.session_state[f"back_score_{member_id}"]
-            back_putt = st.session_state[f"back_putt_{member_id}"]
-            back_game_pt = st.session_state[f"back_game_pt_{member_id}"]
+        # 確認表示用に入力データを保持
+        saved_scores = {}
+        try:
+            # バックスコア保存後の各種処理
             
-            # front_score を取得して合計する
-            front_score = score.get('front_score', 0) or 0
+            # 1. 各プレイヤーのデータをデータベースに保存
+            for score in scores_data:
+                member_id = score['member_id']
+                # セッション状態からスコアを取得
+                back_score = st.session_state[f"back_score_{member_id}"]
+                back_putt = st.session_state[f"back_putt_{member_id}"]
+                back_game_pt = st.session_state[f"back_game_pt_{member_id}"]
+                
+                # 保存した値を記憶（確認表示用）
+                saved_scores[member_id] = {
+                    'back_score': back_score,
+                    'back_putt': back_putt,
+                    'back_game_pt': back_game_pt,
+                    'name': score['member']['name'] if score.get('member') else f"Player {member_id}"
+                }
+                
+                # front_score を取得して合計する
+                front_score = score.get('front_score', 0) or 0
+                
+                # 更新データを作成
+                update_data = {
+                    'back_score': back_score,
+                    'back_putt': back_putt,
+                    'back_game_pt': back_game_pt,
+                    'total_score': front_score + back_score  # total_score を計算して保存
+                }
+                
+                # データベース更新
+                supabase.table('score').update(update_data).eq('round_id', round_id).eq('member_id', member_id).execute()
             
-            # 更新データを作成
-            update_data = {
-                'back_score': back_score,
-                'back_putt': back_putt,
-                'back_game_pt': back_game_pt,
-                'total_score': front_score + back_score  # total_score を計算して保存
-            }
-            
-            # データベース更新
-            supabase.table('score').update(update_data).eq('round_id', round_id).eq('member_id', member_id).execute()
-            
-            # ▼▼▼ 追加: 計算結果をround_resultsに保存 ▼▼▼
-            try:
-                # 現在のround_idのすべてのスコアを取得
-                scores = get_scores_with_fallback(round_id)
-                if scores:
-                    # ハンディキャップ情報を取得
-                    handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
-                    handicaps_data = handicaps_result.data
-                    
-                    # ラウンド情報を取得
-                    round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
-                    active_round = round_result.data[0] if round_result.data else None
-                    
-                    # round_resultsを取得（存在する場合）
-                    round_results = get_round_results(round_id)
-                    
-                    # プレイヤーデータ初期化
-                    from modules.data_formatter import initialize_player_data
-                    player_data = initialize_player_data(scores, round_results)
-                    player_ids = sorted(list(player_data.keys()))
-                    
-                    # ハンディキャップ辞書作成
-                    handicaps = {}
-                    total_only_set = set()
-                    if handicaps_data:
-                        for h in handicaps_data:
-                            handicaps[(h['player_1_id'], h['player_2_id'])] = h['player_1_to_2']
-                            handicaps[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
-                            if 'total_only' in h and h['total_only']:
-                                total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
-                    
-                    # ポイント計算と保存
-                    updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
-                    save_result = save_round_results(round_id, updated_player_data)
-                    if save_result:
-                        st.info("計算結果をround_resultsテーブルに保存しました")
-                    else:
-                        st.warning("計算結果の保存に失敗しました")
-            except Exception as e:
-                st.warning(f"計算処理中にエラーが発生しました: {e}")
-          # フォーム送信状態をリセット
-        st.session_state.back_form_submitted = False
+            # 2. 計算結果をround_resultsに保存
+            # 現在のround_idのすべてのスコアを取得
+            current_scores = get_scores_with_fallback(round_id)
+            if current_scores:
+                # ハンディキャップ情報を取得
+                handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
+                handicaps_data = handicaps_result.data
+                
+                # ラウンド情報を取得
+                round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
+                active_round = round_result.data[0] if round_result.data else None
+                
+                # round_resultsを取得（存在する場合）
+                round_results = get_round_results(round_id)
+                
+                # プレイヤーデータ初期化
+                from modules.data_formatter import initialize_player_data
+                player_data = initialize_player_data(current_scores, round_results)
+                player_ids = sorted(list(player_data.keys()))
+                
+                # ハンディキャップ辞書作成
+                handicaps = {}
+                total_only_set = set()
+                if handicaps_data:
+                    for h in handicaps_data:
+                        handicaps[(h['player_1_id'], h['player_2_id'])] = h['player_1_to_2']
+                        handicaps[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
+                        if 'total_only' in h and h['total_only']:
+                            total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
+                
+                # ポイント計算と保存
+                updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
+                save_result = save_round_results(round_id, updated_player_data)
+                if save_result:
+                    st.info("計算結果をround_resultsテーブルに保存しました")
+                else:
+                    st.warning("計算結果の保存に失敗しました")
+        except Exception as e:
+            st.warning(f"計算処理中にエラーが発生しました: {e}")
         
-        # 保存後にセッション状態をクリア（次回アクセス時にデータベースから再読み込み）
-        for score in scores_data:
-            member_id = score['member_id']
-            # セッション状態から該当のスコア情報を削除
-            for key in [f"back_score_{member_id}", f"back_putt_{member_id}", f"back_game_pt_{member_id}"]:
-                if key in st.session_state:
-                    del st.session_state[key]
-        
-        # 確認表示
+        # 確認表示（Streamlitで表示するため、フォーム送信状態をリセットする前に処理）
         st.write("### 入力内容の確認")
         
-        # 入力されたスコアの一覧表を表示
+        # 保存したスコアの一覧表を表示
         scores_df = []
-        for score in scores_data:
-            member_id = score['member_id']
-            player_name = score['member']['name'] if score['member'] else f"Player {member_id}"
+        for member_id, saved_data in saved_scores.items():
             scores_df.append({
-                'プレイヤー': player_name,
-                'バックスコア': st.session_state[f"back_score_{member_id}"],
-                'バックパット': st.session_state[f"back_putt_{member_id}"],
-                'バックゲームポイント': st.session_state[f"back_game_pt_{member_id}"]
+                'プレイヤー': saved_data['name'],
+                'バックスコア': saved_data['back_score'],
+                'バックパット': saved_data['back_putt'],
+                'バックゲームポイント': saved_data['back_game_pt']
             })
         
         # DataFrameとして表示
         scores_table = pd.DataFrame(scores_df)
         st.dataframe(scores_table, use_container_width=True)
         
-        # エキストラスコア入力またはハンディキャップ計算ページへのリンク
+        # フォーム送信状態をリセット (表示した後でリセット)
+        st.session_state.back_form_submitted = False
+          # エキストラスコア入力またはハンディキャップ計算ページへのリンク
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("エキストラスコア入力へ", use_container_width=True):
+            if st.button("エキストラスコア入力へ", use_container_width=True, key="to_extra"):
+                # セッション状態を明示的に保存
+                st.session_state.active_round_id = round_id
+                # Streamlitキャッシュをクリア
+                st.cache_data.clear()
                 # ラウンドのhas_extraフラグを更新
                 supabase.table('rounds').update({'has_extra': True}).eq('round_id', round_id).execute()
+                # シンプルなページ名で遷移
                 switch_page("エキストラスコア入力")
         with col2:
-            if st.button("結果確認へ", use_container_width=True):
+            if st.button("結果確認へ", use_container_width=True, key="to_results"):
+                # セッション状態を明示的に保存
+                st.session_state.active_round_id = round_id
+                # Streamlitキャッシュをクリア
+                st.cache_data.clear()
                 switch_page("結果確認")
 
 if __name__ == "__main__":
