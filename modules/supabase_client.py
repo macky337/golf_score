@@ -1,7 +1,11 @@
 import os
 import time
 from supabase import create_client, Client
+from dotenv import load_dotenv
 import streamlit as st
+
+# .env から環境変数をロード
+load_dotenv()
 
 def get_supabase_client() -> Client:
     """Supabaseクライアントを取得する"""
@@ -9,13 +13,18 @@ def get_supabase_client() -> Client:
     if "supabase" in st.session_state:
         return st.session_state.supabase
     
-    # 環境変数またはstreamlit secretsから認証情報を取得
-    if 'SUPABASE_URL' in os.environ and 'SUPABASE_KEY' in os.environ:
-        supabase_url = os.environ.get('SUPABASE_URL')
-        supabase_key = os.environ.get('SUPABASE_KEY')
-    else:
-        supabase_url = st.secrets["supabase"]["url"]
-        supabase_key = st.secrets["supabase"]["key"]
+    # 認証情報の取得 (環境変数 → Streamlit secrets)
+    supabase_url = os.getenv("SUPABASE_URL") or None
+    supabase_key = os.getenv("SUPABASE_KEY") or None
+    if not supabase_url or not supabase_key:
+        try:
+            supabase_url = st.secrets["supabase"]["url"]
+            supabase_key = st.secrets["supabase"]["key"]
+        except Exception:
+            st.warning("Supabase接続情報が環境変数またはsecretsから取得できません。")
+    if not supabase_url or not supabase_key:
+        st.error("Supabase URL または KEY が設定されていません。環境変数または Streamlit secrets を確認してください。")
+        return None
     
     # クライアントを初期化
     client = create_client(supabase_url, supabase_key)
@@ -265,7 +274,7 @@ def recalculate_all_past_rounds():
                 round_results = round_results_query.data
                 
                 # バッチ処理で06_結果確認.pyと同じロジックで計算
-                from pages.handicap_calc_logic import process_round_scores
+                from modules.recalculate_scores import process_round_scores
                 updated_scores = process_round_scores(scores, handicaps_result.data, round_data)
                 
                 # 計算されたスコアをround_resultsに保存

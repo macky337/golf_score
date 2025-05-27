@@ -7,9 +7,11 @@ components.html("<base href='/' />", height=0)
 # パスベースのアクセスをクエリパラメータ方式にリダイレクト
 components.html("""
 <script>
-  if (location.pathname !== '/') {
+  // ダイレクトでパス呼び出しされた場合に、クエリパラメータ形式に切り替え
+  if (location.pathname !== '/' && !location.search) {
     const page = decodeURIComponent(location.pathname.slice(1));
-    location.replace('/?page=' + page);
+    history.replaceState({}, '', '/?page=' + page);
+    window.location.reload();
   }
 </script>
 """, height=0)
@@ -280,31 +282,31 @@ def run():
     df.set_index("Player", inplace=True)
     # ±表示カラムは表示用として保持（ここでは既に文字列になっています）
     df = df.astype(str)
+    styled_df = df.style.apply(highlight_total_only, axis=1).applymap(color_points)
 
     st.write("### スコア詳細")
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(styled_df, use_container_width=True)
 
-    st.write("### マッチ対戦表")
     match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
     match_matrix_reset = match_matrix.reset_index()
     match_matrix_reset.rename(columns={'index': 'Player'}, inplace=True)
-    # Arrow 変換エラー回避のため、全データを文字列化
-    match_matrix_reset = match_matrix_reset.astype(str)
+    m_df = match_matrix_reset.astype(str)
+    styled_matrix = m_df.style.applymap(color_points)
+    st.write("### マッチ対戦表")
     st.dataframe(
-        match_matrix_reset,
+        styled_matrix,
         use_container_width=True,
         hide_index=True
     )
 
-    st.write("### 詳細なマッチ結果")
     match_results = create_detailed_match_results(player_data, handicaps, total_only_set)
     df_reset = match_results.reset_index()
     df_reset.rename(columns={'index': 'Player'}, inplace=True)
-    # 全データを文字列化して Arrow 互換性を確保
-    df_reset = df_reset.astype(str)
-    # スタイリングを除外し、Plain DataFrame を表示
+    r_df = df_reset.astype(str)
+    styled_results = r_df.style.applymap(color_points)
+    st.write("### 詳細なマッチ結果")
     st.dataframe(
-        df_reset,
+        styled_results,
         use_container_width=True,
         hide_index=True
     )

@@ -24,28 +24,28 @@ def show_navigation(active_page=""):
         # フロントスコア入力ボタン
         with col2:
             if st.button("🏌️ フロント", key="nav_front"):
-                switch_page("フロントスコア入力")
+                switch_page("02_フロントスコア入力")
         
         # バックスコア入力ボタン
         with col3:
             if st.button("🏌️ バック", key="nav_back"):
-                switch_page("バックスコア入力")
+                switch_page("03_バックスコア入力")
         
         # エキストラスコア入力ボタン（ラウンドがエキストラホールを持つ場合のみ表示）
         if "has_extra" in st.session_state and st.session_state.has_extra:
             with col4:
                 if st.button("🏌️ エキストラ", key="nav_extra"):
-                    switch_page("エキストラスコア入力")
+                    switch_page("05_エキストラスコア入力")
         
         # 結果確認ボタン
         with col5:
             if st.button("📊 結果確認", key="nav_results"):
-                switch_page("結果確認")
+                switch_page("06_結果確認")
     
     # ラウンド設定画面へのボタン
     with col6:
         if st.button("⚙️ ラウンド設定", key="nav_round_settings"):
-            switch_page("ラウンド設定")
+            switch_page("01_ラウンド設定")
     
     # 現在のページを示す
     if active_page:

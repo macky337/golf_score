@@ -4,17 +4,15 @@ import streamlit as st
 import time
 import traceback
 import os
-from supabase import create_client, Client
+from supabase import Client  # 型ヒント用のみ
 
-# Supabase接続情報
-url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
+# Supabase接続は get_supabase_client() を使用
 
 def get_table_columns(table_name):
     """テーブルの実際のカラム名を取得する"""
+    client = get_supabase_client()
     try:
-        response = supabase.table(table_name).select('*').limit(1).execute()
+        response = client.table(table_name).select('*').limit(1).execute()
         if response.data:
             return set(response.data[0].keys())
         else:
@@ -36,7 +34,8 @@ def get_table_columns(table_name):
 def save_round_results(round_id, player_data):
     """ラウンド結果をround_resultsテーブルとscoreテーブルに保存"""
     try:
-        # テーブルカラムの確認
+        client = get_supabase_client()
+         # テーブルカラムの確認
         round_results_columns = get_table_columns('round_results')
         score_columns = get_table_columns('score')
         
@@ -45,7 +44,7 @@ def save_round_results(round_id, player_data):
         
         # まずround_resultsテーブルの既存データを削除（上書き）
         try:
-            supabase.table('round_results').delete().eq('round_id', round_id).execute()
+            client.table('round_results').delete().eq('round_id', round_id).execute()
             print(f"既存のround_resultsデータを削除しました (round_id: {round_id})")
         except Exception as e:
             print(f"既存データの削除エラー（続行します）: {e}")
@@ -70,7 +69,7 @@ def save_round_results(round_id, player_data):
                 }
                 
                 # データ挿入を試みる
-                response = supabase.table('round_results').insert(result_data).execute()
+                response = client.table('round_results').insert(result_data).execute()
                 print(f"Round results saved for player {player_id}")
                 
             except Exception as e:
@@ -79,7 +78,7 @@ def save_round_results(round_id, player_data):
             # scoreテーブルのデータを保存するために既存データを確認
             try:
                 # 既存のスコアレコードを確認
-                existing_score = supabase.table('score').select('score_id').eq('round_id', round_id).eq('member_id', player_id).execute()
+                existing_score = client.table('score').select('score_id').eq('round_id', round_id).eq('member_id', player_id).execute()
                 
                 if existing_score.data:
                     # 既存のレコードがある場合、そのscore_idを使用
@@ -87,7 +86,7 @@ def save_round_results(round_id, player_data):
                     print(f"既存のスコアレコードを更新します (ID: {score_id})")
                 else:
                     # 既存のレコードがない場合、最大のscore_idを取得して新しいIDを生成
-                    max_id_result = supabase.table('score').select('score_id').order('score_id', desc=True).limit(1).execute()
+                    max_id_result = client.table('score').select('score_id').order('score_id', desc=True).limit(1).execute()
                     score_id = 1
                     if max_id_result.data:
                         score_id = max_id_result.data[0]['score_id'] + 1
@@ -113,10 +112,10 @@ def save_round_results(round_id, player_data):
                 # スコアの挿入または更新
                 if existing_score.data:
                     # 既存のレコードを更新
-                    score_response = supabase.table('score').update(score_data).eq('score_id', score_id).execute()
+                    score_response = client.table('score').update(score_data).eq('score_id', score_id).execute()
                 else:
                     # 新しいレコードを挿入
-                    score_response = supabase.table('score').insert(score_data).execute()
+                    score_response = client.table('score').insert(score_data).execute()
                 
                 print(f"Score data saved for player {player_id}")
                 
@@ -132,9 +131,9 @@ def get_round_results(round_id: int) -> dict:
     """
     指定されたラウンドIDのラウンド結果を取得する
     """
-    supabase = get_supabase_client()
+    client = get_supabase_client()
     try:
-        response = supabase.table('round_results').select('*').eq('round_id', round_id).execute()
+        response = client.table('round_results').select('*').eq('round_id', round_id).execute()
         results = {}
         
         # レスポンスデータの確認
@@ -178,13 +177,13 @@ def test_round_results():
     
     try:
         # Supabaseクライアントを初期化
-        supabase = get_supabase_client()
+        client = get_supabase_client()
         
         # 最新ラウンドを取得
         latest_round = None
         print("最新のラウンドを取得中...")
         try:
-            rounds_result = supabase.table('rounds').select('*').order('date_played', desc=True).limit(1).execute()
+            rounds_result = client.table('rounds').select('*').order('date_played', desc=True).limit(1).execute()
             
             # rounds テーブルのデータ構造を確認
             if rounds_result.data:
@@ -200,7 +199,7 @@ def test_round_results():
         
         # round_results テーブルの列名を確認
         try:
-            columns_info = supabase.table('round_results').select('*').limit(1).execute()
+            columns_info = client.table('round_results').select('*').limit(1).execute()
             if columns_info.data:
                 print(f"Round_results table columns: {columns_info.data[0].keys()}")
             else:
