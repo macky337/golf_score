@@ -43,8 +43,7 @@ def run():
     if not scores.data:
         st.error("スコアデータが見つかりません。")
         return
-    
-    # 並び替え: member_idでソート
+      # 並び替え: member_idでソート
     scores_data = sorted(scores.data, key=lambda x: x['member_id'])
     
     # バックスコアがまだ入力されていない場合の警告
@@ -53,6 +52,25 @@ def run():
         st.warning("一部のバックスコアがまだ入力されていません。先にバックスコアを入力することをお勧めします。")
         if st.button("バックスコア入力へ"):
             switch_page("バックスコア入力")
+      # セッション状態の初期化（フォーム実行前に必ず実行）
+    for score in scores_data:
+        member_id = score['member_id']
+        
+        # データベースから取得した値を確実にセッション状態に設定
+        score_values = {
+            'extra_score': score.get('extra_score'),
+            'extra_putt': score.get('extra_putt'),
+            'extra_game_pt': score.get('extra_game_pt')
+        }
+        
+        for field, db_value in score_values.items():
+            session_key = f"{field}_{member_id}"
+            
+            # 常にデータベースの値を優先（nullの場合は0、-300の異常値も0に）
+            if db_value is not None and db_value != -300:
+                st.session_state[session_key] = db_value
+            else:
+                st.session_state[session_key] = 0
     
     # プレイヤーごとのスコア入力フォーム
     st.write("### スコア入力")
@@ -60,15 +78,6 @@ def run():
     # フォーム送信状態を追跡
     if "extra_form_submitted" not in st.session_state:
         st.session_state.extra_form_submitted = False
-    
-    # 以前の入力内容をセッションから初期化（一度だけ）
-    if "initialized_extra_scores" not in st.session_state:
-        st.session_state.initialized_extra_scores = True
-        for score in scores_data:
-            member_id = score['member_id']
-            st.session_state[f"extra_score_{member_id}"] = score.get('extra_score', 0)
-            st.session_state[f"extra_putt_{member_id}"] = score.get('extra_putt', 0)
-            st.session_state[f"extra_game_pt_{member_id}"] = score.get('extra_game_pt', 0)
     
     # プレイヤーごとの入力フォームを表示
     with st.form("extra_scores_form"):
@@ -83,7 +92,7 @@ def run():
                 st.number_input(
                     "エキストラスコア", 
                     min_value=0, 
-                    max_value=100, 
+                    max_value=100,
                     key=f"extra_score_{member_id}"
                 )
             
@@ -172,12 +181,8 @@ def run():
                     st.warning("計算結果の保存に失敗しました")
         except Exception as e:
             st.warning(f"計算処理中にエラーが発生しました: {e}")
-        
-        # フォーム送信状態をリセット
+          # フォーム送信状態をリセット
         st.session_state.extra_form_submitted = False
-        # データの再初期化フラグをリセット
-        if "initialized_extra_scores" in st.session_state:
-            del st.session_state.initialized_extra_scores
         
         # 確認表示
         st.write("### 入力内容の確認")

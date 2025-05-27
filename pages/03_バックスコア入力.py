@@ -36,9 +36,7 @@ def run():
     scores = supabase.table('score').select('*, member:member_id(name)').eq('round_id', round_id).execute()
     if not scores.data:
         st.error("スコアデータが見つかりません。")
-        return
-    
-    # 並び替え: member_idでソート
+        return    # 並び替え: member_idでソート
     scores_data = sorted(scores.data, key=lambda x: x['member_id'])
     
     # フロントスコアがまだ入力されていない場合の警告
@@ -46,7 +44,25 @@ def run():
     if front_scores_missing:
         st.warning("一部のフロントスコアがまだ入力されていません。先にフロントスコアを入力することをお勧めします。")
         if st.button("フロントスコア入力へ"):
-            switch_page("フロントスコア入力")
+            switch_page("フロントスコア入力")    # セッション状態の初期化（フォーム実行前に必ず実行）
+    for score in scores_data:
+        member_id = score['member_id']
+        
+        # データベースから取得した値を確実にセッション状態に設定
+        score_values = {
+            'back_score': score.get('back_score'),
+            'back_putt': score.get('back_putt'),
+            'back_game_pt': score.get('back_game_pt')
+        }
+        
+        for field, db_value in score_values.items():
+            session_key = f"{field}_{member_id}"
+            
+            # 常にデータベースの値を優先（nullの場合は0、-300の異常値も0に）
+            if db_value is not None and db_value != -300:
+                st.session_state[session_key] = db_value
+            else:
+                st.session_state[session_key] = 0
     
     # プレイヤーごとのスコア入力フォーム
     st.write("### スコア入力")
@@ -54,15 +70,6 @@ def run():
     # フォーム送信状態を追跡
     if "back_form_submitted" not in st.session_state:
         st.session_state.back_form_submitted = False
-    
-    # 以前の入力内容をセッションから初期化（一度だけ）
-    if "initialized_back_scores" not in st.session_state:
-        st.session_state.initialized_back_scores = True
-        for score in scores_data:
-            member_id = score['member_id']
-            st.session_state[f"back_score_{member_id}"] = score.get('back_score', 0)
-            st.session_state[f"back_putt_{member_id}"] = score.get('back_putt', 0)
-            st.session_state[f"back_game_pt_{member_id}"] = score.get('back_game_pt', 0)
     
     # プレイヤーごとの入力フォームを表示
     with st.form("back_scores_form"):
@@ -77,7 +84,7 @@ def run():
                 st.number_input(
                     "バックスコア", 
                     min_value=0, 
-                    max_value=100, 
+                    max_value=100,
                     key=f"back_score_{member_id}"
                 )
             
@@ -170,12 +177,16 @@ def run():
                         st.warning("計算結果の保存に失敗しました")
             except Exception as e:
                 st.warning(f"計算処理中にエラーが発生しました: {e}")
-        
-        # フォーム送信状態をリセット
+          # フォーム送信状態をリセット
         st.session_state.back_form_submitted = False
-        # データの再初期化フラグをリセット
-        if "initialized_back_scores" in st.session_state:
-            del st.session_state.initialized_back_scores
+        
+        # 保存後にセッション状態をクリア（次回アクセス時にデータベースから再読み込み）
+        for score in scores_data:
+            member_id = score['member_id']
+            # セッション状態から該当のスコア情報を削除
+            for key in [f"back_score_{member_id}", f"back_putt_{member_id}", f"back_game_pt_{member_id}"]:
+                if key in st.session_state:
+                    del st.session_state[key]
         
         # 確認表示
         st.write("### 入力内容の確認")

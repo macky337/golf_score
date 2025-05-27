@@ -37,9 +37,27 @@ def run():
     if not scores.data:
         st.error("スコアデータが見つかりません。")
         return
-    
-    # 並び替え: member_idでソート
+      # 並び替え: member_idでソート
     scores_data = sorted(scores.data, key=lambda x: x['member_id'])
+    
+    # セッション状態の初期化（フォーム実行前に必ず実行）
+    for score in scores_data:
+        member_id = score['member_id']
+        # フロントスコアの初期化：安全な初期化処理
+        db_front_score = score.get('front_score', 0)
+        session_key = f"front_score_{member_id}"
+        if session_key not in st.session_state:
+            st.session_state[session_key] = db_front_score if db_front_score is not None else 0
+        # フロントパットの初期化：安全な初期化処理
+        db_front_putt = score.get('front_putt', 0)
+        session_key = f"front_putt_{member_id}"
+        if session_key not in st.session_state:
+            st.session_state[session_key] = db_front_putt if db_front_putt is not None else 0
+        # フロントゲームポイントの初期化：安全な初期化処理
+        db_front_game_pt = score.get('front_game_pt', 0)
+        session_key = f"front_game_pt_{member_id}"
+        if session_key not in st.session_state:
+            st.session_state[session_key] = db_front_game_pt if db_front_game_pt is not None else 0
     
     # プレイヤーごとのスコア入力フォーム
     st.write("### スコア入力")
@@ -47,15 +65,6 @@ def run():
     # フォーム送信状態を追跡
     if "form_submitted" not in st.session_state:
         st.session_state.form_submitted = False
-    
-    # 以前の入力内容をセッションから初期化（一度だけ）
-    if "initialized_front_scores" not in st.session_state:
-        st.session_state.initialized_front_scores = True
-        for score in scores_data:
-            member_id = score['member_id']
-            st.session_state[f"front_score_{member_id}"] = score.get('front_score', 0)
-            st.session_state[f"front_putt_{member_id}"] = score.get('front_putt', 0)
-            st.session_state[f"front_game_pt_{member_id}"] = score.get('front_game_pt', 0)
     
     # プレイヤーごとの入力フォームを表示
     with st.form("front_scores_form"):
@@ -70,7 +79,7 @@ def run():
                 st.number_input(
                     "フロントスコア", 
                     min_value=0, 
-                    max_value=100, 
+                    max_value=100,
                     key=f"front_score_{member_id}"
                 )
             
@@ -163,12 +172,8 @@ def run():
                     st.warning("計算結果の保存に失敗しました")
         except Exception as e:
             st.warning(f"計算処理中にエラーが発生しました: {e}")
-        
-        # フォーム送信状態をリセット
+          # フォーム送信状態をリセット
         st.session_state.form_submitted = False
-        # データの再初期化フラグをリセット
-        if "initialized_front_scores" in st.session_state:
-            del st.session_state.initialized_front_scores
         
         # 確認表示
         st.write("### 入力内容の確認")
@@ -195,14 +200,13 @@ def run():
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("バックスコア入力へ", use_container_width=True):
+            if st.button("バックスコア入力へ", use_container_width=True, key="to_back_score"):
                 # セッション状態を明示的に保存
                 st.session_state.active_round_id = round_id
                 # Streamlitキャッシュをクリア
                 st.cache_data.clear()
-                # パス指定を変更
-                switch_page("バックスコア入力")
-        
+                # ファイル名ベースでページ遷移
+                switch_page("03_バックスコア入力")
         with col2:
             if st.button("ホームへ戻る", use_container_width=True):
                 switch_page("main")

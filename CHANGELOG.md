@@ -8,6 +8,7 @@
 - エラーの修正
 
 ### 更新
+- security: Remove exposed JWT token from repository
 - エラーの修正
 - エラーの修正3
 - エラーの修正3

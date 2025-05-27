@@ -182,16 +182,19 @@ def run():
         with col1:
             if st.button("フロントスコア修正", use_container_width=True):
                 st.session_state.active_round_id = round_id
+                st.session_state.admin_selected_round_id = round_id
                 switch_page("02_フロントスコア入力")
         with col2:
             if st.button("バックスコア修正", use_container_width=True):
                 st.session_state.active_round_id = round_id
+                st.session_state.admin_selected_round_id = round_id
                 switch_page("03_バックスコア入力")
         with col3:
             has_extra = active_round.get('has_extra', False)
             if has_extra:
                 if st.button("エキストラスコア修正", use_container_width=True):
                     st.session_state.active_round_id = round_id
+                    st.session_state.admin_selected_round_id = round_id
                     st.session_state.has_extra = True
                     switch_page("05_エキストラスコア入力")
 
@@ -282,7 +285,7 @@ def run():
     df.set_index("Player", inplace=True)
     # ±表示カラムは表示用として保持（ここでは既に文字列になっています）
     df = df.astype(str)
-    styled_df = df.style.apply(highlight_total_only, axis=1).applymap(color_points)
+    styled_df = df.style.apply(highlight_total_only, axis=1).map(color_points)
 
     st.write("### スコア詳細")
     st.dataframe(styled_df, use_container_width=True)
@@ -291,7 +294,7 @@ def run():
     match_matrix_reset = match_matrix.reset_index()
     match_matrix_reset.rename(columns={'index': 'Player'}, inplace=True)
     m_df = match_matrix_reset.astype(str)
-    styled_matrix = m_df.style.applymap(color_points)
+    styled_matrix = m_df.style.map(color_points)
     st.write("### マッチ対戦表")
     st.dataframe(
         styled_matrix,
@@ -303,7 +306,7 @@ def run():
     df_reset = match_results.reset_index()
     df_reset.rename(columns={'index': 'Player'}, inplace=True)
     r_df = df_reset.astype(str)
-    styled_results = r_df.style.applymap(color_points)
+    styled_results = r_df.style.map(color_points)
     st.write("### 詳細なマッチ結果")
     st.dataframe(
         styled_results,
