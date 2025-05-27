@@ -10,7 +10,7 @@ def run():
         st.title("コース管理")
     with col2:
         if st.button("🏠 Home"):
-            switch_page("Main")
+            switch_page("main")
             
     # 既存コースの一覧を表示
     courses = get_course_list()

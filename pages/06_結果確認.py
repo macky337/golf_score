@@ -97,7 +97,7 @@ def run():
         st.title("結果確認")
     with col2:
         if st.button("🏠 Home"):
-            switch_page("Main")
+            switch_page("main")
 
     st.markdown(
         """
@@ -182,18 +182,18 @@ def run():
         with col1:
             if st.button("フロントスコア修正", use_container_width=True):
                 st.session_state.active_round_id = round_id
-                switch_page("フロントスコア入力")
+                switch_page("02_フロントスコア入力")
         with col2:
             if st.button("バックスコア修正", use_container_width=True):
                 st.session_state.active_round_id = round_id
-                switch_page("バックスコア入力")
+                switch_page("03_バックスコア入力")
         with col3:
             has_extra = active_round.get('has_extra', False)
             if has_extra:
                 if st.button("エキストラスコア修正", use_container_width=True):
                     st.session_state.active_round_id = round_id
                     st.session_state.has_extra = True
-                    switch_page("エキストラスコア入力")
+                    switch_page("05_エキストラスコア入力")
 
     # スコア取得
     try:
@@ -380,7 +380,7 @@ def run():
         st.markdown("---")
         if st.button("管理画面でスコアを修正する", use_container_width=True):
             st.session_state.admin_selected_round_id = round_id
-            switch_page("管理画面")
+            switch_page("08_管理画面")
 
     st.markdown("---")
     if st.button("過去のラウンドデータを再計算して保存"):

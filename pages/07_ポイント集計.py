@@ -15,7 +15,7 @@ def run():
         st.title("ポイント集計")
     with col2:
         if st.button("🏠 Home"):
-            switch_page("Main")
+            switch_page("main")
 
     # 3つのタブを作成
     tab1, tab2, tab3, tab4 = st.tabs(["通算成績", "年度別集計", "月間集計", "集計検証"])

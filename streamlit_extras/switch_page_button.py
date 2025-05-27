@@ -5,7 +5,16 @@ def switch_page(page_name: str):
     try:
         # 公式APIがあればそれを使う
         if hasattr(st, "switch_page"):
-            st.switch_page(page_name)
+            # ページ名をStreamlitが期待する形式に変換
+            if page_name == "main":
+                # メインページの場合
+                st.switch_page("main.py")
+            elif not page_name.startswith("pages/") and not page_name.endswith(".py"):
+                # pages/プレフィックスと.py拡張子を追加
+                st.switch_page(f"pages/{page_name}.py")
+            else:
+                # すでに正しい形式の場合
+                st.switch_page(page_name)
         else:
             st.experimental_set_query_params(page=page_name)
             st.experimental_rerun()

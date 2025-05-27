@@ -46,7 +46,7 @@ def main():
     with col2:
         # マニュアルページへのリンク
         if st.button("📚 マニュアル", key="manual_button"):
-            switch_page("pages/09_マニュアル.py")
+            switch_page("09_マニュアル")
 
     # メインメニューの作成
     st.subheader("📌 メインメニュー")
@@ -59,24 +59,24 @@ def main():
         if st.button("ラウンド設定", key="nav_main_round_settings"): 
             st.write("ボタン押下: ラウンド設定")
             try:
-                switch_page("pages/01_ラウンド設定.py")
+                switch_page("01_ラウンド設定")
             except Exception as e:
                 st.error(f"switch_page例外: {e}")
         if st.button("フロントスコア入力", key="nav_main_front"): 
             st.write("ボタン押下: フロントスコア入力")
             try:
-                switch_page("pages/02_フロントスコア入力.py")
+                switch_page("02_フロントスコア入力")
             except Exception as e:
                 st.error(f"switch_page例外: {e}")
         if st.button("バックスコア入力", key="nav_main_back"): 
             try:
-                switch_page("pages/03_バックスコア入力.py")
+                switch_page("03_バックスコア入力")
             except Exception as e:
                 st.error(f"switch_page例外: {e}")
         if st.button("エキストラスコア入力", key="nav_main_extra"): 
             st.write("ボタン押下: エキストラスコア入力")
             try:
-                switch_page("pages/05_エキストラスコア入力.py")
+                switch_page("05_エキストラスコア入力")
             except Exception as e:
                 st.error(f"switch_page例外: {e}")
     with col2:
@@ -84,31 +84,31 @@ def main():
         if st.button("結果確認", key="nav_main_results"): 
             st.write("ボタン押下: 結果確認")
             try:
-                switch_page("pages/06_結果確認.py")
+                switch_page("06_結果確認")
             except Exception as e:
                 st.error(f"switch_page例外: {e}")
         if st.button("ポイント集計", key="nav_main_points"): 
             st.write("ボタン押下: ポイント集計")
             try:
-                switch_page("pages/07_ポイント集計.py")
+                switch_page("07_ポイント集計")
             except Exception as e:
                 st.error(f"switch_page例外: {e}")
         if st.button("管理画面", key="nav_main_admin"): 
             st.write("ボタン押下: 管理画面")
             try:
-                switch_page("pages/08_管理画面.py")
+                switch_page("08_管理画面")
             except Exception as e:
                 st.error(f"switch_page例外: {e}")
         if st.button("メンバー登録", key="nav_main_members"): 
             st.write("ボタン押下: メンバー登録")
             try:
-                switch_page("pages/08_メンバー登録.py")
+                switch_page("08_メンバー登録")
             except Exception as e:
                 st.error(f"switch_page例外: {e}")
         if st.button("コース管理", key="nav_main_courses"): 
             st.write("ボタン押下: コース管理")
             try:
-                switch_page("pages/09_コース管理.py")
+                switch_page("09_コース管理")
             except Exception as e:
                 st.error(f"switch_page例外: {e}")
     

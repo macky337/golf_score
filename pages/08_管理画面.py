@@ -72,7 +72,7 @@ def run():
         st.title("管理画面")
     with col2:
         if st.button("🏠 Home"):
-            switch_page("Main")
+            switch_page("main")
     
     if not check_password():
         return
