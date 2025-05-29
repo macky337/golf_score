@@ -323,75 +323,60 @@ def run():
             "Putt Pt":     p_data["Putt Pt"],
             "Total Pt":    p_data["Total Pt"],
         })
-    
-    # DataFrameの作成とスタイリング
+    # Arrow変換エラー回避のため、全体を文字列型に変換
     df = pd.DataFrame(score_data_list)
     df.set_index("Player", inplace=True)
     df = df.astype(str)
     styled_df = df.style.apply(highlight_total_only, axis=1).map(color_points)
+    
+    # プレイヤー名（インデックス）の文字色を明示的に設定
+    styled_df = styled_df.set_properties(subset=pd.IndexSlice[:, :], **{
+        'color': '#495057',
+        'background-color': '#f8f9fa', 
+        'font-weight': 'bold'
+    }).set_table_styles([
+        {
+            'selector': 'th.row_heading',  # 行ヘッダー（プレイヤー名）のスタイル
+            'props': [
+                ('color', '#495057 !important'),
+                ('background-color', '#f8f9fa !important'),
+                ('font-weight', 'bold !important'),            ('border', '1px solid #dee2e6 !important')
+            ]
+        }
+    ])
 
     st.write("### スコア詳細")
     st.dataframe(styled_df, use_container_width=True)
 
-    # マッチ対戦表の作成と表示
-    if handicaps_data:
-        match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
-        match_matrix_reset = match_matrix.reset_index()
-        match_matrix_reset.rename(columns={'index': 'Player'}, inplace=True)
-        m_df = match_matrix_reset.astype(str)
-        
-        # Pandasスタイリングでプレイヤー列の色を設定
-        styled_matrix = m_df.style.map(color_points)
-        styled_matrix = styled_matrix.set_properties(
-            subset=['Player'], 
-            **{
-                'color': '#495057',
-                'background-color': '#f8f9fa', 
-                'font-weight': 'bold'
-            }
-        )
-        
-        st.write("### マッチ対戦表")
-        st.dataframe(
-            styled_matrix,
-            use_container_width=True,
-            hide_index=True
-        )
+    match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
+    match_matrix_reset = match_matrix.reset_index()
+    match_matrix_reset.rename(columns={'index': 'Player'}, inplace=True)
+    m_df = match_matrix_reset.astype(str)
+    styled_matrix = m_df.style.map(color_points)
+    # ハードコードされた色指定を無効化
+    # styled_matrix = styled_matrix.set_properties(subset=['Player'], **{'color':'white'})  # Player列の文字色を白に設定
+    st.write("### マッチ対戦表")
+    st.dataframe(
+        styled_matrix,
+        use_container_width=True,
+        hide_index=True
+    )
 
-        # 詳細なマッチ結果の作成と表示
-        match_results = create_detailed_match_results(player_data, handicaps, total_only_set)
-        df_reset = match_results.reset_index()
-        df_reset.rename(columns={'index': 'Player'}, inplace=True)
-        r_df = df_reset.astype(str)
-        
-        # Pandasスタイリングでプレイヤー列の色を設定
-        styled_results = r_df.style.map(color_points)
-        styled_results = styled_results.set_properties(
-            subset=['Player'], 
-            **{
-                'color': '#495057',
-                'background-color': '#f8f9fa', 
-                'font-weight': 'bold'
-            }
-        )
-        
-        st.write("### 詳細なマッチ結果")
-        st.dataframe(
-            styled_results,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Player": st.column_config.TextColumn(
-                    "Player",
-                    help="プレイヤー名",
-                    width="medium",
-                )
-            }
-        )
-    else:
-        st.info("ハンディキャップが設定されていないため、マッチ対戦表は表示されません。")
+    match_results = create_detailed_match_results(player_data, handicaps, total_only_set)
+    df_reset = match_results.reset_index()
+    df_reset.rename(columns={'index': 'Player'}, inplace=True)
+    r_df = df_reset.astype(str)
+    # 詳細なマッチ結果でPlayer列の文字色を白に設定し、ダークモードでも読みやすく
+    styled_results = r_df.style.map(color_points)
+    # ハードコードされた色指定を無効化
+    # styled_results = styled_results.set_properties(subset=['Player'], **{'color':'white'})  # ハードコードされた色指定を無効化
+    st.write("### 詳細なマッチ結果")
+    st.dataframe(
+        styled_results,
+        use_container_width=True,
+        hide_index=True
+    )
 
-    # PDF出力機能
     st.subheader("PDF出力")
     if st.button("スコア表をPDFで出力"):
         try:
