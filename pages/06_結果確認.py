@@ -135,20 +135,20 @@ def run():
         /* カラム名とセル文字色設定 */
         @media (prefers-color-scheme: dark) {
             [data-testid="stDataFrame"] table thead th {
-                color: white !important;
+                color: #cccccc !important; /* カラム名をグレーに */
             }
             [data-testid="stDataFrame"] table tbody td,
             [data-testid="stDataFrame"] table tbody th {
-                color: white !important;
+                color: #cccccc !important; /* セルもグレーに */
             }
         }
         @media (prefers-color-scheme: light) {
             [data-testid="stDataFrame"] table thead th {
-                color: black !important;
+                color: #444 !important; /* カラム名を濃いグレーに */
             }
             [data-testid="stDataFrame"] table tbody td,
             [data-testid="stDataFrame"] table tbody th {
-                color: black !important;
+                color: #444 !important; /* セルも濃いグレーに */
             }
         }
         </style>
