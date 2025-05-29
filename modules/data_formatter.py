@@ -10,11 +10,23 @@ def highlight_total_only(row):
 def color_points(val):
     """数値に基づいて背景色を設定する"""
     try:
-        points = int(val)
+        # 文字列として+や-が含まれる場合も処理
+        if isinstance(val, str):
+            # "+10", "-5", "10", "-10" などの文字列を数値に変換
+            val = val.strip()
+            if val.startswith('+'):
+                val = val[1:]  # "+"を除去
+            # 空文字列や"0"でない場合のみ数値変換を試行
+            if val == '' or val == '0':
+                return 'background-color: #F0F0F0; color: black'  # 灰色（0点）
+            points = int(val)
+        else:
+            points = int(val)
+        
         if points > 0:
-            return 'background-color: #90EE90; color: black'  # 薄緑色
+            return 'background-color: #C8E6C9; color: black'  # 薄緑色の塗りつぶし
         elif points < 0:
-            return 'background-color: #FFB6C6; color: black'  # 薄赤色
+            return 'background-color: #FFCDD2; color: black'  # 薄赤色の塗りつぶし
         return 'background-color: #F0F0F0; color: black'  # 灰色（0点）
     except:
         return "background-color: transparent; color: black"  # 数値でない場合

@@ -312,13 +312,13 @@ def run():
             "Match Back":  p_data["Match Back"],
             "Match Total": p_data["Match Total"],
             "Match Extra": p_data["Match Extra"],
-            "Match Pt":    p_data["Match Pt"],
-            "Front GP":    p_data["Front GP"],
+            "Match Pt":    p_data["Match Pt"],            "Front GP":    p_data["Front GP"],
             "Back GP":     p_data["Back GP"],
             "Extra GP":    p_data["Extra GP"],
             "Game Pt":     p_data["Game Pt"],
             "Front Putt":  p_data["Putt Front"],
-            "Back Putt":   p_data["Putt Back"],            "Extra Putt":  p_data["Putt Extra"],
+            "Back Putt":   p_data["Putt Back"],
+            "Extra Putt":  p_data["Putt Extra"],
             "Putt Pt":     p_data["Putt Pt"],
             "Total Pt":    p_data["Total Pt"],
         })
@@ -329,15 +329,15 @@ def run():
     # ±表示カラムは表示用として保持（ここでは既に文字列になっています）
     df = df.astype(str)
     styled_df = df.style.apply(highlight_total_only, axis=1).map(color_points)
-    
-    # プレイヤー名（インデックス）のスタイルのみを設定
+      # プレイヤー名（インデックス）のスタイルのみを設定
     styled_df = styled_df.set_table_styles([
         {
             'selector': 'th.row_heading',  # 行ヘッダー（プレイヤー名）のスタイル
             'props': [
                 ('color', '#495057 !important'),
                 ('background-color', '#f8f9fa !important'),
-                ('font-weight', 'bold !important'),                ('border', '1px solid #dee2e6 !important')
+                ('font-weight', 'bold !important'),
+                ('border', '1px solid #dee2e6 !important')
             ]
         }
     ])
@@ -372,7 +372,7 @@ def run():
             styled_matrix,
             use_container_width=True
         )
-
+        
         # 詳細なマッチ結果の作成と表示
         match_results = create_detailed_match_results(player_data, handicaps, total_only_set)
         df_reset = match_results.reset_index()
@@ -389,7 +389,8 @@ def run():
                     ('color', '#495057 !important'),
                     ('background-color', '#f8f9fa !important'),
                     ('font-weight', 'bold !important'),
-                    ('border', '1px solid #dee2e6 !important')                ]
+                    ('border', '1px solid #dee2e6 !important')
+                ]
             }
         ])
         
