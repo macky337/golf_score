@@ -90,7 +90,7 @@ def initialize_player_data(scores, round_results):
 
 def run():
     supabase = get_supabase_client()
-
+    
     # タイトルとホームボタンのレイアウト
     col1, col2 = st.columns([0.8, 0.2])
     with col1:
@@ -99,57 +99,84 @@ def run():
         if st.button("🏠 Home"):
             switch_page("main")
 
+    # CSSスタイルを追加 - プレイヤー名の表示問題を修正
     st.markdown(
         """
         <style>
-        /* スコア詳細テーブルのスタイル設定 */
-        [data-testid="stDataFrame"] div[data-testid="stTable"] table,
-        [data-testid="stDataFrame"] > div > div > div > div > div table {
-            position: relative !important;
-            border-collapse: collapse !important;
-            table-layout: auto !important;
-        }
-        /* プレイヤー列を固定表示 */
-        [data-testid="stDataFrame"] table th:first-child,
-        [data-testid="stDataFrame"] table td:first-child {
-            position: sticky !important;
-            left: 0 !important;
-            background-color: white !important;
-            z-index: 10 !important;
-            box-shadow: 2px 0px 3px rgba(0,0,0,0.1) !important;
-            min-width: 100px !important;
-        }
-        /* ヘッダー行のスタイル */
-        [data-testid="stDataFrame"] table thead th {
-            position: sticky !重要;
-            top: 0 !important;
-            background-color: #f0f2f6 !important;
-            z-index: 20 !important;
-        }
         /* テーブル全体の横スクロール */
         [data-testid="stDataFrame"] > div {
             overflow-x: auto !important;
             max-width: 100% !important;
             display: block !important;
         }
-        /* カラム名とセル文字色設定 */
+        
+        /* プレイヤー列を固定表示 */
+        [data-testid="stDataFrame"] table th:first-child,
+        [data-testid="stDataFrame"] table td:first-child {
+            position: sticky !important;
+            left: 0 !important;
+            z-index: 10 !important;
+            box-shadow: 2px 0px 3px rgba(0,0,0,0.1) !important;
+            min-width: 100px !important;
+        }
+        
+        /* ヘッダー行のスタイル */
+        [data-testid="stDataFrame"] table thead th {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 20 !important;
+        }
+        
+        /* 基本テーブル設定 */
+        [data-testid="stDataFrame"] table {
+            position: relative !important;
+            border-collapse: collapse !important;
+            table-layout: auto !important;
+        }
+        
+        /* プレイヤー名列の文字色と背景色を強制適用 */
+        [data-testid="stDataFrame"] table tbody tr td:first-child,
+        [data-testid="stDataFrame"] table tbody tr th:first-child,
+        [data-testid="stDataFrame"] td:first-child,
+        [data-testid="stDataFrame"] th:first-child {
+            color: #555555 !important;
+            background-color: #f8f9fa !important;
+            font-weight: bold !important;
+            border-right: 1px solid #ddd !important;
+        }
+        
+        /* より具体的なStreamlitの構造に対応 */
+        div[data-testid="stDataFrame"] table tr td:first-child,
+        div[data-testid="stDataFrame"] table tr th:first-child {
+            color: #495057 !important;
+            background-color: #f8f9fa !important;
+            font-weight: bold !important;
+        }
+        
+        /* ダークモード専用スタイル */
         @media (prefers-color-scheme: dark) {
-            [data-testid="stDataFrame"] table thead th {
-                color: #cccccc !important; /* カラム名をグレーに */
-            }
-            [data-testid="stDataFrame"] table tbody td,
-            [data-testid="stDataFrame"] table tbody th {
-                color: #cccccc !important; /* セルもグレーに */
+            [data-testid="stDataFrame"] table tbody tr td:first-child,
+            [data-testid="stDataFrame"] table tbody tr th:first-child,
+            [data-testid="stDataFrame"] td:first-child,
+            [data-testid="stDataFrame"] th:first-child,
+            div[data-testid="stDataFrame"] table tr td:first-child,
+            div[data-testid="stDataFrame"] table tr th:first-child {
+                color: #cccccc !important;
+                background-color: rgba(50, 50, 50, 0.8) !important;
             }
         }
-        @media (prefers-color-scheme: light) {
-            [data-testid="stDataFrame"] table thead th {
-                color: #444 !important; /* カラム名を濃いグレーに */
-            }
-            [data-testid="stDataFrame"] table tbody td,
-            [data-testid="stDataFrame"] table tbody th {
-                color: #444 !important; /* セルも濃いグレーに */
-            }
+        
+        /* Streamlitのtheme属性に基づく強制適用 */
+        .stApp[data-theme="dark"] [data-testid="stDataFrame"] table tr td:first-child,
+        .stApp[data-theme="dark"] [data-testid="stDataFrame"] table tr th:first-child {
+            color: #cccccc !important;
+            background-color: rgba(50, 50, 50, 0.9) !important;
+        }
+        
+        .stApp[data-theme="light"] [data-testid="stDataFrame"] table tr td:first-child,
+        .stApp[data-theme="light"] [data-testid="stDataFrame"] table tr th:first-child {
+            color: #555555 !important;
+            background-color: rgba(240, 242, 246, 0.9) !important;
         }
         </style>
         """,
@@ -241,15 +268,9 @@ def run():
 
     # round_results を取得（必ず実行）
     round_results = get_round_results(round_id)
-    # ▼▼▼ 追加: round_results を辞書形式に変換（メンバーIDをキーに設定） ▼▼▼
+    # round_results を辞書形式に変換（メンバーIDをキーに設定）
     if isinstance(round_results, list):
         round_results = { item.get('member_id'): item for item in round_results if item.get('member_id') is not None }
-
-    round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
-    active_round = round_result.data[0] if round_result.data else None
-    if not active_round:
-        st.error("選択されたラウンドが見つかりません。")
-        return
 
     # ハンディキャップ情報の取得
     handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
@@ -258,6 +279,7 @@ def run():
     # プレイヤーデータの初期化（scores と round_results を合体）
     player_data = initialize_player_data(scores, round_results)
     player_ids = sorted(list(player_data.keys()))
+    
     if handicaps_data:
         # ハンディキャップ辞書作成
         handicaps = {}
@@ -268,6 +290,7 @@ def run():
             if 'total_only' in h and h['total_only']:
                 total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
 
+    # データフレーム作成とスタイリング
     df_columns = [
         "Player",
         "Front Score", "Back Score", "Total Score", "Extra Score",
@@ -276,6 +299,7 @@ def run():
         "Front Putt", "Back Putt", "Extra Putt", "Putt Pt",
         "Total Pt"
     ]
+    
     score_data_list = []
     for pid, p_data in player_data.items():
         score_data_list.append({
@@ -299,45 +323,75 @@ def run():
             "Putt Pt":     p_data["Putt Pt"],
             "Total Pt":    p_data["Total Pt"],
         })
-    # Arrow変換エラー回避のため、全体を文字列型に変換
+    
+    # DataFrameの作成とスタイリング
     df = pd.DataFrame(score_data_list)
     df.set_index("Player", inplace=True)
-    # ±表示カラムは表示用として保持（ここでは既に文字列になっています）
     df = df.astype(str)
     styled_df = df.style.apply(highlight_total_only, axis=1).map(color_points)
 
     st.write("### スコア詳細")
     st.dataframe(styled_df, use_container_width=True)
 
-    match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
-    match_matrix_reset = match_matrix.reset_index()
-    match_matrix_reset.rename(columns={'index': 'Player'}, inplace=True)
-    m_df = match_matrix_reset.astype(str)
-    styled_matrix = m_df.style.map(color_points)
-    # ハードコードされた色指定を無効化
-    # styled_matrix = styled_matrix.set_properties(subset=['Player'], **{'color':'white'})  # Player列の文字色を白に設定
-    st.write("### マッチ対戦表")
-    st.dataframe(
-        styled_matrix,
-        use_container_width=True,
-        hide_index=True
-    )
+    # マッチ対戦表の作成と表示
+    if handicaps_data:
+        match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
+        match_matrix_reset = match_matrix.reset_index()
+        match_matrix_reset.rename(columns={'index': 'Player'}, inplace=True)
+        m_df = match_matrix_reset.astype(str)
+        
+        # Pandasスタイリングでプレイヤー列の色を設定
+        styled_matrix = m_df.style.map(color_points)
+        styled_matrix = styled_matrix.set_properties(
+            subset=['Player'], 
+            **{
+                'color': '#495057',
+                'background-color': '#f8f9fa', 
+                'font-weight': 'bold'
+            }
+        )
+        
+        st.write("### マッチ対戦表")
+        st.dataframe(
+            styled_matrix,
+            use_container_width=True,
+            hide_index=True
+        )
 
-    match_results = create_detailed_match_results(player_data, handicaps, total_only_set)
-    df_reset = match_results.reset_index()
-    df_reset.rename(columns={'index': 'Player'}, inplace=True)
-    r_df = df_reset.astype(str)
-    # 詳細なマッチ結果でPlayer列の文字色を白に設定し、ダークモードでも読みやすく
-    styled_results = r_df.style.map(color_points)
-    # ハードコードされた色指定を無効化
-    # styled_results = styled_results.set_properties(subset=['Player'], **{'color':'white'})  # ハードコードされた色指定を無効化
-    st.write("### 詳細なマッチ結果")
-    st.dataframe(
-        styled_results,
-        use_container_width=True,
-        hide_index=True
-    )
+        # 詳細なマッチ結果の作成と表示
+        match_results = create_detailed_match_results(player_data, handicaps, total_only_set)
+        df_reset = match_results.reset_index()
+        df_reset.rename(columns={'index': 'Player'}, inplace=True)
+        r_df = df_reset.astype(str)
+        
+        # Pandasスタイリングでプレイヤー列の色を設定
+        styled_results = r_df.style.map(color_points)
+        styled_results = styled_results.set_properties(
+            subset=['Player'], 
+            **{
+                'color': '#495057',
+                'background-color': '#f8f9fa', 
+                'font-weight': 'bold'
+            }
+        )
+        
+        st.write("### 詳細なマッチ結果")
+        st.dataframe(
+            styled_results,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Player": st.column_config.TextColumn(
+                    "Player",
+                    help="プレイヤー名",
+                    width="medium",
+                )
+            }
+        )
+    else:
+        st.info("ハンディキャップが設定されていないため、マッチ対戦表は表示されません。")
 
+    # PDF出力機能
     st.subheader("PDF出力")
     if st.button("スコア表をPDFで出力"):
         try:
@@ -345,7 +399,12 @@ def run():
             # PDF用に数値に戻す必要がある場合、各列ごとに変換してください
             for col in pdf_df.columns:
                 pdf_df[col] = pd.to_numeric(pdf_df[col], errors='coerce').fillna(0)
-            pdf_buffer = generate_pdf(pdf_df, match_results, match_matrix, active_round)
+            
+            if handicaps_data:
+                pdf_buffer = generate_pdf(pdf_df, match_results, match_matrix, active_round)
+            else:
+                pdf_buffer = generate_pdf(pdf_df, None, None, active_round)
+            
             pdf_filename = get_pdf_filename(active_round)
             st.download_button(
                 label="PDFをダウンロード",
@@ -359,15 +418,20 @@ def run():
             import traceback
             st.error(traceback.format_exc())
 
-    # ラウンド確定ボタン
+    # ラウンド確定機能
     if not active_round['finalized']:
         st.markdown("---")
         st.subheader("ラウンド確定")
         st.warning("⚠️ 確定すると、以降はスコア入力画面からの修正ができなくなります。")
         st.info("確定後にスコアの修正が必要な場合は、管理画面のスコア修正タブから行ってください。")
+        
         if st.button("このラウンドを確定する", type="primary"):
             try:
-                updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
+                if handicaps_data:
+                    updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
+                else:
+                    updated_player_data = player_data
+                
                 if save_round_results(round_id, updated_player_data):
                     update_data = {}
                     for mid in player_ids:
@@ -378,6 +442,7 @@ def run():
                             'extra_game_pt': data.get('Extra GP', 0),
                             'total_pt':      data.get('Total Pt', 0)
                         }
+                    
                     success, updates, failures = update_scores_batch(round_id, update_data)
                     if success:
                         # Finalizedフラグを更新
@@ -392,16 +457,8 @@ def run():
                             st.error(f"プレイヤーID {failure['member_id']}: {failure['error']}")
                 else:
                     st.error("計算結果の保存に失敗しました。")
-                    if "calculation_results" not in st.session_state:
-                        st.session_state.calculation_results = {}
-                    st.session_state.calculation_results[round_id] = updated_player_data
-                    st.info("計算結果はセッションに保存されました。再試行してください。")
             except Exception as e:
                 st.error(f"ラウンドの確定中にエラーが発生しました: {str(e)}")
-                if "calculation_results" not in st.session_state:
-                    st.session_state.calculation_results = {}
-                st.session_state.calculation_results[round_id] = player_data
-                st.info("計算結果はセッションに保存されました。再試行してください。")
     else:
         # 確定済みのラウンドの場合、管理画面へのリンクを表示
         st.markdown("---")
@@ -409,6 +466,7 @@ def run():
             st.session_state.admin_selected_round_id = round_id
             switch_page("08_管理画面")
 
+    # 開発者向けツール
     st.markdown("---")
     if st.button("過去のラウンドデータを再計算して保存"):
         recalculate_and_save_results()
@@ -434,6 +492,7 @@ def recalculate_and_save_results():
             if not scores:
                 st.warning(f"ラウンドID {round_id} のスコアデータが見つかりません。")
                 continue
+            
             round_results = get_round_results(round_id)
             handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
             handicaps_data = handicaps_result.data
@@ -442,6 +501,7 @@ def recalculate_and_save_results():
             player_ids = sorted(list(player_data.keys()))
             handicaps = {}
             total_only_set = set()
+            
             if handicaps_data:
                 for h in handicaps_data:
                     handicaps[(h['player_1_id'], h['player_2_id'])] = h['player_1_to_2']
@@ -449,7 +509,10 @@ def recalculate_and_save_results():
                     if 'total_only' in h and h['total_only']:
                         total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
 
-            updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, round_data)
+                updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, round_data)
+            else:
+                updated_player_data = player_data
+                
             if save_round_results(round_id, updated_player_data):
                 st.success(f"ラウンドID {round_id} の計算結果を保存しました。")
             else:
@@ -461,6 +524,7 @@ def recalculate_and_save_results():
 def test_calculation_logic(round_id: int):
     st.subheader("計算ロジックのテスト表示")
     supabase = get_supabase_client()
+    
     try:
         scores = get_scores_with_fallback(round_id)
         if not scores:
@@ -480,13 +544,17 @@ def test_calculation_logic(round_id: int):
     player_ids = sorted(player_data.keys())
     handicaps = {}
     total_only_set = set()
+    
     for h in handicaps_data:
         handicaps[(h['player_1_id'], h['player_2_id'])] = h['player_1_to_2']
         handicaps[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
         if 'total_only' in h and h['total_only']:
             total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
 
-    updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
+    if handicaps_data:
+        updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
+    else:
+        updated_player_data = player_data
 
     with st.expander("計算結果の詳細を表示"):
         st.write("**再計算された各プレイヤーのスコアデータ:**")
