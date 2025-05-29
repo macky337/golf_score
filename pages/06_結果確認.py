@@ -132,6 +132,25 @@ def run():
             max-width: 100% !important;
             display: block !important;
         }
+        /* カラム名とセル文字色設定 */
+        @media (prefers-color-scheme: dark) {
+            [data-testid="stDataFrame"] table thead th {
+                color: white !important;
+            }
+            [data-testid="stDataFrame"] table tbody td,
+            [data-testid="stDataFrame"] table tbody th {
+                color: white !important;
+            }
+        }
+        @media (prefers-color-scheme: light) {
+            [data-testid="stDataFrame"] table thead th {
+                color: black !important;
+            }
+            [data-testid="stDataFrame"] table tbody td,
+            [data-testid="stDataFrame"] table tbody th {
+                color: black !important;
+            }
+        }
         </style>
         """,
         unsafe_allow_html=True
@@ -295,6 +314,8 @@ def run():
     match_matrix_reset.rename(columns={'index': 'Player'}, inplace=True)
     m_df = match_matrix_reset.astype(str)
     styled_matrix = m_df.style.map(color_points)
+    # ハードコードされた色指定を無効化
+    # styled_matrix = styled_matrix.set_properties(subset=['Player'], **{'color':'white'})  # Player列の文字色を白に設定
     st.write("### マッチ対戦表")
     st.dataframe(
         styled_matrix,
@@ -306,7 +327,10 @@ def run():
     df_reset = match_results.reset_index()
     df_reset.rename(columns={'index': 'Player'}, inplace=True)
     r_df = df_reset.astype(str)
+    # 詳細なマッチ結果でPlayer列の文字色を白に設定し、ダークモードでも読みやすく
     styled_results = r_df.style.map(color_points)
+    # ハードコードされた色指定を無効化
+    # styled_results = styled_results.set_properties(subset=['Player'], **{'color':'white'})  # ハードコードされた色指定を無効化
     st.write("### 詳細なマッチ結果")
     st.dataframe(
         styled_results,
