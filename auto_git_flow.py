@@ -19,21 +19,84 @@ def generate_commit_message():
     changed = result.stdout.strip().splitlines()
     if not changed:
         return "chore: no changes"
-    summary = []
+    
+    # ファイルの種類別にカウント
+    added_files = []
+    modified_files = []
+    deleted_files = []
+    renamed_files = []
+    
     for line in changed:
-        status, path = line[:2].strip(), line[3:].strip()
+        status = line[:2].strip()
+        path = line[3:].strip()
+        filename = os.path.basename(path)
+        
         if status == 'A':
-            summary.append(f"add: {path}")
+            added_files.append(filename)
         elif status == 'M':
-            summary.append(f"fix: {path}")
+            modified_files.append(filename)
         elif status == 'D':
-            summary.append(f"remove: {path}")
+            deleted_files.append(filename)
+        elif status in ['R', 'RM']:
+            renamed_files.append(filename)
         else:
-            summary.append(f"update: {path}")
-    msg = ", ".join(summary)
+            modified_files.append(filename)
+    
+    # メッセージの構築
+    parts = []
+    
+    if added_files:
+        if len(added_files) == 1:
+            parts.append(f"feat: add {added_files[0]}")
+        else:
+            parts.append(f"feat: add {len(added_files)} files")
+    
+    if modified_files:
+        # ファイル名から推測される変更内容
+        if any('fix' in f.lower() or 'bug' in f.lower() for f in modified_files):
+            action = "fix"
+        elif any('test' in f.lower() for f in modified_files):
+            action = "test"
+        elif any('config' in f.lower() or 'setting' in f.lower() for f in modified_files):
+            action = "config"
+        elif any('.py' in f for f in modified_files):
+            action = "update"
+        else:
+            action = "chore"
+        
+        if len(modified_files) == 1:
+            parts.append(f"{action}: update {modified_files[0]}")
+        else:
+            # 主要なファイルタイプを特定
+            py_files = [f for f in modified_files if f.endswith('.py')]
+            if py_files and len(py_files) == len(modified_files):
+                parts.append(f"{action}: update {len(py_files)} Python files")
+            else:
+                parts.append(f"{action}: update {len(modified_files)} files")
+    
+    if deleted_files:
+        if len(deleted_files) == 1:
+            parts.append(f"remove: delete {deleted_files[0]}")
+        else:
+            parts.append(f"remove: delete {len(deleted_files)} files")
+    
+    if renamed_files:
+        if len(renamed_files) == 1:
+            parts.append(f"refactor: rename {renamed_files[0]}")
+        else:
+            parts.append(f"refactor: rename {len(renamed_files)} files")
+    
+    # メッセージを結合（最初の項目のみ使用してシンプルに）
+    if parts:
+        main_msg = parts[0]
+        if len(parts) > 1:
+            main_msg += f" and {len(parts)-1} more changes"
+    else:
+        main_msg = "chore: update files"
+    
     # 日付を付与
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    return f"{msg} ({now})"
+    return f"{main_msg} ({now})"
 
 def main():
     repo_dir = os.path.dirname(os.path.abspath(__file__))

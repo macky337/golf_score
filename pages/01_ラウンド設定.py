@@ -99,12 +99,11 @@ def run():
 
     # 過去のゴルフ場名を取得（coursesテーブルから）
     courses = get_course_list()
-    
-    # コース管理画面へのリンク（フォームの外に配置）
+      # コース管理画面へのリンク（フォームの外に配置）
     col1, col2 = st.columns([0.85, 0.15])
     with col2:
         if st.button("➕ コース管理"):
-            switch_page("コース管理")
+            switch_page("09_コース管理")
 
     # フォーム入力部分 - 全体のフォームをやめて個別のフォームに変更
     # 1) 開催日の選択
@@ -113,13 +112,12 @@ def run():
         value=datetime.date.today(),
         min_value=datetime.date(2024, 1, 1)
     )
-    
-    # 2) ゴルフ場の選択
+      # 2) ゴルフ場の選択
     if not courses:
         st.warning("登録済みのゴルフ場がありません。")
         st.info("コース管理画面でゴルフ場を登録してください。")
         if st.button("コース管理へ"):
-            switch_page("コース管理")
+            switch_page("09_コース管理")
         return
     
     # コースのID, 名前のタプルを作成
