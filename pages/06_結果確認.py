@@ -30,7 +30,7 @@ from modules.supabase_client import (
 )
 from modules.pdf_generator import generate_pdf, set_font, get_pdf_filename
 from modules.match_analyzer import create_match_matrix, create_detailed_match_results
-from modules.data_formatter import highlight_total_only, color_points
+from modules.data_formatter import highlight_total_only, color_points, get_color_points_function, get_color_function_for_column, apply_ranking_colors_to_dataframe
 from modules.debug import handle_error
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
@@ -320,15 +320,48 @@ def run():
             "Back Putt":   p_data["Putt Back"],
             "Extra Putt":  p_data["Putt Extra"],
             "Putt Pt":     p_data["Putt Pt"],
-            "Total Pt":    p_data["Total Pt"],
-        })
+            "Total Pt":    p_data["Total Pt"],        })
     
     # Arrow変換エラー回避のため、全体を文字列型に変換
     df = pd.DataFrame(score_data_list)
     df.set_index("Player", inplace=True)
     # ±表示カラムは表示用として保持（ここでは既に文字列になっています）
     df = df.astype(str)
-    styled_df = df.style.apply(highlight_total_only, axis=1).map(color_points)
+    
+    # 順位ベースグラデーションのオプション
+    st.write("### スコア詳細")
+    
+    # 色付けオプション
+    col1, col2 = st.columns(2)
+    with col1:
+        use_ranking_colors = st.checkbox("順位ベースのグラデーション表示", value=False, key="ranking_colors")
+    with col2:
+        if use_ranking_colors:
+            ranking_column = st.selectbox(
+                "順位判定に使用する列を選択",
+                options=['Total Score', 'Front Score', 'Back Score', 'Total Pt', 'Game Pt'],
+                index=0,
+                key="ranking_column"
+            )
+    
+    # 列ごとに適切な色付け関数を適用
+    styled_df = df.style.apply(highlight_total_only, axis=1)
+    
+    if use_ranking_colors and 'ranking_column' in locals():
+        # 順位ベースグラデーションを適用
+        ranking_colors = apply_ranking_colors_to_dataframe(df, ranking_column)
+        styled_df = styled_df.apply(lambda x: ranking_colors, axis=0, subset=[ranking_column])
+        
+        # 他の列は通常の色付け
+        for column in df.columns:
+            if column != ranking_column:
+                color_func = get_color_function_for_column(column)
+                styled_df = styled_df.map(color_func, subset=[column])
+    else:
+        # 通常の色付け
+        for column in df.columns:
+            color_func = get_color_function_for_column(column)
+            styled_df = styled_df.map(color_func, subset=[column])
       # プレイヤー名（インデックス）のスタイルのみを設定
     styled_df = styled_df.set_table_styles([
         {
@@ -338,21 +371,17 @@ def run():
                 ('background-color', '#f8f9fa !important'),
                 ('font-weight', 'bold !important'),
                 ('border', '1px solid #dee2e6 !important')
-            ]
-        }
+            ]        }
     ])
 
-    st.write("### スコア詳細")
-    st.dataframe(styled_df, use_container_width=True)
-
-    # マッチ対戦表の作成と表示
+    st.dataframe(styled_df, use_container_width=True)# マッチ対戦表の作成と表示
     if handicaps_data:
         match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
         match_matrix_reset = match_matrix.reset_index()
         match_matrix_reset.rename(columns={'index': 'Player'}, inplace=True)
         m_df = match_matrix_reset.astype(str)
         m_df.set_index("Player", inplace=True)  # スコア詳細と同じようにインデックスに設定
-        styled_matrix = m_df.style.map(color_points)
+        styled_matrix = m_df.style.map(color_func)
         
         # プレイヤー名（インデックス）のスタイルのみを設定（スコア詳細と同じ書式）
         styled_matrix = styled_matrix.set_table_styles([
@@ -372,14 +401,13 @@ def run():
             styled_matrix,
             use_container_width=True
         )
-        
-        # 詳細なマッチ結果の作成と表示
+          # 詳細なマッチ結果の作成と表示
         match_results = create_detailed_match_results(player_data, handicaps, total_only_set)
         df_reset = match_results.reset_index()
         df_reset.rename(columns={'index': 'Player'}, inplace=True)
         r_df = df_reset.astype(str)
         r_df.set_index("Player", inplace=True)  # スコア詳細と同じようにインデックスに設定
-        styled_results = r_df.style.map(color_points)
+        styled_results = r_df.style.map(color_func)
         
         # プレイヤー名（インデックス）のスタイルのみを設定（スコア詳細と同じ書式）
         styled_results = styled_results.set_table_styles([

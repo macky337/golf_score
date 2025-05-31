@@ -1,12 +1,6 @@
 {
   "major": 1,
   "minor": 0,
-<<<<<<< HEAD
-  "patch": 93,
-||||||| a36d0edd
-  "patch": 91,
-=======
-  "patch": 92,
->>>>>>> develop
-  "last_updated": "2025-05-29"
+  "patch": 94,
+  "last_updated": "2025-05-31"
 }
