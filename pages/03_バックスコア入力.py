@@ -214,25 +214,4 @@ def run():
         
         # フォーム送信状態をリセット (表示した後でリセット)
         st.session_state.back_form_submitted = False
-          # エキストラスコア入力またはハンディキャップ計算ページへのリンク
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("エキストラスコア入力へ", use_container_width=True, key="to_extra"):
-                # セッション状態を明示的に保存
-                st.session_state.active_round_id = round_id
-                # Streamlitキャッシュをクリア
-                st.cache_data.clear()
-                # ラウンドのhas_extraフラグを更新
-                supabase.table('rounds').update({'has_extra': True}).eq('round_id', round_id).execute()
-                # シンプルなページ名で遷移
-                switch_page("エキストラスコア入力")
-        with col2:
-            if st.button("結果確認へ", use_container_width=True, key="to_results"):
-                # セッション状態を明示的に保存
-                st.session_state.active_round_id = round_id
-                # Streamlitキャッシュをクリア
-                st.cache_data.clear()
-                switch_page("結果確認")
-
-if __name__ == "__main__":
-    run()
+        # エキストラスコア入力またはハンディキャル

@@ -185,8 +185,15 @@ def run():
                     st.warning("計算結果の保存に失敗しました")
         except Exception as e:
             st.warning(f"計算処理中にエラーが発生しました: {e}")
-          # フォーム送信状態をリセット
+          # フォーム送信状態をリセット (表示した後でリセット)
         st.session_state.extra_form_submitted = False
+        # 結果確認ページへのリンク
+        st.info("結果確認ページへはサイドバーから選択してください。")
+        # # ↓もし遷移が機能する場合は下記を有効化
+        # if st.button("結果確認へ", use_container_width=True, key="to_results"):
+        #     st.session_state.active_round_id = round_id
+        #     st.cache_data.clear()
+        #     switch_page("06_結果確認")
         
         # 確認表示
         st.write("### 入力内容の確認")
