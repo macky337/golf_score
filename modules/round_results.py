@@ -130,16 +130,21 @@ def save_round_results(round_id, player_data):
 def get_round_results(round_id: int) -> dict:
     """
     指定されたラウンドIDのラウンド結果を取得する
+    member_id昇順でソートされた結果を返す
     """
+    from collections import OrderedDict
+    
     client = get_supabase_client()
     try:
-        response = client.table('round_results').select('*').eq('round_id', round_id).execute()
-        results = {}
+        # member_id順でソートして取得
+        response = client.table('round_results').select('*').eq('round_id', round_id).order('member_id').execute()
+        results = OrderedDict()
         
         # レスポンスデータの確認
         print(f"Round results response data: {response}")
         
         if response.data:
+            # データはすでにmember_id昇順でソートされている
             for record in response.data:
                 # スキーマにmember_idが存在することがわかったので、明示的に使用
                 member_id = record.get('member_id')

@@ -216,37 +216,34 @@ def run():
         with col2:
             if st.button("ハンディキャップ計算"):
                 # ハンディキャップ計算ページへ遷移
-                switch_page("04_ハンディキャップ計算")
+                switch_page("04_ハンディキャップ計算")    # ラウンド結果の表示
+    st.write("### ラウンド結果")
+    
+    if round_id:
+        # 現在のラウンドの結果を取得
+        round_results = get_round_results(round_id)
         
-        # ラウンド結果の表示
-        st.write("### ラウンド結果")
-        # 現在のラウンドIDを取得
-        active_round_id = st.session_state.get("active_round_id")
-        
-        if active_round_id:
-            # 現在のラウンドの結果を取得
-            round_results = get_round_results(active_round_id)
+        if round_results:
+            # results_dfを適切に構築する
+            # round_resultsは{member_id: data}の形式でmember_id昇順になっている
             
-            if round_results:
-                # 結果が存在する場合、テーブルとして表示
-                results_df = pd.DataFrame(round_results)
-                
-                # --- プレイヤーID→名前変換（round_resultsはmember_idをキーにした辞書！）---
-                # results_dfのカラムがmember_idでなく、インデックスがmember_idの場合も考慮
-                id_to_name = {score['member_id']: score['member']['name'] if score.get('member') else f"Player {score['member_id']}" for score in scores_data}
-                # DataFrameのカラム名が数字（member_id）になっている場合は転置
-                if results_df.shape[1] < results_df.shape[0] and set(results_df.columns).issubset(set(id_to_name.keys())):
-                    results_df = results_df.T
-                # インデックスがmember_idの場合
-                if results_df.index.dtype in [int, 'int64'] or results_df.index.name == 'member_id':
-                    results_df.insert(0, '名前', results_df.index.map(id_to_name))
-                elif 'member_id' in results_df.columns:
-                    results_df.insert(0, '名前', results_df['member_id'].map(id_to_name))
-                st.dataframe(results_df, use_container_width=True)
-            else:
-                st.info("まだラウンド結果が計算されていません。")
+            # プレイヤー名のマッピングを作成
+            id_to_name = {score['member_id']: score['member']['name'] if score.get('member') else f"Player {score['member_id']}" for score in scores_data}
+            
+            # DataFrameを行指向で構築（各行がプレイヤー）
+            rows = []
+            for member_id, data in round_results.items():
+                row = {'名前': id_to_name.get(member_id, f"Player {member_id}")}
+                row.update(data)
+                rows.append(row)
+            
+            results_df = pd.DataFrame(rows)
+            
+            st.dataframe(results_df, use_container_width=True)
         else:
-            st.warning("ラウンドIDがアクティブではありません。")
+            st.info("まだラウンド結果が計算されていません。")
+    else:
+        st.warning("ラウンドIDがアクティブではありません。")
         
         # --- スコア入力フォームのリセット機能 ---
     if st.button("スコア入力をリセット"):

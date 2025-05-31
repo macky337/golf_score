@@ -285,29 +285,29 @@ def run():
         key="selected_round_id"
     )
 
+    # --- スコア入力フォームのリセット機能 ---
+    if st.button("スコア入力をリセット"):
+        import streamlit as _st
+        if hasattr(_st, "rerun"):
+            _st.rerun()
+        else:
+            _st.experimental_rerun()
+
     # 削除ボタンが押された場合
     if st.button("選択したラウンドを削除", key="delete_round_btn"):
         if selected_round_id:
             success, message = delete_round(selected_round_id)
             if success:
                 st.success(message)
-                # Streamlit 1.32以降はst.rerun()に変更
-                if hasattr(st, "rerun"):
-                    st.rerun()
+                import streamlit as _st
+                if hasattr(_st, "rerun"):
+                    _st.rerun()
                 else:
-                    st.experimental_rerun()
+                    _st.experimental_rerun()
             else:
                 st.error(message)
         else:
             st.warning("削除するラウンドを選択してください")
-
-    # --- スコア入力フォームのリセット機能 ---
-    if st.button("スコア入力をリセット"):
-        # Streamlit 1.32以降はst.rerun()に変更
-        if hasattr(st, "rerun"):
-            st.rerun()
-        else:
-            st.experimental_rerun()
 
 if __name__ == "__main__": 
     run()
