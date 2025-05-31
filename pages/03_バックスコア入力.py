@@ -232,9 +232,11 @@ def run():
                 results_df = pd.DataFrame(round_results)
                 
                 # --- プレイヤーID→名前変換 ---
-                if 'player' in results_df.columns:
-                    id_to_name = {score['member_id']: score['member']['name'] if score.get('member') else f"Player {score['member_id']}" for score in scores_data}
-                    results_df['player'] = results_df['player'].map(id_to_name).fillna(results_df['player'])
+                id_to_name = {score['member_id']: score['member']['name'] if score.get('member') else f"Player {score['member_id']}" for score in scores_data}
+                if 'member_id' in results_df.columns:
+                    results_df.insert(0, '名前', results_df['member_id'].map(id_to_name))
+                elif results_df.index.name == 'member_id' or (results_df.index.name is None and results_df.index.dtype in [int, 'int64']):
+                    results_df.insert(0, '名前', results_df.index.map(id_to_name))
                 st.dataframe(results_df, use_container_width=True)
             else:
                 st.info("まだラウンド結果が計算されていません。")
