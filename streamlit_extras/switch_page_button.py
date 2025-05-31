@@ -16,7 +16,13 @@ def switch_page(page_name: str):
                 # すでに正しい形式の場合
                 st.switch_page(page_name)
         else:
-            st.experimental_set_query_params(page=page_name)
+            # ページ名から拡張子やパスを除去してページ名だけにする
+            page_param = page_name
+            if page_param.startswith("pages/"):
+                page_param = page_param.replace("pages/", "")
+            if page_param.endswith(".py"):
+                page_param = page_param[:-3]
+            st.experimental_set_query_params(page=page_param)
             st.experimental_rerun()
     except Exception as e:
         st.error(f"switch_page例外: {e}")

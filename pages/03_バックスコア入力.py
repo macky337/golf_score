@@ -4,9 +4,13 @@ from modules.db import supabase
 from streamlit_extras.switch_page_button import switch_page
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
-from modules.supabase_client import get_scores_with_fallback  # 追加: 必要な関数をインポート
+from modules.supabase_client import get_scores_with_fallback
+from components.navigation import show_navigation  # ナビゲーションコンポーネントを追加
 
 def run():
+    # ナビゲーションバーを表示（ページ間の移動を容易にする）
+    show_navigation(active_page="バックスコア入力")
+    
     col1, col2 = st.columns([0.8, 0.2])
     with col1:
         st.title("バックスコア入力")
