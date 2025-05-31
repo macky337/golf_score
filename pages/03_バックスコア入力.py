@@ -250,8 +250,12 @@ def run():
         
         # --- スコア入力フォームのリセット機能 ---
     if st.button("スコア入力をリセット"):
-        # （リセット処理は「スコア入力をリセット」ボタンでのみ実行するよう修正済み）
-        st.experimental_rerun()
+        # Streamlit 1.32以降はst.rerun()に変更
+        import streamlit as _st
+        if hasattr(_st, "rerun"):
+            _st.rerun()
+        else:
+            _st.experimental_rerun()
 
 if __name__ == "__main__":
     run()

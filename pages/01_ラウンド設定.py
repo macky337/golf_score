@@ -291,11 +291,23 @@ def run():
             success, message = delete_round(selected_round_id)
             if success:
                 st.success(message)
-                st.experimental_rerun()  # 画面を再読み込み
+                # Streamlit 1.32以降はst.rerun()に変更
+                if hasattr(st, "rerun"):
+                    st.rerun()
+                else:
+                    st.experimental_rerun()
             else:
                 st.error(message)
         else:
             st.warning("削除するラウンドを選択してください")
+
+    # --- スコア入力フォームのリセット機能 ---
+    if st.button("スコア入力をリセット"):
+        # Streamlit 1.32以降はst.rerun()に変更
+        if hasattr(st, "rerun"):
+            st.rerun()
+        else:
+            st.experimental_rerun()
 
 if __name__ == "__main__": 
     run()
