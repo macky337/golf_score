@@ -230,6 +230,13 @@ def run():
             if round_results:
                 # 結果が存在する場合、テーブルとして表示
                 results_df = pd.DataFrame(round_results)
+                
+                # --- プレイヤーID→名前変換 ---
+                if "player" in results_df.columns:
+                    # member_id→名前の辞書を作成
+                    id_to_name = {score['member_id']: (score['member']['name'] if score.get('member') else f"Player {score['member_id']}") for score in scores_data}
+                    results_df["player"] = results_df["player"].map(lambda x: id_to_name.get(x, x))
+                # 結果が存在する場合、テーブルとして表示
                 st.dataframe(results_df, use_container_width=True)
             else:
                 st.info("まだラウンド結果が計算されていません。")
