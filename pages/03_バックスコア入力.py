@@ -231,12 +231,17 @@ def run():
                 # 結果が存在する場合、テーブルとして表示
                 results_df = pd.DataFrame(round_results)
                 
-                # --- プレイヤーID→名前変換 ---
+                # --- プレイヤーID→名前変換（round_resultsはmember_idをキーにした辞書！）---
+                # results_dfのカラムがmember_idでなく、インデックスがmember_idの場合も考慮
                 id_to_name = {score['member_id']: score['member']['name'] if score.get('member') else f"Player {score['member_id']}" for score in scores_data}
-                if 'member_id' in results_df.columns:
-                    results_df.insert(0, '名前', results_df['member_id'].map(id_to_name))
-                elif results_df.index.name == 'member_id' or (results_df.index.name is None and results_df.index.dtype in [int, 'int64']):
+                # DataFrameのカラム名が数字（member_id）になっている場合は転置
+                if results_df.shape[1] < results_df.shape[0] and set(results_df.columns).issubset(set(id_to_name.keys())):
+                    results_df = results_df.T
+                # インデックスがmember_idの場合
+                if results_df.index.dtype in [int, 'int64'] or results_df.index.name == 'member_id':
                     results_df.insert(0, '名前', results_df.index.map(id_to_name))
+                elif 'member_id' in results_df.columns:
+                    results_df.insert(0, '名前', results_df['member_id'].map(id_to_name))
                 st.dataframe(results_df, use_container_width=True)
             else:
                 st.info("まだラウンド結果が計算されていません。")
