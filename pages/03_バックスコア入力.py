@@ -214,4 +214,42 @@ def run():
         
         # フォーム送信状態をリセット (表示した後でリセット)
         st.session_state.back_form_submitted = False
-        # エキストラスコア入力またはハンディキャル
+        # エキストラスコア入力またはハンディキャップ計算ページへのリンク
+        col1, col2 = st.columns([0.5, 0.5])
+        with col1:
+            if st.button("エキストラスコア入力"):
+                # エキストラスコア入力ページへ遷移
+                switch_page("03_エキストラスコア入力")
+        
+        with col2:
+            if st.button("ハンディキャップ計算"):
+                # ハンディキャップ計算ページへ遷移
+                switch_page("04_ハンディキャップ計算")
+        
+        # ラウンド結果の表示
+        st.write("### ラウンド結果")
+        # 現在のラウンドIDを取得
+        active_round_id = st.session_state.get("active_round_id")
+        
+        if active_round_id:
+            # 現在のラウンドの結果を取得
+            round_results = get_round_results(active_round_id)
+            
+            if round_results:
+                # 結果が存在する場合、テーブルとして表示
+                results_df = pd.DataFrame(round_results)
+                st.dataframe(results_df, use_container_width=True)
+            else:
+                st.info("まだラウンド結果が計算されていません。")
+        else:
+            st.warning("ラウンドIDがアクティブではありません。")
+        
+        # スコア入力フォームのリセット
+        for score in scores_data:
+            member_id = score['member_id']
+            st.session_state[f"back_score_{member_id}"] = 0
+            st.session_state[f"back_putt_{member_id}"] = 0
+            st.session_state[f"back_game_pt_{member_id}"] = 0
+
+if __name__ == "__main__":
+    run()

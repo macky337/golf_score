@@ -55,7 +55,7 @@ def run():
     if back_scores_missing:
         st.warning("一部のバックスコアがまだ入力されていません。先にバックスコアを入力することをお勧めします。")
         if st.button("バックスコア入力へ"):
-            switch_page("バックスコア入力")
+            switch_page("03_バックスコア入力")
       # セッション状態の初期化（フォーム実行前に必ず実行）
     for score in scores_data:
         member_id = score['member_id']
