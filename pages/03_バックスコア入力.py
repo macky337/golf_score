@@ -44,7 +44,7 @@ def run():
     if front_scores_missing:
         st.warning("一部のフロントスコアがまだ入力されていません。先にフロントスコアを入力することをお勧めします。")
         if st.button("フロントスコア入力へ"):
-            switch_page("フロントスコア入力")    # セッション状態の初期化（フォーム実行前に必ず実行）
+            switch_page("02_フロントスコア入力")    # セッション状態の初期化（フォーム実行前に必ず実行）
     for score in scores_data:
         member_id = score['member_id']
           # データベースから取得した値を確実にセッション状態に設定

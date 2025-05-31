@@ -248,7 +248,7 @@ def run():
 
                 if success:
                     st.success("ラウンド設定が完了しました。")
-                    switch_page("フロントスコア入力")
+                    switch_page("02_フロントスコア入力")
 
             except Exception as e:
                 st.error(f"ラウンド設定の保存中にエラーが発生しました: {str(e)}")
