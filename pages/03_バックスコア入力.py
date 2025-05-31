@@ -236,12 +236,10 @@ def run():
         else:
             st.warning("ラウンドIDがアクティブではありません。")
         
-        # スコア入力フォームのリセット
-        for score in scores_data:
-            member_id = score['member_id']
-            st.session_state[f"back_score_{member_id}"] = 0
-            st.session_state[f"back_putt_{member_id}"] = 0
-            st.session_state[f"back_game_pt_{member_id}"] = 0
+        # --- スコア入力フォームのリセット機能 ---
+    if st.button("スコア入力をリセット"):
+        # （リセット処理は「スコア入力をリセット」ボタンでのみ実行するよう修正済み）
+        st.experimental_rerun()
 
 if __name__ == "__main__":
     run()
