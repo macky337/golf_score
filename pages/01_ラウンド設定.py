@@ -69,13 +69,16 @@ def run():
         if selected:
             round_id = int(selected.split('ID: ')[1].rstrip(')'))
             st.session_state.active_round_id = round_id
-            st.info(f"選択中のラウンドID: {round_id} の編集画面に切り替わりました。サイドバーや各スコア入力ページから編集を続けてください。")
-            # ▼▼▼ 未確定ラウンドの削除機能 ▼▼▼
+            st.info(f"選択中のラウンドID: {round_id} の編集画面に切り替わりました。サイドバーや各スコア入力ページから編集を続けてください。")            # ▼▼▼ 未確定ラウンドの削除機能 ▼▼▼
             if st.button("この未確定ラウンドを削除", key="delete_unfinalized_round"):
                 success, message = delete_round(round_id)
                 if success:
                     st.success(message)
-                    st.experimental_rerun()
+                    import streamlit as _st
+                    if hasattr(_st, "rerun"):
+                        _st.rerun()
+                    else:
+                        _st.experimental_rerun()
                 else:
                     st.error(message)
             st.stop()
