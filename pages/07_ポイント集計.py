@@ -330,7 +330,11 @@ def show_yearly_statistics():
                 7: '7月', 8: '8月', 9: '9月', 10: '10月', 11: '11月', 12: '12月'
             }
             monthly_df['Month Name'] = monthly_df['Month'].map(month_names)
-            
+
+            # --- 追加: 月順でソート ---
+            monthly_df = monthly_df.sort_values("Month")
+            # --- ここまで追加 ---
+
             # Total Ptの月別推移グラフ
             fig3 = px.line(
                 monthly_df,
