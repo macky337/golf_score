@@ -48,27 +48,19 @@ def run():
     if front_scores_missing:
         st.warning("一部のフロントスコアがまだ入力されていません。先にフロントスコアを入力することをお勧めします。")
         if st.button("フロントスコア入力へ"):
-            switch_page("02_フロントスコア入力")    # セッション状態の初期化（フォーム実行前に必ず実行）
+            switch_page("02_フロントスコア入力")    # セッション状態の初期化（ウィジェット表示前のみ！）
     for score in scores_data:
         member_id = score['member_id']
-          # データベースから取得した値を確実にセッション状態に設定
         score_values = {
             'back_score': score.get('back_score'),
             'back_putt': score.get('back_putt'),
             'back_game_pt': score.get('back_game_pt')
         }
-        
         for field, db_value in score_values.items():
             session_key = f"{field}_{member_id}"
-            
-            # 入力中に再読み込みされた場合はセッション状態を優先
             if session_key not in st.session_state:
-                # データベース値が有効な場合はそれを使用（nullまたは-300の場合は0を使用）
-                if db_value is not None and db_value != -300:
-                    st.session_state[session_key] = db_value
-                else:
-                    st.session_state[session_key] = 0
-    
+                st.session_state[session_key] = db_value if db_value is not None and db_value != -300 else 0
+
     # プレイヤーごとのスコア入力フォーム
     st.write("### スコア入力")
     
