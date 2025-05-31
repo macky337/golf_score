@@ -58,6 +58,20 @@ def create_score_records(supabase, round_id, member_ids):
     return success
 
 def run():
+    # ▼▼▼ 未確定ラウンド選択セクション ▼▼▼
+    unfinalized_rounds = supabase.table('rounds').select('round_id', 'date_played', 'course_name').eq('finalized', False).order('date_played', desc=True).execute().data
+    if unfinalized_rounds:
+        st.write('### 未確定ラウンドの選択')
+        round_options = [
+            f"{r['date_played']} - {r['course_name']} (ID: {r['round_id']})" for r in unfinalized_rounds
+        ]
+        selected = st.selectbox('未確定ラウンドを選択して編集', options=round_options, key='unfinalized_round_select')
+        if selected:
+            round_id = int(selected.split('ID: ')[1].rstrip(')'))
+            st.session_state.active_round_id = round_id
+            st.info(f"選択中のラウンドID: {round_id} の編集画面に切り替わりました。サイドバーや各スコア入力ページから編集を続けてください。")
+            st.stop()
+    
     col1, col2 = st.columns([0.8, 0.2])
     with col1:
         st.title("ラウンド設定")
