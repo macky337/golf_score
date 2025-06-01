@@ -233,13 +233,12 @@ def recalculate_putt_points(putt_scores, n_players):
                 if m_id in winners:
                     points[m_id] = 10  # 最少が2名の場合は+10pt
                 else:
-                    points[m_id] = -10  # 残り2名は-10pt
-        elif len(winners) == 3:
+                    points[m_id] = -10  # 残り2名は-10pt        elif len(winners) == 3:
             for m_id in putt_scores:
                 if m_id in winners:
-                    points[m_id] = 10  # 最少が3名の場合は+10pt
+                    points[m_id] = 5  # 最少が3名の場合は+5pt
                 else:
-                    points[m_id] = -30  # 残り1名は-30pt
+                    points[m_id] = -15  # 残り1名は-15pt
         # 全員同点の場合は初期値の0のまま
     
     return points

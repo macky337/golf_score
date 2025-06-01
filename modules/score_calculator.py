@@ -1,3 +1,4 @@
+# filepath: c:\Users\user\Documents\GitHub\golf_score\modules\score_calculator.py
 def safe_get_score(data, key):
     """スコア取得時、Noneや例外発生時は 0 を返す"""
     try:
@@ -40,7 +41,7 @@ def calc_putt_points(putt_scores, n):
     4. 【4人の場合】
        - 勝者が1名の場合: 勝者に +30pt、残り3名に -10pt
        - 勝者が2名の場合: 両勝者に +10pt、残り2名に -10pt
-       - 勝者が3名の場合: 勝者に +10pt、残り1名に -30pt
+       - 勝者が3名の場合: 勝者に +5pt、残り1名に -15pt
     なお、すべてのプレイヤーが同じスコアの場合は全員0点とする。
     """
     if not putt_scores:
@@ -82,9 +83,9 @@ def calc_putt_points(putt_scores, n):
         elif len(winners) == 3:
             for m_id in putt_scores:
                 if m_id in winners:
-                    points[m_id] = 10
+                    points[m_id] = 5
                 else:
-                    points[m_id] = -30
+                    points[m_id] = -15
     
     return points
 
