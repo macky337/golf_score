@@ -515,14 +515,12 @@ def show_monthly_statistics():
             player = score['member']['name']
             rounds_data[round_id]['players'][player] = {
                 'Total Pt': score.get('total_pt', 0)
-            }
-        
+            }        
         # ラウンド順に表示
         sorted_rounds = sorted(rounds_data.items(), key=lambda x: x[1]['date'])
-        
         for round_id, round_info in sorted_rounds:
             st.markdown(f"#### {round_info['date']} - {round_info['course']}")
-              round_records = []
+            round_records = []
             # プレイヤーを名前順でソート
             for player, stats in sorted(round_info['players'].items()):
                 round_records.append({
