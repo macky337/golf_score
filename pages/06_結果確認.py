@@ -50,7 +50,10 @@ else:
 
 def initialize_player_data(scores, round_results):
     player_data = {}
-    for sc in scores:
+    # スコアデータをmember_idでソート
+    sorted_scores = sorted(scores, key=lambda x: x['member_id'])
+    
+    for sc in sorted_scores:
         member_id = sc['member_id']
         player_name = sc['member']['name'] if ('member' in sc and sc['member']) else f"Player {member_id}"
         # DB側のキーがスネークケースの場合
@@ -297,11 +300,12 @@ def run():
         "Match Front", "Match Back", "Match Total", "Match Extra", "Match Pt",
         "Front GP", "Back GP", "Extra GP", "Game Pt",
         "Front Putt", "Back Putt", "Extra Putt", "Putt Pt",
-        "Total Pt"
-    ]
+        "Total Pt"    ]
     
     score_data_list = []
-    for pid, p_data in player_data.items():
+    # player_ids（ソート済み）の順序でデータを構築
+    for pid in player_ids:
+        p_data = player_data[pid]
         score_data_list.append({
             "Player":      p_data["Player"],
             "Front Score": p_data["Front Score"],
@@ -312,7 +316,8 @@ def run():
             "Match Back":  p_data["Match Back"],
             "Match Total": p_data["Match Total"],
             "Match Extra": p_data["Match Extra"],
-            "Match Pt":    p_data["Match Pt"],            "Front GP":    p_data["Front GP"],
+            "Match Pt":    p_data["Match Pt"],
+            "Front GP":    p_data["Front GP"],
             "Back GP":     p_data["Back GP"],
             "Extra GP":    p_data["Extra GP"],
             "Game Pt":     p_data["Game Pt"],
@@ -320,7 +325,8 @@ def run():
             "Back Putt":   p_data["Putt Back"],
             "Extra Putt":  p_data["Putt Extra"],
             "Putt Pt":     p_data["Putt Pt"],
-            "Total Pt":    p_data["Total Pt"],        })
+            "Total Pt":    p_data["Total Pt"],
+        })
     
     # Arrow変換エラー回避のため、全体を文字列型に変換
     df = pd.DataFrame(score_data_list)
@@ -351,8 +357,7 @@ def run():
         # 順位ベースグラデーションを適用
         ranking_colors = apply_ranking_colors_to_dataframe(df, ranking_column)
         styled_df = styled_df.apply(lambda x: ranking_colors, axis=0, subset=[ranking_column])
-        
-        # 他の列は通常の色付け
+          # 他の列は通常の色付け
         for column in df.columns:
             if column != ranking_column:
                 color_func = get_color_function_for_column(column)
@@ -362,7 +367,8 @@ def run():
         for column in df.columns:
             color_func = get_color_function_for_column(column)
             styled_df = styled_df.map(color_func, subset=[column])
-      # プレイヤー名（インデックス）のスタイルのみを設定
+    
+    # プレイヤー名（インデックス）のスタイルのみを設定
     styled_df = styled_df.set_table_styles([
         {
             'selector': 'th.row_heading',  # 行ヘッダー（プレイヤー名）のスタイル
@@ -371,7 +377,8 @@ def run():
                 ('background-color', '#f8f9fa !important'),
                 ('font-weight', 'bold !important'),
                 ('border', '1px solid #dee2e6 !important')
-            ]        }
+            ]
+        }
     ])
 
     st.dataframe(styled_df, use_container_width=True)# マッチ対戦表の作成と表示

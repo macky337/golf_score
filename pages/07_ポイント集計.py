@@ -309,11 +309,11 @@ def show_yearly_statistics():
                 # Total Ptの集計
                 monthly_data[month][player]['Total Pt'] += score.get('total_pt', 0)
                 monthly_data[month][player]['Rounds'] += 1
-        
-        # 月別データをDataFrameに変換
+          # 月別データをDataFrameに変換
         monthly_records = []
         for month, players in monthly_data.items():
-            for player, stats in players.items():
+            # プレイヤーを名前順でソート
+            for player, stats in sorted(players.items()):
                 monthly_records.append({
                     'Month': month,
                     'Player': player,
@@ -522,9 +522,9 @@ def show_monthly_statistics():
         
         for round_id, round_info in sorted_rounds:
             st.markdown(f"#### {round_info['date']} - {round_info['course']}")
-            
-            round_records = []
-            for player, stats in round_info['players'].items():
+              round_records = []
+            # プレイヤーを名前順でソート
+            for player, stats in sorted(round_info['players'].items()):
                 round_records.append({
                     'プレイヤー': player,
                     'Total Pt': stats['Total Pt']
