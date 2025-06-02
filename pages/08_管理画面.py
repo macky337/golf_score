@@ -65,8 +65,7 @@ def check_password():
         return False
     return True
 
-def run():
-    # タイトルとホームボタンを横に配置
+def run():    # タイトルとホームボタンを横に配置
     col1, col2 = st.columns([0.8, 0.2])
     with col1:
         st.title("管理画面")
@@ -76,12 +75,13 @@ def run():
     
     if not check_password():
         return
-
-    tab1, tab2, tab3, tab4 = st.tabs([
+    
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "スコア修正", 
         "ハンディキャップ修正", 
         "メンバー管理",
-        "バックアップ・リストア"
+        "バックアップ・リストア",
+        "ポイントバランス診断"
     ])
 
     with tab1:
@@ -95,6 +95,9 @@ def run():
 
     with tab4:
         show_backup_restore()
+    
+    with tab5:
+        show_balance_diagnostics()
 
 def recalculate_scores(round_id):
     """ラウンドのスコアを再計算する"""
@@ -1023,6 +1026,183 @@ def score_edit_tab():
             if st.button("結果確認画面へ移動", use_container_width=True):
                 st.session_state.active_round_id = round_id
                 switch_page("結果確認")
+
+def show_balance_diagnostics():
+    """ポイントバランス診断と修復機能"""
+    st.header("ポイントバランス診断")
+    
+    # 現在のポイントバランスを確認
+    try:
+        # 全ラウンドの合計ポイントを計算
+        all_rounds = supabase.table('round').select('*').execute().data
+        total_balance = 0
+        round_details = []
+        
+        for round_data in all_rounds:
+            round_id = round_data['round_id']
+            # このラウンドの全プレイヤーのTotal Ptを合計
+            scores = supabase.table('score').select('total_pt, member_id').eq('round_id', round_id).execute().data
+            round_total = sum(score.get('total_pt', 0) for score in scores)
+            total_balance += round_total
+            
+            round_details.append({
+                'round_id': round_id,
+                'date': round_data.get('round_date', '不明'),
+                'course': round_data.get('course_name', '不明'),
+                'round_total': round_total,
+                'player_count': len(scores)
+            })
+        
+        # 診断結果を表示
+        st.subheader("📊 ポイントバランス診断結果")
+        
+        # バランス状況の表示
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("総ポイント合計", f"{total_balance:+d}")
+        with col2:
+            status = "✅ 正常" if total_balance == 0 else "⚠️ 不均衡"
+            st.metric("バランス状況", status)
+        with col3:
+            st.metric("対象ラウンド数", len(all_rounds))
+        
+        # 詳細データの表示
+        if st.checkbox("ラウンド別詳細を表示", value=False):
+            df = pd.DataFrame(round_details)
+            if not df.empty:
+                df = df.sort_values('date', ascending=False)
+                st.dataframe(df, use_container_width=True)
+        
+        # 修復オプション
+        st.subheader("🔧 修復オプション")
+        
+        if total_balance != 0:
+            st.warning(f"ポイントバランスが {total_balance:+d} の不均衡があります。")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("🔄 全ラウンド再計算", help="すべてのラウンドのポイントを再計算します"):
+                    with st.spinner("再計算中..."):
+                        repair_count = 0
+                        for round_data in all_rounds:
+                            try:
+                                recalculate_single_round(round_data['round_id'])
+                                repair_count += 1
+                            except Exception as e:
+                                st.error(f"ラウンド{round_data['round_id']}の再計算に失敗: {str(e)}")
+                        
+                        st.success(f"{repair_count}ラウンドの再計算が完了しました。")
+                        st.rerun()
+            
+            with col2:
+                if st.button("📋 詳細レポート", help="問題のあるラウンドの詳細を表示します"):
+                    show_detailed_balance_report(round_details)
+        else:
+            st.success("ポイントバランスは正常です！")
+            
+    except Exception as e:
+        st.error(f"診断中にエラーが発生しました: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
+
+def recalculate_single_round(round_id):
+    """単一ラウンドのポイントを再計算する"""
+    try:
+        # ラウンドのスコアデータを取得
+        scores = supabase.table('score').select('*').eq('round_id', round_id).execute().data
+        
+        if not scores:
+            raise Exception(f"ラウンド{round_id}のスコアデータが見つかりません")
+        
+        # ハンディキャップデータを取得
+        handicaps = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute().data
+        
+        # ハンディキャップをペアごとにマッピング
+        handicap_map = {}
+        for hc in handicaps:
+            key = tuple(sorted([hc['member_id_1'], hc['member_id_2']]))
+            handicap_map[key] = hc['handicap_difference']
+        
+        # 各プレイヤーのポイントを再計算
+        updated_scores = []
+        player_ids = [score['member_id'] for score in scores]
+        
+        for score in scores:
+            member_id = score['member_id']
+            
+            # ゲームポイントを計算
+            front_gp, back_gp, extra_gp, total_pt = calculate_player_points(
+                round_id, member_id, player_ids, handicap_map
+            )
+            
+            # スコアを更新
+            update_data = {
+                'front_game_pt': front_gp,
+                'back_game_pt': back_gp,
+                'extra_game_pt': extra_gp,
+                'total_pt': total_pt
+            }
+            
+            supabase.table('score').update(update_data).eq('score_id', score['score_id']).execute()
+            updated_scores.append({**score, **update_data})
+        
+        # ラウンド結果も更新
+        save_round_results(round_id, updated_scores)
+        
+        return True
+        
+    except Exception as e:
+        raise Exception(f"ラウンド{round_id}の再計算に失敗: {str(e)}")
+
+def show_detailed_balance_report(round_details):
+    """詳細なバランスレポートを表示"""
+    st.subheader("📋 詳細バランスレポート")
+    
+    # 不均衡のあるラウンドをフィルタ
+    problematic_rounds = [r for r in round_details if r['round_total'] != 0]
+    
+    if problematic_rounds:
+        st.warning(f"{len(problematic_rounds)}個のラウンドで不均衡が検出されました")
+        
+        for round_info in problematic_rounds:
+            with st.expander(f"ラウンド {round_info['round_id']} - {round_info['date']} ({round_info['round_total']:+d}pt)"):
+                # このラウンドの詳細スコアを取得
+                scores = supabase.table('score').select(
+                    'member_id, front_game_pt, back_game_pt, extra_game_pt, total_pt'
+                ).eq('round_id', round_info['round_id']).execute().data
+                
+                # メンバー名も取得
+                for score in scores:
+                    member = supabase.table('member').select('name').eq('member_id', score['member_id']).execute()
+                    score['name'] = member.data[0]['name'] if member.data else f"Member {score['member_id']}"
+                
+                # データフレームで表示
+                df = pd.DataFrame(scores)
+                if not df.empty:
+                    # 合計行を追加
+                    totals = {
+                        'name': '合計',
+                        'member_id': '',
+                        'front_game_pt': df['front_game_pt'].sum(),
+                        'back_game_pt': df['back_game_pt'].sum(),
+                        'extra_game_pt': df['extra_game_pt'].sum(),
+                        'total_pt': df['total_pt'].sum()
+                    }
+                    df = pd.concat([df, pd.DataFrame([totals])], ignore_index=True)
+                    
+                    st.dataframe(df[['name', 'front_game_pt', 'back_game_pt', 'extra_game_pt', 'total_pt']], 
+                               use_container_width=True)
+                
+                # 個別修復ボタン                if st.button(f"このラウンドを修復", key=f"repair_{round_info['round_id']}"):
+                    try:
+                        recalculate_single_round(round_info['round_id'])
+                        st.success(f"ラウンド {round_info['round_id']} の修復が完了しました")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"修復に失敗: {str(e)}")
+    else:
+        st.info("すべてのラウンドが正常なバランスです")
 
 if __name__ == "__main__":
     run()
