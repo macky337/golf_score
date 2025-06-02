@@ -1,20 +1,12 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# 相対パス解決用のベースタグを挿入
-components.html("<base href='/' />", height=0)
-
-# パスベースのアクセスをクエリパラメータ方式にリダイレクト
-components.html("""
-<script>
-  // ダイレクトでパス呼び出しされた場合に、クエリパラメータ形式に切り替え
-  if (location.pathname !== '/' && !location.search) {
-    const page = decodeURIComponent(location.pathname.slice(1));
-    history.replaceState({}, '', '/?page=' + page);
-    window.location.reload();
-  }
-</script>
-""", height=0)
+# Streamlit ページ設定
+st.set_page_config(
+    page_title="結果確認", 
+    page_icon="📊",
+    layout="wide"
+)
 
 import pandas as pd
 import os
@@ -92,15 +84,24 @@ def initialize_player_data(scores, round_results):
 
 
 def run():
-    supabase = get_supabase_client()
-    
-    # タイトルとホームボタンのレイアウト
-    col1, col2 = st.columns([0.8, 0.2])
-    with col1:
-        st.title("結果確認")
-    with col2:
-        if st.button("🏠 Home"):
-            switch_page("main")
+    """結果確認画面のメイン関数"""
+    try:
+        # エラーハンドリングを追加
+        if 'supabase' not in st.session_state:
+            supabase = get_supabase_client()
+            if supabase is None:
+                st.error("データベースに接続できません。しばらくしてから再度お試しください。")
+                return
+        else:
+            supabase = st.session_state.supabase
+
+        # タイトルとホームボタンのレイアウト
+        col1, col2 = st.columns([0.8, 0.2])
+        with col1:
+            st.title("結果確認")
+        with col2:
+            if st.button("🏠 Home"):
+                switch_page("main")
 
     # CSSスタイルを追加 - プレイヤー名の表示問題を修正
     st.markdown(
@@ -505,13 +506,19 @@ def run():
                     st.error("計算結果の保存に失敗しました。")
             except Exception as e:
                 st.error(f"ラウンドの確定中にエラーが発生しました: {str(e)}")
-    else:
-        # 確定済みのラウンドの場合、管理画面へのリンクを表示
+    else:    # 確定済みのラウンドの場合、管理画面へのリンクを表示
         st.markdown("---")
         if st.button("管理画面でスコアを修正する", use_container_width=True):
             st.session_state.admin_selected_round_id = round_id
             switch_page("08_管理画面")    # 開発者向けツール
     st.markdown("---")
+
+    except Exception as e:
+        st.error(f"ページの読み込み中にエラーが発生しました: {str(e)}")
+        st.error("ページを再読み込みしてください。問題が続く場合は管理者にお問い合わせください。")
+        import traceback
+        with st.expander("詳細なエラー情報"):
+            st.code(traceback.format_exc())
 
 if __name__ == "__main__":
     run()

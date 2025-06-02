@@ -6,4 +6,11 @@ gatherUsageStats = false
 [server]
 # 以下の設定を確認し、正しくページが非表示になるか確認する
 enableStaticServing = true
+baseUrlPath = ""
+headless = true
+enableCORS = false
+enableXsrfProtection = false
+
+[global]
+developmentMode = false
 
