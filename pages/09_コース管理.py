@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from modules.db import supabase
 from streamlit_extras.switch_page_button import switch_page
-from modules.models import get_course_list, create_course, is_course_in_use, update_rounds_course_references
+from modules.models import get_course_list, create_course, is_course_in_use, update_rounds_course_references, get_unused_courses, delete_unused_courses
 
 def run():
     col1, col2 = st.columns([0.8, 0.2])
@@ -24,7 +24,40 @@ def run():
     if courses:
         st.write("### 登録済みコース")
         
+        # 未使用ゴルフ場の一括削除機能
+        st.write("#### 🗑️ 未使用ゴルフ場の一括削除")
+        unused_courses = get_unused_courses()
+        
+        if unused_courses:
+            st.warning(f"⚠️ {len(unused_courses)}個の未使用ゴルフ場が見つかりました")
+            
+            # 未使用ゴルフ場の一覧を表示
+            unused_df = pd.DataFrame(
+                [(c.get('id', ''), c.get('name', '')) for c in unused_courses],
+                columns=["ID", "ゴルフ場名"]
+            )
+            st.dataframe(unused_df, use_container_width=True)
+            
+            # 削除確認
+            with st.expander("⚠️ 未使用ゴルフ場を一括削除"):
+                st.error("注意: この操作は取り消せません。上記の未使用ゴルフ場がすべて削除されます。")
+                confirm_bulk_delete = st.checkbox("未使用ゴルフ場を一括削除することを確認しました", key="confirm_bulk_delete")
+                
+                if st.button("未使用ゴルフ場を一括削除", disabled=not confirm_bulk_delete, type="primary", key="bulk_delete_button"):
+                    with st.spinner("未使用ゴルフ場を削除中..."):
+                        deleted_count, message = delete_unused_courses()
+                        if deleted_count > 0:
+                            st.success(message)
+                            st.rerun()
+                        else:
+                            st.info(message)
+        else:
+            st.success("✅ 未使用のゴルフ場はありません")
+        
+        st.write("---")
+        
         # 削除対象のコース選択用のセレクトボックス
+        st.write("#### 個別コース削除")
         delete_course_id = st.selectbox(
             "削除するコースを選択",
             options=[None] + [(c.get('id', ''), c.get('name', '')) for c in courses],

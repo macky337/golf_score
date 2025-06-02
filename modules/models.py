@@ -135,38 +135,57 @@ def is_course_in_use(course_id):
         print(f"コース使用確認エラー: {str(e)}")
         return False
 
-def update_rounds_course_references():
-    """既存のラウンドデータにcourse_idを設定する移行関数"""
+def get_unused_courses():
+    """使用されていないゴルフ場の一覧を取得する"""
     try:
-        # すべてのラウンドを取得
-        rounds_result = supabase.table('rounds').select('*').execute()
-        rounds = rounds_result.data
+        # 全てのコースを取得
+        courses_result = supabase.table('courses').select('*').order('name').execute()
+        courses = courses_result.data
         
-        updated_count = 0
-        for r in rounds:
-            if 'course_name' in r and r['course_name'] and not r.get('course_id'):
-                # コース名でコースを検索
-                course = get_course_by_name(r['course_name'])
-                if course:
-                    # course_idを更新
-                    supabase.table('rounds').update({
-                        'course_id': course['id']
-                    }).eq('round_id', r['round_id']).execute()
-                    updated_count += 1
+        # 使用されているコースIDを取得
+        used_courses_result = supabase.table('rounds').select('course_id').execute()
+        used_course_ids = set()
+        for round_data in used_courses_result.data:
+            if round_data.get('course_id'):
+                used_course_ids.add(round_data['course_id'])
         
-        return updated_count
+        # 未使用のコースをフィルタリング
+        unused_courses = []
+        for course in courses:
+            if course['id'] not in used_course_ids:
+                unused_courses.append(course)
+        
+        return unused_courses
     except Exception as e:
-        print(f"ラウンドコース参照更新エラー: {str(e)}")
-        return 0
-
-def get_members_list():
-    """メンバー一覧を取得する（ID昇順）"""
-    try:
-        result = supabase.table('member').select('*').order('member_id').execute()
-        return result.data
-    except Exception as e:
-        print(f"メンバー一覧取得エラー: {str(e)}")
+        print(f"未使用コース取得エラー: {str(e)}")
         return []
+
+def delete_unused_courses():
+    """未使用のゴルフ場を一括削除する"""
+    try:
+        unused_courses = get_unused_courses()
+        if not unused_courses:
+            return 0, "削除対象の未使用ゴルフ場がありません"
+        
+        deleted_count = 0
+        deleted_names = []
+        
+        for course in unused_courses:
+            try:
+                result = supabase.table('courses').delete().eq('id', course['id']).execute()
+                if result.data:
+                    deleted_count += 1
+                    deleted_names.append(course['name'])
+            except Exception as e:
+                print(f"コース {course['name']} の削除に失敗: {str(e)}")
+        
+        if deleted_count > 0:
+            return deleted_count, f"以下の{deleted_count}個の未使用ゴルフ場を削除しました: {', '.join(deleted_names)}"
+        else:
+            return 0, "ゴルフ場の削除に失敗しました"
+        
+    except Exception as e:
+        return 0, f"未使用ゴルフ場削除エラー: {str(e)}"
 
 # 例: 新規ラウンド登録時（デバッグ用のサンプルコード）
 if __name__ == "__main__":
