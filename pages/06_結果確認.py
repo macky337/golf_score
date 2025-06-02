@@ -512,60 +512,6 @@ def run():
             st.session_state.admin_selected_round_id = round_id
             switch_page("08_管理画面")    # 開発者向けツール
     st.markdown("---")
-    if st.button("このラウンドの計算詳細をテスト表示", help="現在のロジックでこのラウンドを再計算し、詳細を表示します"):
-        test_calculation_logic(round_id)
-
-def test_calculation_logic(round_id: int):
-    st.subheader("計算ロジックのテスト表示")
-    supabase = get_supabase_client()
-    
-    try:
-        scores = get_scores_with_fallback(round_id)
-        if not scores:
-            st.warning("スコアデータがありません。")
-            return
-    except Exception as e:
-        st.error("スコア取得エラー: {}".format(e))
-        return
-
-    round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
-    active_round = round_result.data[0] if round_result.data else {}
-    round_results = get_round_results(round_id)
-    handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
-    handicaps_data = handicaps_result.data if handicaps_result.data else []
-
-    player_data = initialize_player_data(scores, round_results)
-    player_ids = sorted(player_data.keys())
-    handicaps = {}
-    total_only_set = set()
-    
-    for h in handicaps_data:
-        handicaps[(h['player_1_id'], h['player_2_id'])] = h['player_1_to_2']
-        handicaps[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
-        if 'total_only' in h and h['total_only']:
-            total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
-
-    if handicaps_data:
-        updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
-    else:
-        updated_player_data = player_data
-
-    with st.expander("計算結果の詳細を表示"):
-        st.write("**再計算された各プレイヤーのスコアデータ:**")
-        for pid in player_ids:
-            data = updated_player_data[pid]
-            player_name = data["Player"]
-            st.write(f"- **{player_name}**")
-            st.write(f"  - Front Score: {data['Front Score']}")
-            st.write(f"  - Back Score:  {data['Back Score']}")
-            st.write(f"  - Extra Score: {data['Extra Score']}")
-            st.write(f"  - Front GP: {data['Front GP']} / Back GP: {data['Back GP']} / Extra GP: {data['Extra GP']} => **Game Pt: {data['Game Pt']}**")
-            st.write(f"  - Match Front: {data['Match Front']} / Match Back: {data['Match Back']} / Match Total: {data['Match Total']} / Match Extra: {data['Match Extra']} => **Match Pt: {data['Match Pt']}**")
-            st.write(f"  - Putt Front: {data['Putt Front']} / Putt Back: {data['Putt Back']} / Putt Extra: {data['Putt Extra']} => **Putt Pt: {data['Putt Pt']}**")
-            st.write(f"  - **Total Pt: {data['Total Pt']}**")
-            st.write("---")
-    st.success("再計算のテスト表示が完了しました。")
-
 
 if __name__ == "__main__":
     run()
