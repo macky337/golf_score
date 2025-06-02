@@ -2,6 +2,9 @@
 
 ## [2025-06-02]
 
+### 追加機能
+- add 6 files (2025-06-02 19:26)
+
 ### 更新
 - Fix Supabase order syntax error in backup functionality
 - Remove round deletion functionality from round setup page
