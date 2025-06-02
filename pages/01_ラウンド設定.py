@@ -3,7 +3,7 @@ import datetime
 from modules.db import supabase
 from streamlit_extras.switch_page_button import switch_page
 from modules.models import get_course_list, get_or_create_course, get_course_by_id, get_members_list
-from modules.rounds_manager import delete_round
+
 
 def create_score_records(supabase, round_id, member_ids):
     """選択されたメンバーのスコアレコードを作成"""
@@ -69,18 +69,7 @@ def run():
         if selected:
             round_id = int(selected.split('ID: ')[1].rstrip(')'))
             st.session_state.active_round_id = round_id
-            st.info(f"選択中のラウンドID: {round_id} の編集画面に切り替わりました。サイドバーや各スコア入力ページから編集を続けてください。")            # ▼▼▼ 未確定ラウンドの削除機能 ▼▼▼
-            if st.button("この未確定ラウンドを削除", key="delete_unfinalized_round"):
-                success, message = delete_round(round_id)
-                if success:
-                    st.success(message)
-                    import streamlit as _st
-                    if hasattr(_st, "rerun"):
-                        _st.rerun()
-                    else:
-                        _st.experimental_rerun()
-                else:
-                    st.error(message)
+            st.info(f"選択中のラウンドID: {round_id} の編集画面に切り替わりました。サイドバーや各スコア入力ページから編集を続けてください。")
             st.stop()
     
     col1, col2 = st.columns([0.8, 0.2])
@@ -275,40 +264,6 @@ def run():
 
             except Exception as e:
                 st.error(f"ラウンド設定の保存中にエラーが発生しました: {str(e)}")
-
-    # 削除対象のラウンド選択
-    st.write("### ラウンド削除")
-    rounds_list = supabase.table('rounds').select('round_id').order('round_id', desc=True).execute().data
-    round_ids = [r['round_id'] for r in rounds_list]
-    selected_round_id = st.selectbox(
-        "削除するラウンドIDを選択",
-        options=round_ids,
-        key="selected_round_id"
-    )
-
-    # --- スコア入力フォームのリセット機能 ---
-    if st.button("スコア入力をリセット"):
-        import streamlit as _st
-        if hasattr(_st, "rerun"):
-            _st.rerun()
-        else:
-            _st.experimental_rerun()
-
-    # 削除ボタンが押された場合
-    if st.button("選択したラウンドを削除", key="delete_round_btn"):
-        if selected_round_id:
-            success, message = delete_round(selected_round_id)
-            if success:
-                st.success(message)
-                import streamlit as _st
-                if hasattr(_st, "rerun"):
-                    _st.rerun()
-                else:
-                    _st.experimental_rerun()
-            else:
-                st.error(message)
-        else:
-            st.warning("削除するラウンドを選択してください")
 
 if __name__ == "__main__": 
     run()
