@@ -510,62 +510,10 @@ def run():
         st.markdown("---")
         if st.button("管理画面でスコアを修正する", use_container_width=True):
             st.session_state.admin_selected_round_id = round_id
-            switch_page("08_管理画面")
-
-    # 開発者向けツール
+            switch_page("08_管理画面")    # 開発者向けツール
     st.markdown("---")
-    if st.button("過去のラウンドデータを再計算して保存"):
-        recalculate_and_save_results()
-
     if st.button("このラウンドの計算詳細をテスト表示", help="現在のロジックでこのラウンドを再計算し、詳細を表示します"):
         test_calculation_logic(round_id)
-
-
-def recalculate_and_save_results():
-    supabase = get_supabase_client()
-    all_rounds_result = supabase.table('rounds').select('*').order('date_played', desc=True).execute()
-    all_rounds = all_rounds_result.data
-
-    if not all_rounds:
-        st.warning("ラウンドデータが見つかりません。")
-        return
-
-    for round_data in all_rounds:
-        round_id = round_data['round_id']
-        st.info(f"ラウンドID {round_id} の再計算を開始します...")
-        try:
-            scores = get_scores_with_fallback(round_id)
-            if not scores:
-                st.warning(f"ラウンドID {round_id} のスコアデータが見つかりません。")
-                continue
-            
-            round_results = get_round_results(round_id)
-            handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
-            handicaps_data = handicaps_result.data
-
-            player_data = initialize_player_data(scores, round_results)
-            player_ids = sorted(list(player_data.keys()))
-            handicaps = {}
-            total_only_set = set()
-            
-            if handicaps_data:
-                for h in handicaps_data:
-                    handicaps[(h['player_1_id'], h['player_2_id'])] = h['player_1_to_2']
-                    handicaps[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
-                    if 'total_only' in h and h['total_only']:
-                        total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
-
-                updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, round_data)
-            else:
-                updated_player_data = player_data
-                
-            if save_round_results(round_id, updated_player_data):
-                st.success(f"ラウンドID {round_id} の計算結果を保存しました。")
-            else:
-                st.error(f"ラウンドID {round_id} の計算結果の保存に失敗しました。")
-        except Exception as e:
-            st.error(f"ラウンドID {round_id} の再計算中にエラーが発生しました: {str(e)}")
-
 
 def test_calculation_logic(round_id: int):
     st.subheader("計算ロジックのテスト表示")
