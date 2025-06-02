@@ -8,6 +8,7 @@
 - add 6 files (2025-06-02 19:26)
 
 ### 更新
+- Fix Railway deployment issues: Fix main.py syntax errors, improve error handling, and update deployment configuration
 - update: update 215.py" (2025-06-02 20:17)
 - update: update 215.py" and 1 more changes (2025-06-02 20:14)
 - Fix Supabase order syntax error in backup functionality
