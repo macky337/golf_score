@@ -3,6 +3,7 @@
 ## [2025-06-02]
 
 ### 更新
+- Fix Supabase order syntax error in backup functionality
 - Remove round deletion functionality from round setup page
 
 ## [2025-06-01]
