@@ -722,7 +722,7 @@ def save_backup_to_supabase(backup_data):
     """バックアップデータをSupabaseに保存（最新5件まで）"""
     try:
         # 既存のバックアップを取得
-        existing_backups = supabase.table('backups').select('*').order('created_at.desc').execute()
+        existing_backups = supabase.table('backups').select('*').order('created_at', desc=True).execute()
         
         # 5件以上ある場合、古いものを削除
         if len(existing_backups.data) >= 5:
@@ -750,7 +750,7 @@ def save_backup_to_supabase(backup_data):
 
 def get_backups_from_supabase():
     """Supabaseからバックアップ一覧を取得"""
-    result = supabase.table('backups').select('*').order('created_at.desc').execute()
+    result = supabase.table('backups').select('*').order('created_at', desc=True).execute()
     return result.data
 
 def score_edit_tab():
@@ -954,11 +954,10 @@ def score_edit_tab():
             
             if success_count > 0:
                 st.success(f"{success_count}人のプレイヤーのスコアを更新しました。")
-                
-                # スコア更新後、ラウンド結果を再計算
+                  # スコア更新後、ラウンド結果を再計算
                 try:
                     # 最新のスコアデータを取得
-                    updated_scores = get_scores_with_fallback(round_id)
+                    updated_scores = supabase.table('score').select('*').eq('round_id', round_id).execute().data
                     
                     # ハンディキャップ情報を取得
                     handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()

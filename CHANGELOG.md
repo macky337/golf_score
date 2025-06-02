@@ -1,5 +1,10 @@
 # 変更履歴
 
+## [2025-06-02]
+
+### 更新
+- Remove round deletion functionality from round setup page
+
 ## [2025-06-01]
 
 ### 追加機能
