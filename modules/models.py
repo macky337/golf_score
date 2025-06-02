@@ -187,6 +187,19 @@ def delete_unused_courses():
     except Exception as e:
         return 0, f"未使用ゴルフ場削除エラー: {str(e)}"
 
+def get_members_list():
+    """メンバー一覧を取得する（ID昇順）"""
+    try:
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_ANON_KEY")
+        supabase = create_client(supabase_url, supabase_key)
+        
+        response = supabase.table('member').select('*').order('member_id').execute()
+        return response.data
+    except Exception as e:
+        print(f"メンバー一覧取得エラー: {str(e)}")
+        return []
+
 # 例: 新規ラウンド登録時（デバッグ用のサンプルコード）
 if __name__ == "__main__":
     import datetime
