@@ -187,6 +187,50 @@ def delete_unused_courses():
     except Exception as e:
         return 0, f"未使用ゴルフ場削除エラー: {str(e)}"
 
+def update_rounds_course_references():
+    """既存のラウンドデータのコース参照を更新する（マイグレーション用）"""
+    try:
+        # course_idがNULLのラウンドを取得
+        rounds_result = supabase.table('rounds').select('*').is_('course_id', None).execute()
+        rounds_to_update = rounds_result.data
+        
+        if not rounds_to_update:
+            print("更新対象のラウンドはありません")
+            return 0
+        
+        updated_count = 0
+        
+        for round_data in rounds_to_update:
+            round_id = round_data['round_id']
+            course_name = round_data.get('course_name', '').strip()
+            
+            if not course_name:
+                print(f"ラウンドID {round_id}: コース名が空です")
+                continue
+            
+            # コースを取得または作成
+            course = get_or_create_course(course_name)
+            if course:
+                try:
+                    # ラウンドのcourse_idを更新
+                    supabase.table('rounds').update({
+                        'course_id': course['id']
+                    }).eq('round_id', round_id).execute()
+                    
+                    updated_count += 1
+                    print(f"ラウンドID {round_id}: コースID {course['id']} ({course_name}) を設定しました")
+                    
+                except Exception as e:
+                    print(f"ラウンドID {round_id} の更新に失敗: {str(e)}")
+            else:
+                print(f"ラウンドID {round_id}: コース '{course_name}' の取得/作成に失敗")
+        
+        return updated_count
+        
+    except Exception as e:
+        print(f"ラウンドコース参照更新エラー: {str(e)}")
+        return 0
+
 def get_members_list():
     """メンバー一覧を取得する（ID昇順）"""
     try:
