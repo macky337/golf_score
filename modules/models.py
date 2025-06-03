@@ -129,7 +129,7 @@ def get_or_create_course(course_name):
 def is_course_in_use(course_id):
     """コースがラウンドで使用されているか確認する"""
     try:
-        result = supabase.table('rounds').select('count').eq('course_id', course_id).execute()
+        result = supabase.table('rounds').select('round_id').eq('course_id', course_id).execute()
         return len(result.data) > 0
     except Exception as e:
         print(f"コース使用確認エラー: {str(e)}")

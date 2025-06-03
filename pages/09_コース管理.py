@@ -60,8 +60,7 @@ def run():
             st.success("✅ 未使用のゴルフ場はありません")
         
         st.write("---")
-        
-        # 削除対象のコース選択用のセレクトボックス
+          # 削除対象のコース選択用のセレクトボックス
         st.write("#### 個別コース削除")
         delete_course_id = st.selectbox(
             "削除するコースを選択",
@@ -74,6 +73,28 @@ def run():
             # コースが使用中か確認
             if is_course_in_use(course_id):
                 st.warning(f"「{course_name}」はラウンドデータで使用されているため削除できません")
+                
+                # 詳細情報の表示
+                try:
+                    rounds_result = supabase.table('rounds').select('round_id, date_played').eq('course_id', course_id).execute()
+                    if rounds_result.data:
+                        st.info(f"📊 使用中のラウンド数: {len(rounds_result.data)} 件")
+                        
+                        with st.expander("📋 使用中のラウンド詳細"):
+                            for round_data in rounds_result.data:
+                                st.write(f"- ラウンドID: {round_data.get('round_id')}, 日付: {round_data.get('date_played')}")
+                        
+                        # 解決策の提示
+                        st.write("**解決方法:**")
+                        st.write("1. 管理画面のスコア修正タブで関連ラウンドを削除")
+                        st.write("2. または、詳細調査ページで強制削除を実行")
+                        
+                        # 詳細調査ページへのリンク
+                        if st.button("🔍 詳細調査ページで確認", help="Course ID 7の削除問題を詳しく調査"):
+                            switch_page("Course7削除調査")
+                            
+                except Exception as e:
+                    st.error(f"ラウンド使用状況の確認でエラー: {e}")
             else:
                 # 削除確認
                 if st.button(f"「{course_name}」を削除", type="primary", help="このコースを削除します"):

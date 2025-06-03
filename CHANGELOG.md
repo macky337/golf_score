@@ -3,6 +3,7 @@
 ## [2025-06-03]
 
 ### 追加機能
+- add check_score_table_schema.py and 1 more changes (2025-06-03 21:16)
 - add 7 files and 1 more changes (2025-06-03 20:55)
 - add 3 files and 1 more changes (2025-06-03 19:56)
 
