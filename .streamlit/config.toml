@@ -1,16 +1,21 @@
-[browser]
-gatherUsageStats = false
-
-[theme]
-
 [server]
-# 以下の設定を確認し、正しくページが非表示になるか確認する
-enableStaticServing = true
-baseUrlPath = ""
 headless = true
 enableCORS = false
 enableXsrfProtection = false
+maxUploadSize = 50
+maxMessageSize = 50
+
+[browser]
+gatherUsageStats = false
+serverAddress = "0.0.0.0"
+
+[theme]
+primaryColor = "#1f77b4"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f0f2f6"
+textColor = "#262730"
 
 [global]
 developmentMode = false
+dataFrameSerialization = "legacy"
 

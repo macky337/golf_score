@@ -3,6 +3,7 @@
 ## [2025-06-03]
 
 ### 更新
+- update: update models.py (2025-06-03 05:59)
 - update: update models.py and 1 more changes (2025-06-03 05:51)
 
 ## [2025-06-02]

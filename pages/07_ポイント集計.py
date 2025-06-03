@@ -9,6 +9,14 @@ from streamlit_extras.switch_page_button import switch_page
 import plotly.express as px
 import plotly.graph_objects as go
 
+# ページ設定
+st.set_page_config(
+    page_title="ポイント集計 - Golf Score App",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
 def run():
     col1, col2 = st.columns([0.8, 0.2])
     with col1:

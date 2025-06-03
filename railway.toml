@@ -1,0 +1,13 @@
+# Railway.toml - Railway deployment configuration
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+
+[environments.production.variables]
+STREAMLIT_SERVER_HEADLESS = "true"
+STREAMLIT_SERVER_ENABLE_CORS = "false"
+STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION = "false"
