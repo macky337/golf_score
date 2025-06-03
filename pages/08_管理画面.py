@@ -2,9 +2,8 @@ import streamlit as st
 import pandas as pd
 import sys
 import os
-
-# モジュールのインポートパスを追加
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 from modules.db import supabase
 import datetime

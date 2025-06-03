@@ -49,6 +49,59 @@ def run():
             # ラウンドの詳細を表示
             for round_data in rounds_result.data:
                 st.write(f"- ラウンドID: {round_data.get('round_id')}, 日付: {round_data.get('date_played')}, コース名: {round_data.get('course_name')}")
+            
+            # 🚨 強制削除セクション
+            st.subheader("🚨 強制削除オプション")
+            st.error("⚠️ 警告: この操作はすべての関連データを削除します")
+            
+            with st.expander("⚠️ 強制削除の実行"):
+                st.write("**削除される項目:**")
+                st.write(f"- {len(rounds_result.data)} 件のラウンドデータ")
+                st.write("- 関連するスコアデータ")
+                st.write(f"- コース「{course_name}」")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    confirm_deletion = st.checkbox("削除を実行することを確認しました", key="confirm_force_delete_1")
+                with col2:
+                    force_delete_key = st.text_input("確認キー（「DELETE」と入力）", key="delete_confirmation_key")
+                
+                if confirm_deletion and force_delete_key == "DELETE":
+                    if st.button("🚨 強制削除を実行", type="primary", key="execute_force_delete_1", help="すべての関連データとコースを削除"):
+                        with st.spinner("削除中..."):
+                            try:
+                                # 削除処理を実行
+                                deleted_scores = 0
+                                # スコア記録の削除
+                                for round_data in rounds_result.data:
+                                    round_id = round_data.get('round_id')
+                                    score_result = supabase.table('score').delete().eq('round_id', round_id).execute()
+                                    deleted_scores += len(score_result.data) if score_result.data else 0
+                                
+                                # まず round_results を削除
+                                for round_data in rounds_result.data:
+                                    round_id = round_data.get('round_id')
+                                    supabase.table('round_results').delete().eq('round_id', round_id).execute()
+                                # その後 rounds を削除
+                                round_result = supabase.table('rounds').delete().eq('course_id', course_id).execute()
+                                deleted_rounds = len(round_result.data) if round_result.data else 0
+                                
+                                # コース記録の削除
+                                course_result = supabase.table('courses').delete().eq('id', course_id).execute()
+                                deleted_courses = len(course_result.data) if course_result.data else 0
+                                
+                                st.success(f"✅ 削除完了:")
+                                st.write(f"- スコア記録: {deleted_scores} 件")
+                                st.write(f"- ラウンド記録: {deleted_rounds} 件") 
+                                st.write(f"- コース記録: {deleted_courses} 件")
+                                
+                                if st.button("コース管理画面へ", key="goto_course_mgmt_1"):
+                                    switch_page("コース管理")
+                                    
+                            except Exception as e:
+                                st.error(f"❌ 削除中にエラー: {e}")
+                else:
+                    st.button("🚨 強制削除を実行", disabled=True, key="execute_force_delete_1_disabled", help="上記の確認を完了してください")
         else:
             st.success("✅ roundsテーブルでは使用されていません")
             
@@ -108,9 +161,9 @@ def run():
             st.write("- 関連するすべてのスコア記録")
             st.write(f"- コース記録: {course_name}")
             
-            confirm = st.checkbox("削除を実行することを確認しました", key="confirm_force_delete")
+            confirm = st.checkbox("削除を実行することを確認しました", key="confirm_force_delete_2")
             
-            if confirm and st.button("🗑️ 強制削除を実行", type="primary", key="execute_delete"):
+            if confirm and st.button("🗑️ 強制削除を実行", type="primary", key="execute_force_delete_2"):
                 with st.spinner("削除中..."):
                     try:
                         deleted_scores = 0
@@ -118,22 +171,26 @@ def run():
                         for round_data in rounds_result.data:
                             round_id = round_data.get('round_id')
                             score_result = supabase.table('score').delete().eq('round_id', round_id).execute()
-                            deleted_scores += len(score_result.data)
+                            deleted_scores += len(score_result.data) if score_result.data else 0
                         
-                        # ラウンド記録の削除
+                        # まず round_results を削除
+                        for round_data in rounds_result.data:
+                            round_id = round_data.get('round_id')
+                            supabase.table('round_results').delete().eq('round_id', round_id).execute()
+                        # その後 rounds を削除
                         round_result = supabase.table('rounds').delete().eq('course_id', course_id).execute()
-                        deleted_rounds = len(round_result.data)
+                        deleted_rounds = len(round_result.data) if round_result.data else 0
                         
                         # コース記録の削除
                         course_result = supabase.table('courses').delete().eq('id', course_id).execute()
-                        deleted_courses = len(course_result.data)
+                        deleted_courses = len(course_result.data) if course_result.data else 0
                         
                         st.success(f"✅ 削除完了:")
                         st.write(f"- スコア記録: {deleted_scores} 件")
                         st.write(f"- ラウンド記録: {deleted_rounds} 件")
                         st.write(f"- コース記録: {deleted_courses} 件")
                         
-                        if st.button("コース管理画面へ"):
+                        if st.button("コース管理画面へ", key="goto_course_mgmt_2"):
                             switch_page("コース管理")
                             
                     except Exception as e:
@@ -141,12 +198,12 @@ def run():
     else:
         st.success("✅ このコースは削除可能です")
         
-        if st.button("🗑️ コースを削除", type="primary"):
+        if st.button("🗑️ コースを削除", type="primary", key="delete_course_simple"):
             try:
                 course_result = supabase.table('courses').delete().eq('id', course_id).execute()
                 if course_result.data:
                     st.success(f"✅ {course_name} (ID: {course_id}) を削除しました")
-                    if st.button("コース管理画面へ"):
+                    if st.button("コース管理画面へ", key="goto_course_mgmt_3"):
                         switch_page("コース管理")
                 else:
                     st.error("削除に失敗しました")
