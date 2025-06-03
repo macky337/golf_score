@@ -872,14 +872,13 @@ def score_edit_tab():
                     edited_scores[member_id]["front_putt"] = st.number_input(
                         "フロントパット", 
                         min_value=0, 
-                        max_value=50, 
-                        value=score.get('front_putt', 0) or 0,
+                        max_value=50,                        value=score.get('front_putt', 0) or 0,
                         key=f"front_putt_{member_id}"
                     )
                     edited_scores[member_id]["front_game_pt"] = st.number_input(
                         "フロントゲームポイント", 
-                        min_value=-50, 
-                        max_value=50, 
+                        min_value=-100, 
+                        max_value=100, 
                         value=score.get('front_game_pt', 0) or 0,
                         key=f"front_game_pt_{member_id}"
                     )
@@ -893,8 +892,7 @@ def score_edit_tab():
                         value=score.get('back_score', 0) or 0,
                         key=f"back_score_{member_id}"
                     )
-                    edited_scores[member_id]["back_putt"] = st.number_input(
-                        "バックパット", 
+                    edited_scores[member_id]["back_putt"] = st.number_input(                        "バックパット", 
                         min_value=0, 
                         max_value=50, 
                         value=score.get('back_putt', 0) or 0,
@@ -902,8 +900,8 @@ def score_edit_tab():
                     )
                     edited_scores[member_id]["back_game_pt"] = st.number_input(
                         "バックゲームポイント", 
-                        min_value=-50, 
-                        max_value=50, 
+                        min_value=-100, 
+                        max_value=100, 
                         value=score.get('back_game_pt', 0) or 0,
                         key=f"back_game_pt_{member_id}"
                     )
@@ -919,16 +917,15 @@ def score_edit_tab():
                             key=f"extra_score_{member_id}"
                         )
                         edited_scores[member_id]["extra_putt"] = st.number_input(
-                            "エキストラパット", 
-                            min_value=0, 
+                            "エキストラパット",                            min_value=0, 
                             max_value=50, 
                             value=score.get('extra_putt', 0) or 0,
                             key=f"extra_putt_{member_id}"
                         )
                         edited_scores[member_id]["extra_game_pt"] = st.number_input(
                             "エキストラゲームポイント", 
-                            min_value=-50, 
-                            max_value=50, 
+                            min_value=-100, 
+                            max_value=100, 
                             value=score.get('extra_game_pt', 0) or 0,
                             key=f"extra_game_pt_{member_id}"
                         )
@@ -937,13 +934,27 @@ def score_edit_tab():
         
         if submit:
             success_count = 0
-            failure_count = 0
-            
-            # 各プレイヤーのスコアを更新
+            failure_count = 0            # 各プレイヤーのスコアを更新
             for member_id, data in edited_scores.items():
                 try:
-                    # total_score を計算して追加
-                    data["total_score"] = data.get("front_score", 0) + data.get("back_score", 0)
+                    # 明示的に更新するフィールドのみを指定
+                    update_data = {
+                        'front_score': data.get("front_score", 0),
+                        'front_putt': data.get("front_putt", 0),
+                        'front_game_pt': data.get("front_game_pt", 0),
+                        'back_score': data.get("back_score", 0),
+                        'back_putt': data.get("back_putt", 0),
+                        'back_game_pt': data.get("back_game_pt", 0),
+                        'total_score': data.get("front_score", 0) + data.get("back_score", 0)
+                    }
+                    
+                    # エキストラデータがある場合のみ追加
+                    if has_extra:
+                        update_data.update({
+                            'extra_score': data.get("extra_score", 0),
+                            'extra_putt': data.get("extra_putt", 0),
+                            'extra_game_pt': data.get("extra_game_pt", 0)
+                        })
                     
                     # score_id を取得するためのクエリ
                     score_id_result = supabase.table('score').select('score_id').eq('round_id', round_id).eq('member_id', member_id).execute()
@@ -951,7 +962,7 @@ def score_edit_tab():
                         score_id = score_id_result.data[0]['score_id']
                         
                         # スコアを更新
-                        supabase.table('score').update(data).eq('score_id', score_id).execute()
+                        supabase.table('score').update(update_data).eq('score_id', score_id).execute()
                         success_count += 1
                     else:
                         st.error(f"プレイヤーID {member_id} のスコアIDが見つかりません。")
@@ -1011,8 +1022,7 @@ def score_edit_tab():
                                 'back_game_pt': data.get('Back GP', 0),
                                 'extra_game_pt': data.get('Extra GP', 0) if has_extra else 0,
                                 'total_pt': data.get('Total Pt', 0)
-                            }
-                            # score_id を取得して更新
+                            }                            # score_id を取得して更新
                             score_id_result = supabase.table('score').select('score_id').eq('round_id', round_id).eq('member_id', mid).execute()
                             if score_id_result.data:
                                 score_id = score_id_result.data[0]['score_id']
@@ -1026,11 +1036,12 @@ def score_edit_tab():
             
             if failure_count > 0:
                 st.warning(f"{failure_count}人のプレイヤーのスコア更新に失敗しました。")
-                
-            # 結果確認画面への遷移ボタン
-            if st.button("結果確認画面へ移動", use_container_width=True):
-                st.session_state.active_round_id = round_id
-                switch_page("結果確認")
+    
+    # フォーム外に配置する結果確認画面への遷移ボタン
+    st.markdown("---")
+    if st.button("結果確認画面へ移動", use_container_width=True):
+        st.session_state.active_round_id = round_id
+        switch_page("結果確認")
 
 def show_balance_diagnostics():
     """ポイントバランス診断と修復機能"""
