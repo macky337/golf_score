@@ -1,3 +1,8 @@
+import sys
+import os
+# モジュールのインポートパスを追加
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import streamlit as st
 import pandas as pd
 import datetime
@@ -76,10 +81,12 @@ def get_all_scores():
             round_id = score.get('round_id')
             member_id = score.get('member_id')
             result_key = f"{round_id}_{member_id}"
-            
-            # round_resultsからtotal_ptを直接取得
+              # round_resultsからポイント成分を取得してtotal_ptを計算
             round_result = round_results_data.get(result_key, {})
-            score['total_pt'] = round_result.get('total_pt', 0) or 0
+            match_pt = round_result.get('match_pt', 0) or 0
+            putt_pt = round_result.get('putt_pt', 0) or 0
+            total_game_pt = round_result.get('total_game_pt', 0) or 0
+            score['total_pt'] = match_pt + putt_pt + total_game_pt
             
             filtered_scores.append(score)
         

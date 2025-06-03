@@ -51,9 +51,13 @@ def save_round_results(round_id, player_data):
         
         # プレイヤーごとにデータを保存
         for player_id, data in player_data.items():
-            try:
-                # round_resultsテーブルに保存するデータ
+            try:                # round_resultsテーブルに保存するデータ
                 # スキーマに合わせて正しいカラム名のみ使用
+                match_pt = data.get('Match Pt', 0)
+                putt_pt = data.get('Putt Pt', 0)
+                game_pt = data.get('total_game_pt', data.get('Game Pt', 0))
+                # total_ptは成分の合計として計算（データベーススキーマに依存しない）
+                
                 result_data = {
                     'round_id': round_id,
                     'member_id': player_id,  # メンバーIDを使用
@@ -61,12 +65,15 @@ def save_round_results(round_id, player_data):
                     'match_back': data.get('Match Back', 0),
                     'match_total': data.get('Match Total', 0),
                     'match_extra': data.get('Match Extra', 0),
-                    'match_pt': data.get('Match Pt', 0),
-                    'putt_pt': data.get('Putt Pt', 0),
+                    'match_pt': match_pt,
+                    'putt_pt': putt_pt,
                     'temp_game_pt': data.get('temp_game_pt', 0),
-                    'total_game_pt': data.get('total_game_pt', data.get('Game Pt', 0)),
-                    'total_pt': data.get('Total Pt', 0)
+                    'total_game_pt': game_pt
+                    # total_ptはround_resultsテーブルのスキーマに依存するため、存在する場合のみ追加
                 }
+                
+                # total_ptカラムが存在するかは実際のスキーマ次第なので、
+                # エラーが発生しないよう条件的に追加することも検討可能
                 
                 # データ挿入を試みる
                 response = client.table('round_results').insert(result_data).execute()
@@ -153,17 +160,21 @@ def get_round_results(round_id: int) -> dict:
                 if member_id is None:
                     print(f"Warning: Could not find member_id in record: {record}")
                     continue
+                  # Game Ptにはtotal_game_ptを使用（game_ptは存在しない）
+                match_pt = record.get('match_pt', 0)
+                putt_pt = record.get('putt_pt', 0)
+                game_pt = record.get('total_game_pt', 0)
+                total_pt = match_pt + putt_pt + game_pt  # total_ptを計算で算出
                 
-                # Game Ptにはtotal_game_ptを使用（game_ptは存在しない）
                 results[member_id] = {
                     'Match Front': record.get('match_front', 0),
                     'Match Back': record.get('match_back', 0),
                     'Match Total': record.get('match_total', 0),
                     'Match Extra': record.get('match_extra', 0),
-                    'Match Pt': record.get('match_pt', 0),
-                    'Putt Pt': record.get('putt_pt', 0),
-                    'Game Pt': record.get('total_game_pt', 0),  # game_ptはなくtotal_game_ptを使用
-                    'Total Pt': record.get('total_pt', 0)       
+                    'Match Pt': match_pt,
+                    'Putt Pt': putt_pt,
+                    'Game Pt': game_pt,
+                    'Total Pt': total_pt       
                 }
         return results
     except Exception as e:

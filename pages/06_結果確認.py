@@ -1,3 +1,8 @@
+import sys
+import os
+# モジュールのインポートパスを追加
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -489,8 +494,8 @@ def run():
                             update_data[mid] = {
                                 'front_game_pt': data.get('Front GP', 0),
                                 'back_game_pt':  data.get('Back GP', 0),
-                                'extra_game_pt': data.get('Extra GP', 0),
-                                'total_pt':      data.get('Total Pt', 0)
+                                'extra_game_pt': data.get('Extra GP', 0)
+                                # total_ptはround_resultsテーブルで管理するため、scoreテーブルの更新からは除外
                             }
                         
                         success, updates, failures = update_scores_batch(round_id, update_data)

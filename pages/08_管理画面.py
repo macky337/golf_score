@@ -1,10 +1,15 @@
 import streamlit as st
 import pandas as pd
+import sys
+import os
+
+# モジュールのインポートパスを追加
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from modules.db import supabase
 import datetime
 from streamlit_extras.switch_page_button import switch_page
 import json
-import os
 import pytz
 import time
 from dotenv import load_dotenv
@@ -1032,17 +1037,25 @@ def show_balance_diagnostics():
     st.header("ポイントバランス診断")
     
     # 現在のポイントバランスを確認
-    try:
-        # 全ラウンドの合計ポイントを計算
+    try:        # 全ラウンドの合計ポイントを計算
         all_rounds = supabase.table('rounds').select('*').execute().data
         total_balance = 0
         round_details = []
         
         for round_data in all_rounds:
             round_id = round_data['round_id']
-            # このラウンドの全プレイヤーのTotal Ptを合計
-            scores = supabase.table('score').select('total_pt, member_id').eq('round_id', round_id).execute().data
-            round_total = sum(score.get('total_pt', 0) for score in scores)
+            # このラウンドの全プレイヤーのTotal Ptを合計（round_resultsテーブルから計算）
+            round_results = supabase.table('round_results').select('match_pt, putt_pt, total_game_pt, member_id').eq('round_id', round_id).execute().data
+            
+            # total_ptカラムが存在しないため、計算で算出
+            round_total = 0
+            for result in round_results:
+                match_pt = result.get('match_pt', 0) or 0
+                putt_pt = result.get('putt_pt', 0) or 0
+                total_game_pt = result.get('total_game_pt', 0) or 0
+                total_pt = match_pt + putt_pt + total_game_pt
+                round_total += total_pt
+            
             total_balance += round_total
             
             round_details.append({
@@ -1050,7 +1063,7 @@ def show_balance_diagnostics():
                 'date': round_data.get('round_date', '不明'),
                 'course': round_data.get('course_name', '不明'),
                 'round_total': round_total,
-                'player_count': len(scores)
+                'player_count': len(round_results)
             })
         
         # 診断結果を表示
