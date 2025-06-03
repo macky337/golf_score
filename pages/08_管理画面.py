@@ -2,24 +2,42 @@ import streamlit as st
 import pandas as pd
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-
-from modules.db import supabase
 import datetime
-from streamlit_extras.switch_page_button import switch_page
 import json
 import pytz
 import time
 from dotenv import load_dotenv
-from modules.game_points import calculate_game_pt  # 必要な関数のみをインポート
-from modules.calculation_logic import calculate_player_points
-from modules.round_results import save_round_results, get_round_results
-# 追加: 必要なクライアント関数をインポート
-from modules.supabase_client import get_supabase_client
 
-# config からの直接インポートを削除
-# from config import get_admin_password
+# モジュールのインポートパスを追加（確実な方法）
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+
+# パスが存在することを確認
+if os.path.exists(parent_dir) and parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+# モジュールディレクトリも直接追加
+modules_path = os.path.join(parent_dir, 'modules')
+if os.path.exists(modules_path) and modules_path not in sys.path:
+    sys.path.insert(0, modules_path)
+
+try:
+    from modules.db import supabase
+    from modules.score_calculation import calculate_player_ranking
+    from modules.data_formatter import format_display_data
+    from modules.models import *
+    from modules.game_points import calculate_game_pt
+    from modules.calculation_logic import calculate_player_points
+    from modules.round_results import save_round_results, get_round_results
+    from modules.supabase_client import get_supabase_client
+    import_success = True
+except ImportError as e:
+    st.error(f"モジュールのインポートエラー: {e}")
+    import_success = False
+    # エラー時の代替処理用
+    supabase = None
+
+from streamlit_extras.switch_page_button import switch_page
 
 # パスワード取得関数を完全にインライン化
 def get_admin_password():
@@ -69,7 +87,8 @@ def check_password():
         return False
     return True
 
-def run():    # タイトルとホームボタンを横に配置
+def run():
+    # タイトルとホームボタンを横に配置
     col1, col2 = st.columns([0.8, 0.2])
     with col1:
         st.title("管理画面")
@@ -80,12 +99,13 @@ def run():    # タイトルとホームボタンを横に配置
     if not check_password():
         return
     
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "スコア修正", 
         "ハンディキャップ修正", 
         "メンバー管理",
         "バックアップ・リストア",
-        "ポイントバランス診断"
+        "ポイントバランス診断",
+        "エキストラスコア診断"
     ])
 
     with tab1:
@@ -102,6 +122,211 @@ def run():    # タイトルとホームボタンを横に配置
     
     with tab5:
         show_balance_diagnostics()
+    
+    with tab6:
+        show_extra_score_diagnostics()
+
+def show_extra_score_diagnostics():
+    """エキストラスコア診断と修復機能"""
+    st.header("エキストラスコア診断")
+    
+    try:
+        # エキストラホールを持つラウンドを取得
+        rounds_with_extra = supabase.table('rounds').select('*').eq('has_extra', True).order('date_played', desc=True).execute().data
+        
+        if not rounds_with_extra:
+            st.info("エキストラホールを持つラウンドが見つかりません。")
+            return
+        
+        # ラウンド選択
+        round_options = []
+        for r in rounds_with_extra:
+            round_options.append((r['round_id'], f"{r['date_played']} - {r['course_name']} (ID: {r['round_id']})"))
+        
+        selected_round = st.selectbox(
+            "診断するラウンドを選択",
+            options=round_options,
+            format_func=lambda x: x[1]
+        )
+        
+        if selected_round:
+            round_id, round_name = selected_round
+            
+            # ラウンド情報を取得
+            round_info = supabase.table('rounds').select('*').eq('round_id', round_id).execute().data[0]
+            
+            # スコアデータを取得
+            scores = supabase.table('score').select('*, member(name)').eq('round_id', round_id).execute().data
+            
+            # ラウンド詳細情報を表示
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("ラウンドID", round_id)
+            with col2:
+                st.metric("プレイヤー数", len(scores))
+            with col3:
+                st.metric("エキストラフラグ", "✅" if round_info.get('has_extra') else "❌")
+            with col4:
+                st.metric("確定状態", "✅" if round_info.get('finalized') else "❌")
+            
+            # エキストラスコア状況を分析
+            st.subheader("エキストラスコア状況")
+            
+            problems = []
+            for score in scores:
+                player_name = score.get('member', {}).get('name', f"Player {score['member_id']}")
+                extra_score = score.get('extra_score')
+                extra_putt = score.get('extra_putt')
+                extra_game_pt = score.get('extra_game_pt')
+                
+                # 問題の検出
+                if extra_score is None:
+                    problems.append(f"{player_name}: エキストラスコアが未入力")
+                elif extra_score == 0:
+                    problems.append(f"{player_name}: エキストラスコアが0（要確認）")
+                
+                if extra_putt is None:
+                    problems.append(f"{player_name}: エキストラパットが未入力")
+                
+                if extra_game_pt is None:
+                    problems.append(f"{player_name}: エキストラゲームポイントが未計算")
+            
+            # 問題の表示
+            if problems:
+                st.error(f"{len(problems)}個の問題が検出されました:")
+                for problem in problems:
+                    st.write(f"- {problem}")
+            else:
+                st.success("エキストラスコアデータに問題はありません。")
+            
+            # 詳細データテーブル
+            st.subheader("詳細データ")
+            extra_data = []
+            for score in scores:
+                player_name = score.get('member', {}).get('name', f"Player {score['member_id']}")
+                extra_data.append({
+                    'プレイヤー': player_name,
+                    'エキストラスコア': score.get('extra_score', 'NULL'),
+                    'エキストラパット': score.get('extra_putt', 'NULL'),
+                    'エキストラGP': score.get('extra_game_pt', 'NULL'),
+                    'フロントスコア': score.get('front_score', 'NULL'),
+                    'バックスコア': score.get('back_score', 'NULL')
+                })
+            
+            df = pd.DataFrame(extra_data)
+            st.dataframe(df, use_container_width=True)
+            
+            # 修復オプション
+            st.subheader("🔧 修復オプション")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("🔄 エキストラスコア再計算", help="このラウンドのエキストラスコアを再計算します"):
+                    with st.spinner("再計算中..."):
+                        try:
+                            recalculate_single_round(round_id)
+                            st.success("エキストラスコアの再計算が完了しました。")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"再計算に失敗: {str(e)}")
+            
+            with col2:
+                if st.button("📝 エキストラスコア入力画面へ", help="エキストラスコア入力画面で手動修正"):
+                    st.session_state.active_round_id = round_id
+                    switch_page("05_エキストラスコア入力")
+            
+            # デバッグスクリプト実行
+            st.subheader("🔍 高度な診断")
+            
+            if st.button("詳細デバッグ実行", help="このラウンドの詳細な診断を実行します"):
+                with st.spinner("診断中..."):
+                    try:
+                        # デバッグスクリプトの内容をインライン実行
+                        debug_output = run_round_debug(round_id)
+                        
+                        st.subheader("診断結果")
+                        st.code(debug_output, language="text")
+                        
+                    except Exception as e:
+                        st.error(f"診断中にエラーが発生しました: {str(e)}")
+                        import traceback
+                        st.error(traceback.format_exc())
+        
+    except Exception as e:
+        st.error(f"エキストラスコア診断中にエラーが発生しました: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
+
+def run_round_debug(round_id):
+    """ラウンドのデバッグ情報を取得"""
+    output = []
+    
+    try:
+        # ラウンド情報
+        round_info = supabase.table('rounds').select('*').eq('round_id', round_id).execute().data
+        if round_info:
+            r = round_info[0]
+            output.append(f"=== ラウンド情報 (ID: {round_id}) ===")
+            output.append(f"日付: {r.get('date_played', 'N/A')}")
+            output.append(f"コース: {r.get('course_name', 'N/A')}")
+            output.append(f"プレイヤー数: {r.get('num_players', 'N/A')}")
+            output.append(f"エキストラフラグ: {r.get('has_extra', False)}")
+            output.append(f"確定状態: {r.get('finalized', False)}")
+            output.append("")
+        
+        # スコア情報
+        scores = supabase.table('score').select('*, member(name)').eq('round_id', round_id).execute().data
+        output.append(f"=== スコア情報 ({len(scores)}名) ===")
+        
+        for score in scores:
+            player_name = score.get('member', {}).get('name', f"Player {score['member_id']}")
+            output.append(f"プレイヤー: {player_name}")
+            output.append(f"  フロント: {score.get('front_score', 'NULL')} ({score.get('front_putt', 'NULL')}パット)")
+            output.append(f"  バック: {score.get('back_score', 'NULL')} ({score.get('back_putt', 'NULL')}パット)")
+            output.append(f"  エキストラ: {score.get('extra_score', 'NULL')} ({score.get('extra_putt', 'NULL')}パット)")
+            output.append(f"  ゲームポイント: F={score.get('front_game_pt', 'NULL')}, B={score.get('back_game_pt', 'NULL')}, E={score.get('extra_game_pt', 'NULL')}")
+            output.append(f"  合計ポイント: {score.get('total_pt', 'NULL')}")
+            output.append("")
+        
+        # ハンディキャップ情報
+        handicaps = supabase.table('handicap_match').select('*, player1:member!player_1_id(name), player2:member!player_2_id(name)').eq('round_id', round_id).execute().data
+        output.append(f"=== ハンディキャップ情報 ({len(handicaps)}組) ===")
+        
+        for h in handicaps:
+            p1_name = h.get('player1', {}).get('name', f"Player {h['player_1_id']}")
+            p2_name = h.get('player2', {}).get('name', f"Player {h['player_2_id']}")
+            output.append(f"{p1_name} vs {p2_name}")
+            output.append(f"  {p1_name} → {p2_name}: {h.get('player_1_to_2', 'NULL')}")
+            output.append(f"  {p2_name} → {p1_name}: {h.get('player_2_to_1', 'NULL')}")
+            output.append(f"  Total Only: {h.get('total_only', False)}")
+            output.append("")
+        
+        # ラウンド結果情報
+        round_results = supabase.table('round_results').select('*, member(name)').eq('round_id', round_id).execute().data
+        output.append(f"=== ラウンド結果 ({len(round_results)}名) ===")
+        
+        for result in round_results:
+            player_name = result.get('member', {}).get('name', f"Player {result['member_id']}")
+            output.append(f"プレイヤー: {player_name}")
+            output.append(f"  マッチポイント: {result.get('match_pt', 'NULL')}")
+            output.append(f"  パットポイント: {result.get('putt_pt', 'NULL')}")
+            output.append(f"  ゲームポイント合計: {result.get('total_game_pt', 'NULL')}")
+            output.append("")
+        
+    except Exception as e:
+        output.append(f"デバッグ情報取得中にエラー: {str(e)}")
+    
+    return "\n".join(output)
+
+def recalculate_single_round(round_id):
+    """単一ラウンドの再計算（エキストラスコア診断用）"""
+    try:
+        # 既存のrecalculate_scores関数を使用
+        recalculate_scores(round_id)
+        return True
+    except Exception as e:
+        raise Exception(f"ラウンド{round_id}の再計算に失敗: {str(e)}")
 
 def recalculate_scores(round_id):
     """ラウンドのスコアを再計算する"""
