@@ -1034,7 +1034,7 @@ def show_balance_diagnostics():
     # 現在のポイントバランスを確認
     try:
         # 全ラウンドの合計ポイントを計算
-        all_rounds = supabase.table('round').select('*').execute().data
+        all_rounds = supabase.table('rounds').select('*').execute().data
         total_balance = 0
         round_details = []
         
