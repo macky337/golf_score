@@ -9,7 +9,12 @@ import traceback
 st.set_page_config(
     page_title="Golf Score App", 
     page_icon="⛳",
-    layout="wide"
+    layout="wide",
+    menu_items={
+        'Get Help': 'https://github.com/your-repo',
+        'Report a bug': 'https://github.com/your-repo/issues',
+        'About': "Golf Score App - main"
+    }
 )
 
 def check_supabase_connection():
