@@ -1,0 +1,5 @@
+# Railway SQLAlchemy Fix - Clean config
+providers = ["python"]
+
+[phases.install]
+cmds = ["pip install --no-cache-dir -r requirements.txt"]
