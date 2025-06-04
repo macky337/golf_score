@@ -177,12 +177,27 @@ def main():
 def show_changelog():
     try:
         with st.expander("📋 更新履歴"):
-            with open("CHANGELOG.md", "r", encoding="utf-8") as f:
-                changelog = f.read()
-            st.markdown(changelog)
+            # スクリプトのディレクトリを基準にCHANGELOG.mdのパスを構築
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            changelog_path = os.path.join(script_dir, "CHANGELOG.md")
+            
+            if os.path.exists(changelog_path):
+                with open(changelog_path, "r", encoding="utf-8") as f:
+                    changelog = f.read()
+                st.markdown(changelog)
+            else:
+                st.warning(f"CHANGELOG.mdファイルが見つかりません: {changelog_path}")
     except Exception as e:
         with st.expander("📋 更新履歴"):
             st.error(f"更新履歴の読み込みに失敗しました: {str(e)}")
+            # デバッグ情報を追加
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            changelog_path = os.path.join(script_dir, "CHANGELOG.md")
+            st.code(f"探索パス: {changelog_path}")
+            st.code(f"ファイル存在確認: {os.path.exists(changelog_path)}")
+            if os.path.exists(script_dir):
+                files = os.listdir(script_dir)
+                st.code(f"ディレクトリ内容: {files}")
 
 if __name__ == "__main__":
     main()

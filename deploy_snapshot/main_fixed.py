@@ -172,12 +172,30 @@ def main():
 def show_changelog():
     try:
         with st.expander("📋 更新履歴"):
-            with open("CHANGELOG.md", "r", encoding="utf-8") as f:
-                changelog = f.read()
-            st.markdown(changelog)
+            # スクリプトのディレクトリを基準にCHANGELOG.mdのパスを構築
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            # deploy_snapshotフォルダ内なので、親ディレクトリを参照
+            parent_dir = os.path.dirname(script_dir)
+            changelog_path = os.path.join(parent_dir, "CHANGELOG.md")
+            
+            if os.path.exists(changelog_path):
+                with open(changelog_path, "r", encoding="utf-8") as f:
+                    changelog = f.read()
+                st.markdown(changelog)
+            else:
+                st.warning(f"CHANGELOG.mdファイルが見つかりません: {changelog_path}")
     except Exception as e:
         with st.expander("📋 更新履歴"):
             st.error(f"更新履歴の読み込みに失敗しました: {str(e)}")
+            # デバッグ情報を追加
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            parent_dir = os.path.dirname(script_dir)
+            changelog_path = os.path.join(parent_dir, "CHANGELOG.md")
+            st.code(f"探索パス: {changelog_path}")
+            st.code(f"ファイル存在確認: {os.path.exists(changelog_path)}")
+            if os.path.exists(parent_dir):
+                files = os.listdir(parent_dir)
+                st.code(f"親ディレクトリ内容: {files}")
 
 if __name__ == "__main__":
     main()
