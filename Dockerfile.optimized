@@ -18,6 +18,7 @@ COPY main_fixed.py .
 COPY pages/ pages/
 COPY modules/ modules/
 COPY .streamlit/ .streamlit/
+COPY ipaexg.ttf /app/ipaexg.ttf
 
 EXPOSE 8501
 CMD ["streamlit", "run", "main_fixed.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]
