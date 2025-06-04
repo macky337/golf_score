@@ -6,6 +6,7 @@
 - add 9 files and 1 more changes (2025-06-04 06:38)
 
 ### 更新
+- 📋 デプロイエラー解決レポート追加: .dockerignore修正の詳細記録
 - 🔧 重要修正: .dockerignoreからrequirements.txtを除外してRailwayデプロイエラーを解決
 - ✨ 2個のファイルを新規追加 (2025/06/04 21:34)
 - 🔧 Railway デプロイエラー修正: requirements.txt文字化け解決、ビルド設定最適化
