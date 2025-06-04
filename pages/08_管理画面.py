@@ -23,8 +23,7 @@ if os.path.exists(modules_path) and modules_path not in sys.path:
 
 try:
     from modules.db import supabase
-    from modules.score_calculation import calculate_player_ranking
-    from modules.data_formatter import format_display_data
+    
     from modules.models import *
     from modules.game_points import calculate_game_pt
     from modules.calculation_logic import calculate_player_points

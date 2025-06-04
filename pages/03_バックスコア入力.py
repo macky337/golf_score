@@ -208,24 +208,31 @@ def run():
                 'バックパット': saved_data['back_putt'],
                 'バックゲームポイント': saved_data['back_game_pt']
             })
-        
-        # DataFrameとして表示
+          # DataFrameとして表示
         scores_table = pd.DataFrame(scores_df)
         st.dataframe(scores_table, use_container_width=True)
         
         # フォーム送信状態をリセット (表示した後でリセット)
         st.session_state.back_form_submitted = False
-        # エキストラスコア入力またはハンディキャップ計算ページへのリンク
-        col1, col2 = st.columns([0.5, 0.5])
-        with col1:
-            if st.button("エキストラスコア入力"):
-                # エキストラスコア入力ページへ遷移
-                switch_page("03_エキストラスコア入力")
-        
-        with col2:
-            if st.button("ハンディキャップ計算"):
-                # ハンディキャップ計算ページへ遷移
-                switch_page("04_ハンディキャップ計算")    # ラウンド結果の表示
+
+    # --- active_roundの値を保存しておく ---
+    has_extra = active_round.get("has_extra") if active_round else False
+    
+    # エキストラスコア入力またはハンディキャップ計算ページへのリンク
+    st.write("### 次のステップ")
+    col1, col2 = st.columns([0.5, 0.5])
+    with col1:
+        if has_extra:
+            if st.button("エキストラスコア入力", use_container_width=True):
+                st.session_state.active_round_id = round_id  # 遷移前に明示的にセット
+                switch_page("05_エキストラスコア入力")
+    with col2:
+        if st.button("ハンディキャップ管理", use_container_width=True):
+            # ハンディキャップ計算ページは存在しないため、管理画面にリダイレクト
+            st.session_state.admin_tab = "ハンディキャップ修正"  # 管理画面の該当タブを設定
+            switch_page("08_管理画面")
+    
+    # ラウンド結果の表示
     st.write("### ラウンド結果")
     
     if round_id:

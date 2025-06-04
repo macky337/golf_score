@@ -45,17 +45,6 @@ def run():
     active_round = round_result.data[0]
     st.write(f"### {active_round['date_played']} - {active_round['course_name']}")
     
-    # デバッグ情報パネル（管理者用）
-    with st.expander("🔧 デバッグ情報", expanded=False):
-        st.write(f"**ラウンドID**: {round_id}")
-        st.write(f"**プレイヤー数**: {active_round.get('num_players', 'N/A')}")
-        st.write(f"**エキストラフラグ**: {active_round.get('has_extra', False)}")
-        st.write(f"**確定フラグ**: {active_round.get('finalized', False)}")
-        
-        if st.button("ラウンド情報を再読み込み"):
-            st.cache_data.clear()
-            st.rerun()
-    
     # has_extraフラグを更新
     if not active_round.get('has_extra'):
         supabase.table('rounds').update({'has_extra': True}).eq('round_id', round_id).execute()
@@ -142,7 +131,6 @@ def run():
                     "エキストラスコア", 
                     min_value=0, 
                     max_value=100,
-                    value=st.session_state.get(f"extra_score_{member_id}", 0),
                     key=f"extra_score_{member_id}",
                     help=f"現在: {current_extra_score}"
                 )
@@ -152,7 +140,6 @@ def run():
                     "エキストラパット",
                     min_value=0,
                     max_value=40,
-                    value=st.session_state.get(f"extra_putt_{member_id}", 0),
                     key=f"extra_putt_{member_id}",
                     help=f"現在: {current_extra_putt}"
                 )
@@ -162,7 +149,6 @@ def run():
                     "エキストラゲームポイント",
                     min_value=-300,
                     max_value=300,
-                    value=st.session_state.get(f"extra_game_pt_{member_id}", 0),
                     key=f"extra_game_pt_{member_id}",
                     help=f"現在: {current_extra_game_pt}"
                 )
@@ -186,24 +172,14 @@ def run():
                 member_id = score['member_id']
                 member_name = score['member']['name'] if score['member'] else f"Player {member_id}"
                 
-                # セッション状態から値を取得（デバッグ情報も表示）
+                # セッション状態から値を取得
                 extra_score_key = f"extra_score_{member_id}"
                 extra_putt_key = f"extra_putt_{member_id}" 
                 extra_game_pt_key = f"extra_game_pt_{member_id}"
                 
-                st.write(f"**{member_name} (ID: {member_id}) のデバッグ情報:**")
-                st.write(f"  - セッション状態キー存在確認:")
-                st.write(f"    * {extra_score_key}: {extra_score_key in st.session_state}")
-                st.write(f"    * {extra_putt_key}: {extra_putt_key in st.session_state}")
-                st.write(f"    * {extra_game_pt_key}: {extra_game_pt_key in st.session_state}")
-                
-                # セッション状態から値を取得
                 extra_score = st.session_state.get(extra_score_key, 0)
                 extra_putt = st.session_state.get(extra_putt_key, 0)
                 extra_game_pt = st.session_state.get(extra_game_pt_key, 0)
-                
-                st.write(f"  - セッション状態値: スコア={extra_score}, パット={extra_putt}, GP={extra_game_pt}")
-                st.write(f"  - データベース現在値: スコア={score.get('extra_score')}, パット={score.get('extra_putt')}, GP={score.get('extra_game_pt')}")
                 
                 # 入力値の検証
                 if extra_score < 0 or extra_score > 100:
@@ -220,8 +196,6 @@ def run():
                     'extra_game_pt': extra_game_pt
                 }
                 
-                st.write(f"  - 保存予定データ: {update_data}")
-                
                 # データベース更新
                 result = supabase.table('score').update(update_data).eq('round_id', round_id).eq('member_id', member_id).execute()
                 
@@ -229,8 +203,8 @@ def run():
                 if not result.data:
                     raise Exception(f"データベース更新に失敗しました（結果が空）")
                 
-                st.write(f"  - 保存結果: {result.data[0] if result.data else 'データなし'}")
-                st.write(f"✓ {member_name} のエキストラスコアを保存しました")
+                # 個別の成功メッセージは削除
+                # st.write(f"✓ {member_name} のエキストラスコアを保存しました")
                 
             except Exception as e:
                 save_success = False
@@ -248,37 +222,29 @@ def run():
             return  # エラーがある場合は計算処理をスキップ        
         # ▼▼▼ 追加: 計算結果をround_resultsに保存 ▼▼▼
         try:
-            st.write("### 計算処理を開始...")
-            
+            # --- 進捗コメント出力をすべて削除 ---
             # 現在のround_idのすべてのスコアを取得
             scores = get_scores_with_fallback(round_id)
             if not scores:
                 raise Exception("スコアデータの取得に失敗しました")
-                
-            st.write(f"✓ {len(scores)}件のスコアデータを取得しました")
             
             # ハンディキャップ情報を取得
             handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
             handicaps_data = handicaps_result.data
-            st.write(f"✓ {len(handicaps_data) if handicaps_data else 0}件のハンディキャップデータを取得しました")
             
             # ラウンド情報を取得
             round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
             active_round = round_result.data[0] if round_result.data else None
             if not active_round:
                 raise Exception("ラウンド情報の取得に失敗しました")
-                
-            st.write(f"✓ ラウンド情報を取得しました: {active_round['course_name']}")
             
             # round_resultsを取得（存在する場合）
             round_results = get_round_results(round_id)
-            st.write(f"✓ 既存のround_results: {len(round_results) if round_results else 0}件")
             
             # プレイヤーデータ初期化
             from modules.data_formatter import initialize_player_data
             player_data = initialize_player_data(scores, round_results)
             player_ids = sorted(list(player_data.keys()))
-            st.write(f"✓ プレイヤーデータを初期化しました: {len(player_ids)}人")
             
             # ハンディキャップ辞書作成
             handicaps = {}
@@ -289,16 +255,11 @@ def run():
                     handicaps[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
                     if 'total_only' in h and h['total_only']:
                         total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
-                        
-            st.write(f"✓ ハンディキャップ設定: {len(handicaps)}組")
             
             # ポイント計算と保存
-            st.write("ポイント計算を実行中...")
             updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
-            st.write("✓ ポイント計算が完了しました")
             
             # round_resultsに保存
-            st.write("round_resultsテーブルに保存中...")
             save_result = save_round_results(round_id, updated_player_data)
             
             if save_result:
@@ -348,7 +309,7 @@ def run():
     
     # 結果確認ページへのリンク
     if st.button("結果確認へ", use_container_width=True):
-        switch_page("結果確認")
+        switch_page("06_結果確認")
 
 if __name__ == "__main__":
     run()
