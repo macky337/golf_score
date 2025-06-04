@@ -59,7 +59,7 @@ setup.py
 alembic.ini
 
 # 依存関係
-requirements.txt
+# requirements.txt  # <- 本番デプロイで必要なので除外しない
 temp_requirements.txt
 
 # その他の開発ファイル
