@@ -1,7 +1,6 @@
 # 超高速デプロイ用Railway設定
 [build]
 builder = "NIXPACKS"
-buildCommand = "pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements-ultra-minimal.txt"
 
 [deploy]
 healthcheckPath = "/"

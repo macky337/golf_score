@@ -1,4 +1,4 @@
-# 超最小限依存関係 - 最高速デプロイ用
+# Ultra minimal dependencies for fastest deploy
 streamlit==1.45.1
 pandas==2.2.3
 supabase==2.15.1
