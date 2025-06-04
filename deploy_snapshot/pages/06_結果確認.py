@@ -32,7 +32,6 @@ from modules.supabase_client import (
 from modules.pdf_generator import generate_pdf, set_font, get_pdf_filename
 from modules.match_analyzer import create_match_matrix, create_detailed_match_results
 from modules.data_formatter import highlight_total_only, color_points, get_color_points_function, get_color_function_for_column, apply_ranking_colors_to_dataframe
-from modules.debug import handle_error
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
 
@@ -312,7 +311,8 @@ def run():
                 return
         except Exception as e:
             st.error(f"データ取得中にエラーが発生しました: {str(e)}")
-            handle_error(e)
+            import traceback
+            st.error(traceback.format_exc())
             return
 
         # round_results を取得（必ず実行）
