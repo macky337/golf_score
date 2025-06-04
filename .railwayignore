@@ -1,0 +1,10 @@
+# Railway ignore file - prevent problematic files
+nixpacks.toml
+*.toml.bak
+.vscode/
+.idea/
+*.log
+*.tmp
+test_*.py
+*_test.py
+debug_*.py
