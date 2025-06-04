@@ -19,13 +19,14 @@ def create_deployment_snapshot():
     
     # 必要最小限のファイルのみコピー
     essential_files = [
-        "main_fixed.py",
+        "main.py",
         "app.py",
         "config.py.example",
         "requirements-minimal.txt",
         "Procfile",
         "railway.toml",
-        ".dockerignore"
+        ".dockerignore",
+        "ipaexg.ttf"  # 日本語フォント
     ]
     
     essential_dirs = [
@@ -124,13 +125,14 @@ COPY --from=builder /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH
 
 # アプリケーションファイルのみコピー
-COPY main_fixed.py .
+COPY main.py .
+COPY ipaexg.ttf .
 COPY pages/ pages/
 COPY modules/ modules/
 COPY .streamlit/ .streamlit/
 
 EXPOSE 8501
-CMD ["streamlit", "run", "main_fixed.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]
+CMD ["streamlit", "run", "main.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]
 """
     
     with open("Dockerfile.optimized", "w", encoding="utf-8") as f:
@@ -151,7 +153,7 @@ buildCommand = "pip install --no-cache-dir --upgrade pip && pip install --no-cac
 healthcheckPath = "/"
 healthcheckTimeout = 20
 restartPolicyType = "ON_FAILURE"
-startCommand = "streamlit run main_fixed.py --server.port $PORT --server.address 0.0.0.0 --server.headless true --server.runOnSave false"
+startCommand = "streamlit run main.py --server.port $PORT --server.address 0.0.0.0 --server.headless true --server.runOnSave false"
 
 [environments.production.variables]
 STREAMLIT_SERVER_HEADLESS = "true"

@@ -89,8 +89,8 @@ def check_main_file():
     
     print("🔍 メインファイルの確認...")
     
-    if os.path.exists("main_fixed.py"):
-        print("  ✅ main_fixed.py が見つかりました")
+    if os.path.exists("main.py"):
+        print("  ✅ main.py が見つかりました")
     elif os.path.exists("main.py"):
         print("  ✅ main.py が見つかりました")
     else:

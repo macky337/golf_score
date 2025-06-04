@@ -38,14 +38,28 @@ from modules.round_results import save_round_results, get_round_results
 
 # ▼▼▼ フォント登録（日本語対応） ▼▼▼
 FONT_NAME = "Helvetica"
-if os.path.exists("ipaexg.ttf"):
-    try:
-        pdfmetrics.registerFont(TTFont('IPAexGothic', 'ipaexg.ttf'))
-        FONT_NAME = "IPAexGothic"
-        set_font(FONT_NAME)
-    except Exception as e:
-        st.warning(f"フォント登録エラー: {e}. デフォルトHelveticaを使用します。")
-else:
+
+# フォントファイルの検索パス
+font_paths = [
+    "ipaexg.ttf",  # 現在のディレクトリ
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ipaexg.ttf"),  # プロジェクトルート
+    os.path.join(os.getcwd(), "ipaexg.ttf"),  # 作業ディレクトリ
+    "/app/ipaexg.ttf"  # Railway/Docker環境
+]
+
+font_found = False
+for font_path in font_paths:
+    if os.path.exists(font_path):
+        try:
+            pdfmetrics.registerFont(TTFont('IPAexGothic', font_path))
+            FONT_NAME = "IPAexGothic"
+            set_font(FONT_NAME)
+            font_found = True
+            break
+        except Exception as e:
+            continue
+
+if not font_found:
     st.warning("ipaexg.ttf が見つかりません。PDF出力は Helvetica となります（日本語表示に問題が生じる可能性があります）。")
 
 
