@@ -1,0 +1,23 @@
+# 超高速デプロイ用マルチステージビルド
+FROM python:3.11-slim as builder
+
+# ビルド時のキャッシュ最適化
+WORKDIR /app
+COPY requirements-ultra-minimal.txt .
+RUN pip install --no-cache-dir --user -r requirements-ultra-minimal.txt
+
+FROM python:3.11-slim
+WORKDIR /app
+
+# ビルド済みパッケージをコピー
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+# アプリケーションファイルのみコピー
+COPY main_fixed.py .
+COPY pages/ pages/
+COPY modules/ modules/
+COPY .streamlit/ .streamlit/
+
+EXPOSE 8501
+CMD ["streamlit", "run", "main_fixed.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]

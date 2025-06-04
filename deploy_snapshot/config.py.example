@@ -1,0 +1,54 @@
+"""
+アプリケーション設定ファイル（サンプル）
+実際の使用時はこのファイルを config.py にコピーして値を設定してください。
+"""
+import os
+from dotenv import load_dotenv
+
+# .envファイルを読み込む
+load_dotenv()
+
+# 管理者設定
+ADMIN = {
+    'password': 'your_admin_password_here'  # 管理画面のパスワード
+}
+
+# アプリケーション設定
+APP = {
+    'name': 'Golf Score App',
+    'version': '1.0.0'
+}
+
+# データベース設定
+DATABASE = {
+    'supabase_url': os.getenv('SUPABASE_URL'),
+    'supabase_key': os.getenv('SUPABASE_KEY')
+}
+
+# ファイルパス設定
+PATHS = {
+    'fonts': {
+        'japanese': 'ipaexg.ttf'
+    }
+}
+
+# 取得
+def get_admin_password():
+    """管理者パスワードを取得"""
+    return ADMIN['password']
+
+def get_app_name():
+    """アプリ名を取得"""
+    return APP['name']
+
+def get_app_version():
+    """アプリバージョンを取得"""
+    return APP['version']
+
+def get_db_config():
+    """データベース設定を取得"""
+    return DATABASE
+
+def get_font_path(font_type='japanese'):
+    """フォントパスを取得"""
+    return PATHS['fonts'].get(font_type, None)

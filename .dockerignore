@@ -1,0 +1,68 @@
+# 開発・テスト関連ファイルを除外してデプロイサイズを削減
+*.pyc
+__pycache__/
+.pytest_cache/
+.git/
+.gitignore
+*.md
+*.bat
+*.ps1
+
+# テストファイル
+test_*.py
+*_test.py
+tests/
+debug_*.py
+analyze_*.py
+check_*.py
+diagnose_*.py
+investigate_*.py
+fix_*.py
+clean_*.py
+create_*_folder.py
+migrate_*.py
+restore_*.py
+
+# 一時ファイル
+*.tmp
+*.temp
+nul
+output.txt
+dump.sql
+
+# 設定例ファイル
+*.example
+*.sample
+
+# ドキュメント
+README.md
+CHANGELOG.md
+*.md
+
+# データベースファイル
+*.db
+*.sqlite
+
+# 不要なスクリプト
+add_*.py
+setup.py
+init_*.py
+manual_test.py
+simple_*.py
+dummy_*.py
+
+# アーカイブ・バックアップ
+*.zip
+*.tar.gz
+backup/
+temp/
+
+# IDE設定
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS固有
+.DS_Store
+Thumbs.db
