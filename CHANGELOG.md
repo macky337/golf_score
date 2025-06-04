@@ -6,6 +6,7 @@
 - add 9 files and 1 more changes (2025-06-04 06:38)
 
 ### 更新
+- 🔧 NIXPACKS FIX: Remove problematic nixpacks.toml, use Railway defaults for SQLAlchemy install
 - 📝 更新: nixpacks.toml を更新 (2025/06/04 22:51)
 - 🔧 RAILWAY CRITICAL FIX: Force SQLAlchemy installation with no-cache, nixpacks config, explicit requirements.txt inclusion
 - 🚀 Railway SQLAlchemy Fix: Add missing sqlalchemy dependency for ultra-fast deploy (6 packages total, 96% reduction from 129)

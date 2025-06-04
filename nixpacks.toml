@@ -1,0 +1,18 @@
+# Railway SQLAlchemy Fix - Minimal config
+providers = ["python"]
+
+[phases.install]
+cmds = ["pip install --no-cache-dir -r requirements.txt"]lchemy Fix - Force rebuild
+[providers]
+python = "3.11"
+
+[phases.install]
+cmds = [
+    "pip install --no-cache-dir --force-reinstall -r requirements.txt"
+]
+
+[phases.build]
+cmds = ["echo 'SQLAlchemy installation complete'"]
+
+[start]
+cmd = "streamlit run main_fixed.py --server.port $PORT --server.address 0.0.0.0 --server.headless true"
