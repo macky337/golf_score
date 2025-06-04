@@ -1,7 +1,6 @@
 # 超高速デプロイ用Railway設定 - SQLAlchemy Fix
 [build]
 builder = "NIXPACKS"
-buildCommand = "pip install --no-cache-dir -r requirements.txt"
 
 [deploy]
 healthcheckPath = "/"
