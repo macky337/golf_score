@@ -40,10 +40,18 @@ from modules.round_results import save_round_results, get_round_results
 FONT_NAME = "Helvetica"
 
 # フォントファイルの検索パス
+current_file_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_file_dir))  # 2つ上のディレクトリ
+deploy_snapshot_dir = os.path.dirname(current_file_dir)  # 1つ上のディレクトリ
+
 font_paths = [
     "ipaexg.ttf",  # 現在のディレクトリ
-    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ipaexg.ttf"),  # プロジェクトルート
+    os.path.join(current_file_dir, "ipaexg.ttf"),  # pagesディレクトリ内
+    os.path.join(deploy_snapshot_dir, "ipaexg.ttf"),  # deploy_snapshotディレクトリ
+    os.path.join(project_root, "ipaexg.ttf"),  # プロジェクトルート
     os.path.join(os.getcwd(), "ipaexg.ttf"),  # 作業ディレクトリ
+    r"c:\Users\user\Documents\GitHub\golf_score\ipaexg.ttf",  # 絶対パス（プロジェクトルート）
+    r"c:\Users\user\Documents\GitHub\golf_score\deploy_snapshot\ipaexg.ttf",  # 絶対パス（deploy_snapshot）
     "/app/ipaexg.ttf"  # Railway/Docker環境
 ]
 
@@ -55,12 +63,26 @@ for font_path in font_paths:
             FONT_NAME = "IPAexGothic"
             set_font(FONT_NAME)
             font_found = True
+            print(f"フォントが見つかりました: {font_path}")  # デバッグ用
             break
         except Exception as e:
+            print(f"フォント登録エラー ({font_path}): {e}")  # デバッグ用
             continue
 
 if not font_found:
-    st.warning("ipaexg.ttf が見つかりません。PDF出力は Helvetica となります（日本語表示に問題が生じる可能性があります）。")
+    st.warning("⚠️ 日本語フォント(ipaexg.ttf)が見つかりません。PDF出力は英語フォント(Helvetica)となり、日本語文字が正しく表示されない可能性があります。")
+    # デバッグ情報を表示
+    with st.expander("🔍 フォント検索詳細情報（トラブルシューティング用）"):
+        st.write("**検索したパス:**")
+        for i, path in enumerate(font_paths):
+            exists = os.path.exists(path)
+            icon = "✅" if exists else "❌"
+            st.write(f"{icon} `{path}` - {'存在する' if exists else '存在しない'}")
+        st.write("**システム情報:**")
+        st.write(f"- 現在のファイル位置: `{os.path.abspath(__file__)}`")
+        st.write(f"- 現在の作業ディレクトリ: `{os.getcwd()}`")
+        st.write(f"- プロジェクトルート: `{project_root}`")
+        st.write(f"- Deploy Snapshotディレクトリ: `{deploy_snapshot_dir}`")
 
 
 def initialize_player_data(scores, round_results):
