@@ -6,4 +6,5 @@ supabase==2.15.1
 python-dotenv==1.1.0
 requests==2.32.3
 sqlalchemy==2.0.36
+reportlab
 # Railway standard build - timestamp: 2025-06-04 23:59
