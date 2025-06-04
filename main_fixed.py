@@ -172,27 +172,70 @@ def main():
 def show_changelog():
     try:
         with st.expander("📋 更新履歴"):
-            # スクリプトのディレクトリを基準にCHANGELOG.mdのパスを構築
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            changelog_path = os.path.join(script_dir, "CHANGELOG.md")
+            # 複数のパスで CHANGELOG.md を検索
+            possible_paths = [
+                # 1. スクリプトと同じディレクトリ
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "CHANGELOG.md"),
+                # 2. 現在の作業ディレクトリ
+                os.path.join(os.getcwd(), "CHANGELOG.md"),
+                # 3. Railway環境での絶対パス
+                "/app/CHANGELOG.md",
+                # 4. 相対パス
+                "CHANGELOG.md",
+                # 5. 一つ上のディレクトリ
+                os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "CHANGELOG.md")
+            ]
             
-            if os.path.exists(changelog_path):
+            changelog_path = None
+            for path in possible_paths:
+                if os.path.exists(path):
+                    changelog_path = path
+                    break
+            
+            if changelog_path:
                 with open(changelog_path, "r", encoding="utf-8") as f:
                     changelog = f.read()
                 st.markdown(changelog)
+                st.caption(f"📍 読み込み元: {changelog_path}")
             else:
-                st.warning(f"CHANGELOG.mdファイルが見つかりません: {changelog_path}")
+                st.warning("📋 更新履歴ファイルが見つかりません")
+                # フォールバック: 基本的な更新情報を表示
+                st.markdown("""
+                ### 🚀 最新の更新内容
+                - ✅ Railway デプロイエラー解決
+                - ⚡ 超高速デプロイ最適化 (2-3分)
+                - 📦 依存関係96%削減 (129個→5個)
+                - 🔧 CHANGELOG読み込み問題修正
+                """)
     except Exception as e:
         with st.expander("📋 更新履歴"):
             st.error(f"更新履歴の読み込みに失敗しました: {str(e)}")
             # デバッグ情報を追加
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            changelog_path = os.path.join(script_dir, "CHANGELOG.md")
-            st.code(f"探索パス: {changelog_path}")
-            st.code(f"ファイル存在確認: {os.path.exists(changelog_path)}")
-            if os.path.exists(script_dir):
-                files = os.listdir(script_dir)
-                st.code(f"ディレクトリ内容: {files}")
+            st.subheader("🔍 デバッグ情報")
+            st.code(f"現在の作業ディレクトリ: {os.getcwd()}")
+            st.code(f"スクリプトの場所: {os.path.abspath(__file__)}")
+            
+            # 利用可能なファイルを表示
+            try:
+                current_files = os.listdir(os.getcwd())
+                md_files = [f for f in current_files if f.endswith('.md')]
+                st.code(f"現在のディレクトリのMDファイル: {md_files}")
+                
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                if os.path.exists(script_dir):
+                    script_files = os.listdir(script_dir)
+                    script_md_files = [f for f in script_files if f.endswith('.md')]
+                    st.code(f"スクリプトディレクトリのMDファイル: {script_md_files}")
+            except Exception as debug_e:
+                st.code(f"ディレクトリ情報取得エラー: {str(debug_e)}")
+            
+            # フォールバック情報
+            st.markdown("""
+            ### 🚀 主要な更新内容
+            - ✅ Railway デプロイエラー解決
+            - ⚡ 超高速デプロイ最適化
+            - 📦 依存関係大幅削減
+            """)
 
 if __name__ == "__main__":
     main()

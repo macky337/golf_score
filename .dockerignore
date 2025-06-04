@@ -79,3 +79,8 @@ manual_test.py
 # フォント（必要に応じて）
 *.ttf
 *.otf
+
+# 重要ファイルを明示的に含める（Railwayデプロイ対応）
+!CHANGELOG.md
+!README.md
+!CALCULATION_LOGIC.md
