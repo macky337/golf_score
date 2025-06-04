@@ -126,24 +126,45 @@ def generate_commit_message():
 
 def main():
     repo_dir = os.path.dirname(os.path.abspath(__file__))
-    # 1. git add .
+    
+    print("🚀 Git フローを開始します...\n")
+    
+    # 1. 変更ファイルをステージング
+    print("📋 ステップ 1: 変更ファイルをステージングエリアに追加")
     run_git_command(["git", "add", "."], cwd=repo_dir)
-    # 2. git commit -m "..."
+    
+    # 2. コミット実行
+    print("\n💾 ステップ 2: 変更をコミット")
     commit_msg = generate_commit_message()
+    print(f"📝 コミットメッセージ: {commit_msg}")
     run_git_command(["git", "commit", "-m", commit_msg], cwd=repo_dir)
-    # 3. git push
+    
+    # 3. developブランチにプッシュ
+    print("\n🔄 ステップ 3: developブランチに変更をプッシュ")
     run_git_command(["git", "push"], cwd=repo_dir)
-    # 4. git checkout main
+    
+    # 4. mainブランチに切り替え
+    print("\n🌟 ステップ 4: mainブランチに切り替え")
     run_git_command(["git", "checkout", "main"], cwd=repo_dir)
-    # 5. git pull origin main
+    
+    # 5. mainブランチの最新版を取得
+    print("\n⬇️ ステップ 5: mainブランチの最新版を取得")
     run_git_command(["git", "pull", "origin", "main"], cwd=repo_dir)
-    # 6. git merge develop
+    
+    # 6. developブランチをmainにマージ
+    print("\n🔀 ステップ 6: developブランチをmainにマージ")
     run_git_command(["git", "merge", "develop"], cwd=repo_dir)
-    # 7. git push origin main
+    
+    # 7. mainブランチにプッシュ
+    print("\n⬆️ ステップ 7: mainブランチに変更をプッシュ")
     run_git_command(["git", "push", "origin", "main"], cwd=repo_dir)
-    # 8. git checkout develop
+    
+    # 8. developブランチに戻る
+    print("\n🔄 ステップ 8: developブランチに戻る")
     run_git_command(["git", "checkout", "develop"], cwd=repo_dir)
-    print("\n=== Git flow 完了 ===")
+    
+    print("\n✅ === Git フロー完了！ ===")
+    print("🎉 すべての変更がmainブランチに正常にマージされました。")
 
 if __name__ == "__main__":
     main()
