@@ -235,7 +235,7 @@ def get_members_list():
     """メンバー一覧を取得する（ID昇順）"""
     try:
         supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_ANON_KEY")
+        supabase_key = os.getenv("SUPABASE_KEY")  # SUPABASE_ANON_KEY から修正
         supabase = create_client(supabase_url, supabase_key)
         
         response = supabase.table('member').select('*').order('member_id').execute()

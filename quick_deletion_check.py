@@ -9,7 +9,7 @@ def check_deletion_impact():
     try:
         # Supabase接続
         url = os.getenv('SUPABASE_URL')
-        key = os.getenv('SUPABASE_ANON_KEY')
+        key = os.getenv('SUPABASE_KEY')  # SUPABASE_ANON_KEY から修正
         
         if not url or not key:
             print("❌ 環境変数が設定されていません")
