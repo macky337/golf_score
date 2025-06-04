@@ -1,8 +1,9 @@
-# Ultra minimal dependencies for fastest deploy - Railway SQLAlchemy Fix v3 FINAL
+# Ultra minimal dependencies for fastest deploy - Railway SQLAlchemy Fix FINAL v4
+# NO NIXPACKS.TOML - STANDARD RAILWAY BUILD ONLY
 streamlit==1.45.1
 pandas==2.2.3
 supabase==2.15.1
 python-dotenv==1.1.0
 requests==2.32.3
 sqlalchemy==2.0.36
-# Railway standard build - no custom nixpacks
+# Railway standard build - timestamp: 2025-06-04 23:59

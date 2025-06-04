@@ -1,6 +1,10 @@
 # Railway ignore file - prevent problematic files
+# CRITICAL: Block all nixpacks configs
 nixpacks.toml
+nixpacks.json
+nixpacks.*
 *.toml.bak
+*.toml.old
 .vscode/
 .idea/
 *.log
@@ -8,3 +12,5 @@ nixpacks.toml
 test_*.py
 *_test.py
 debug_*.py
+# Build cache blockers
+.force-rebuild

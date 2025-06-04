@@ -6,6 +6,7 @@
 - add 9 files and 1 more changes (2025-06-04 06:38)
 
 ### 更新
+- 🛡️ ADD RAILWAY IGNORE: Create .railwayignore to prevent nixpacks.toml deployment issues
 - 🚀 FORCE RAILWAY CACHE CLEAR: Update requirements.txt v3 to trigger clean build without nixpacks
 - 🚫 FINAL NIXPACKS REMOVAL: Delete nixpacks.toml permanently, add to .gitignore to prevent pip command not found error
 - ✨ nixpacks.toml を新規追加 (2025/06/04 22:58)
