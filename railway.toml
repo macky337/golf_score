@@ -1,13 +1,13 @@
-# Railway.toml - Railway deployment configuration (最適化版)
+# 超高速デプロイ用Railway設定
 [build]
 builder = "NIXPACKS"
-buildCommand = "pip install --no-cache-dir -r requirements-minimal.txt"
+buildCommand = "pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements-ultra-minimal.txt"
 
 [deploy]
 healthcheckPath = "/"
-healthcheckTimeout = 30
+healthcheckTimeout = 20
 restartPolicyType = "ON_FAILURE"
-startCommand = "streamlit run main_fixed.py --server.port $PORT --server.address 0.0.0.0 --server.headless true"
+startCommand = "streamlit run main_fixed.py --server.port $PORT --server.address 0.0.0.0 --server.headless true --server.runOnSave false"
 
 [environments.production.variables]
 STREAMLIT_SERVER_HEADLESS = "true"
@@ -15,3 +15,5 @@ STREAMLIT_SERVER_ENABLE_CORS = "false"
 STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION = "false"
 STREAMLIT_SERVER_RUN_ON_SAVE = "false"
 STREAMLIT_BROWSER_GATHER_USAGE_STATS = "false"
+STREAMLIT_SERVER_FILE_WATCHER_TYPE = "none"
+STREAMLIT_SERVER_MAX_UPLOAD_SIZE = "1"
