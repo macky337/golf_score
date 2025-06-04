@@ -81,6 +81,7 @@ manual_test.py
 *.otf
 
 # 重要ファイルを明示的に含める（Railwayデプロイ対応）
+!requirements.txt
 !CHANGELOG.md
 !README.md
 !CALCULATION_LOGIC.md

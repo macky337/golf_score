@@ -6,6 +6,7 @@
 - add 9 files and 1 more changes (2025-06-04 06:38)
 
 ### 更新
+- 🚀 Railway SQLAlchemy Fix: Add missing sqlalchemy dependency for ultra-fast deploy (6 packages total, 96% reduction from 129)
 - ✨ 3個のファイルを新規追加 (2025/06/04 22:10)
 - ✨ cleanup_for_deploy.py を新規追加 ほか1件の変更 (2025/06/04 22:06)
 - 🧹 本番デプロイ最適化: 不要なテストファイル削除でプロジェクト軽量化

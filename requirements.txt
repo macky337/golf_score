@@ -1,4 +1,4 @@
-# Ultra minimal dependencies for fastest deploy
+# Ultra minimal dependencies for fastest deploy - Railway SQLAlchemy Fix
 streamlit==1.45.1
 pandas==2.2.3
 supabase==2.15.1
