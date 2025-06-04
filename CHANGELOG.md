@@ -6,6 +6,7 @@
 - add 9 files and 1 more changes (2025-06-04 06:38)
 
 ### 更新
+- ✨ nixpacks.toml を新規追加 (2025/06/04 22:58)
 - 🗑️ FINAL FIX: Remove corrupted nixpacks.toml completely - use Railway defaults for clean SQLAlchemy build
 - ✨ nixpacks.toml を新規追加 (2025/06/04 22:55)
 - 🔧 NIXPACKS FIX: Remove problematic nixpacks.toml, use Railway defaults for SQLAlchemy install
