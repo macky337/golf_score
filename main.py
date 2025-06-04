@@ -1,11 +1,7 @@
-import sys
-import os
-# モジュールのインポートパスを追加
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 import streamlit as st
 from streamlit_extras.switch_page_button import switch_page
 from scripts.version_manager import load_version
+import os
 from dotenv import load_dotenv
 import traceback
 
@@ -13,8 +9,7 @@ import traceback
 st.set_page_config(
     page_title="Golf Score App", 
     page_icon="⛳",
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    layout="wide"
 )
 
 def check_supabase_connection():
