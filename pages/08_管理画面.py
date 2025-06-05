@@ -1264,7 +1264,7 @@ def score_edit_tab():
     st.markdown("---")
     if st.button("結果確認画面へ移動", use_container_width=True):
         st.session_state.active_round_id = round_id
-        switch_page("結果確認")
+        switch_page("06_結果確認")
 
 def show_balance_diagnostics():
     """ポイントバランス診断と修復機能"""
