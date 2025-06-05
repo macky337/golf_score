@@ -17,7 +17,8 @@ def run():
     
     # マニュアルの内容を読み込んで表示
     try:
-        with open("マニュアル.md", "r", encoding='utf-8') as f:
+        manual_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "マニュアル.md")
+        with open(manual_path, "r", encoding='utf-8') as f:
             manual_content = f.read()
         st.markdown(manual_content)
     except FileNotFoundError:
