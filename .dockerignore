@@ -77,8 +77,9 @@ gradient_demo.py
 manual_test.py
 
 # フォント（必要に応じて）
-*.ttf
-*.otf
+# *.ttf
+# *.otf
+!ipaexg.ttf
 
 # 重要ファイルを明示的に含める（Railwayデプロイ対応）
 !requirements.txt
