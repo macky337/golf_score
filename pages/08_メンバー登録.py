@@ -9,6 +9,14 @@ from modules.db import supabase
 from streamlit_extras.switch_page_button import switch_page
 from modules.models import get_members_list
 
+# ページ設定
+st.set_page_config(
+    page_title="メンバー登録 - Golf Score App",
+    page_icon="👤",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 def run():
     col1, col2 = st.columns([0.8, 0.2])
     with col1:
@@ -60,6 +68,30 @@ def run():
                     st.error(f"メンバーの追加に失敗しました: {str(e)}")
             else:
                 st.warning("名前を入力してください")
+
+    # --- ラウンド未参加メンバー削除機能 ---
+    st.write("### ラウンド未参加メンバーの一括削除")
+    if st.button("ラウンド未参加メンバーを削除", key="delete_unplayed_members"):
+        try:
+            # すべてのメンバーIDを取得
+            all_members = supabase.table('member').select('member_id', 'name').execute().data
+            all_member_ids = [m['member_id'] for m in all_members]
+            # スコアテーブルに一度も出現しないmember_idを抽出
+            played_member_ids = set()
+            scores = supabase.table('score').select('member_id').execute().data
+            for s in scores:
+                played_member_ids.add(s['member_id'])
+            unplayed_members = [m for m in all_members if m['member_id'] not in played_member_ids]
+            if not unplayed_members:
+                st.info("すべてのメンバーがラウンドに参加しています。削除対象はありません。")
+            else:
+                for m in unplayed_members:
+                    supabase.table('member').delete().eq('member_id', m['member_id']).execute()
+                st.success(f"{len(unplayed_members)}名の未参加メンバーを削除しました。")
+                st.rerun()
+        except Exception as e:
+            st.error(f"未参加メンバーの削除に失敗しました: {str(e)}")
+    # --- ここまで ---
 
 if __name__ == "__main__":
     run()

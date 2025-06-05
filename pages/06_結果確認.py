@@ -563,4 +563,10 @@ def run():
             st.code(traceback.format_exc())
 
 if __name__ == "__main__":
+    st.set_page_config(
+    page_title="結果確認 - Golf Score App",
+    page_icon="📄",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
     run()

@@ -116,11 +116,31 @@ def run():
     
     # コースのID, 名前のタプルを作成
     course_options = [(c.get('id'), c.get('name')) for c in courses]
-    
+
+    # 一番多いゴルフ場名を集計
+    from collections import Counter
+    course_name_list = [c.get('name') for c in courses]
+    # roundsテーブルからも集計（過去のラウンド数が多いコースを優先）
+    all_rounds = supabase.table('rounds').select('course_name').execute().data
+    round_course_names = [r['course_name'] for r in all_rounds if r.get('course_name')]
+    if round_course_names:
+        most_played_course = Counter(round_course_names).most_common(1)[0][0]
+    else:
+        most_played_course = course_name_list[0] if course_name_list else None
+
+    # デフォルトインデックスを決定
+    default_index = 0
+    if most_played_course:
+        for i, (_, name) in enumerate(course_options):
+            if name == most_played_course:
+                default_index = i
+                break
+
     selected_course = st.selectbox(
         "ゴルフ場を選択",
         options=course_options,
-        format_func=lambda x: x[1]  # IDは表示せず、名前だけ表示
+        format_func=lambda x: x[1],  # IDは表示せず、名前だけ表示
+        index=default_index if course_options else 0
     )
     
     # 選択されたコースのIDと名前を取得

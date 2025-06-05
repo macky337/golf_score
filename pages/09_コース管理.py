@@ -9,6 +9,13 @@ from modules.db import supabase
 from streamlit_extras.switch_page_button import switch_page
 from modules.models import get_course_list, create_course, is_course_in_use, update_rounds_course_references, get_unused_courses, delete_unused_courses
 
+st.set_page_config(
+    page_title="コース管理 - Golf Score App",
+    page_icon="⛳",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 def run():
     col1, col2 = st.columns([0.8, 0.2])
     with col1:
