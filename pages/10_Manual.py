@@ -21,7 +21,9 @@ def run():
         candidates = [
             os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "マニュアル.md"),
             os.path.join(os.getcwd(), "マニュアル.md"),
-            os.path.abspath("マニュアル.md")
+            os.path.abspath("マニュアル.md"),
+            os.path.join(os.path.dirname(__file__), "..", "マニュアル.md"),
+            os.path.join(os.path.dirname(__file__), "../..", "マニュアル.md")
         ]
         manual_content = None
         for manual_path in candidates:
@@ -32,7 +34,7 @@ def run():
         if manual_content:
             st.markdown(manual_content)
         else:
-            st.error("マニュアルファイルが見つかりません。")
+            st.error(f"マニュアルファイルが見つかりません。パス候補: {candidates}")
     except Exception as e:
         st.error(f"マニュアルファイルの読み込み中にエラー: {e}")
 
