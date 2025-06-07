@@ -1,0 +1,8 @@
+{
+  "timestamp": "2025-06-07 21:42:00",
+  "optimization_level": "ultra",
+  "python_files": 22574,
+  "total_size_mb": 595.97,
+  "core_packages": 5,
+  "estimated_deploy_time": "2-3分"
+}
