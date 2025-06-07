@@ -11,9 +11,10 @@ print(f"システムのエンコーディング: {system_encoding}")
 def run_git_command(cmd, cwd=None):
     print(f"$ {' '.join(cmd)}")
     try:
-        # Windows環境ではcp932エンコーディングを使用
+        # Windows環境では errors='replace' を使用してエンコーディングエラーを回避
         encoding = 'cp932' if sys.platform == 'win32' else 'utf-8'
-        result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding=encoding)
+        result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, 
+                              encoding=encoding, errors='replace')
         if result.stdout:
             print(result.stdout)
         if result.stderr:
@@ -21,23 +22,9 @@ def run_git_command(cmd, cwd=None):
         if result.returncode != 0:
             raise Exception(f"Command failed: {' '.join(cmd)}")
         return result
-    except UnicodeDecodeError as e:
-        print(f"エンコーディングエラー: {e}")
-        # エンコーディングエラーが発生した場合、バイナリモードで実行し直す
-        result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=False)
-        if result.stdout:
-            try:
-                print(result.stdout.decode('utf-8', errors='replace'))
-            except:
-                print("stdout出力をデコードできませんでした")
-        if result.stderr:
-            try:
-                print(result.stderr.decode('utf-8', errors='replace'))
-            except:
-                print("stderr出力をデコードできませんでした")
-        if result.returncode != 0:
-            raise Exception(f"Command failed: {' '.join(cmd)}")
-        return result
+    except Exception as e:
+        print(f"コマンド実行エラー: {e}")
+        raise
 
 def check_git_status():
     """
@@ -122,10 +109,12 @@ def fix_detached_head():
 # 変更ファイル一覧を取得し、分かりやすい日本語でコミットメッセージを自動生成
 def generate_commit_message():
     try:
-        result = subprocess.run(["git", "status", "-s"], capture_output=True, text=True, encoding='cp932' if sys.platform == 'win32' else 'utf-8')
+        result = subprocess.run(["git", "status", "-s"], capture_output=True, text=True, 
+                              encoding='cp932' if sys.platform == 'win32' else 'utf-8', 
+                              errors='replace')
         changed = result.stdout.strip().splitlines()
         if not changed:
-            return "変更なし"
+            return None  # 変更がない場合はNoneを返す
         
         # ファイルの種類別にカウント
         added_files = []
@@ -331,6 +320,19 @@ def main():
     # 2. コミット実行
     print("\n💾 ステップ 2: 変更をコミット")
     commit_msg = generate_commit_message()
+    
+    if commit_msg is None:
+        print("📝 コミットする変更がありません。プッシュのみ実行します。")
+        # プッシュのみ実行
+        print("\n🔄 ステップ 3: developブランチに変更をプッシュ")
+        try:
+            run_git_command(["git", "push"], cwd=repo_dir)
+        except Exception as e:
+            print(f"\n⚠️ プッシュに失敗しました: {e}")
+        
+        print("\n✅ === プッシュ完了！ ===")
+        return
+    
     print(f"📝 コミットメッセージ: {commit_msg}")
     
     # コミットメッセージにダブルクォーテーションを追加
