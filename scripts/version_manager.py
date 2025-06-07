@@ -12,8 +12,21 @@ def load_version():
     """バージョン情報を読み込む"""
     version_file = get_version_file_path()
     if os.path.exists(version_file):
-        with open(version_file, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        try:
+            with open(version_file, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if not content:
+                    # ファイルが空の場合はデフォルトを返す
+                    return get_default_version()
+                return json.loads(content)
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            print(f"バージョンファイルの読み込みエラー: {e}")
+            print("デフォルトバージョンを使用します")
+            return get_default_version()
+    return get_default_version()
+
+def get_default_version():
+    """デフォルトバージョン情報を返す"""
     return {
         'major': 1,
         'minor': 0,

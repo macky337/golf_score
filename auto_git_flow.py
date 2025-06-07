@@ -109,6 +109,7 @@ def fix_detached_head():
 # 変更ファイル一覧を取得し、分かりやすい日本語でコミットメッセージを自動生成
 def generate_commit_message():
     try:
+        # ステージングエリアの変更を確認
         result = subprocess.run(["git", "status", "-s"], capture_output=True, text=True, 
                               encoding='cp932' if sys.platform == 'win32' else 'utf-8', 
                               errors='replace')

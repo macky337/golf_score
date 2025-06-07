@@ -1,48 +1,6 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 {
   "major": 1,
   "minor": 0,
-  "patch": 203,
+  "patch": 1,
   "last_updated": "2025-06-07"
-||||||| db536d17
-{
-  "major": 1,
-  "minor": 0,
-  "patch": 201,
-  "last_updated": "2025-06-07"
-=======
-{
-  "major": 1,
-  "minor": 0,
-  "patch": 203,
-  "last_updated": "2025-06-07"
->>>>>>> develop
-||||||| e6f94897
-{
-  "major": 1,
-  "minor": 0,
-  "patch": 203,
-  "last_updated": "2025-06-07"
-=======
-{
-  "major": 1,
-  "minor": 0,
-  "patch": 204,
-  "last_updated": "2025-06-07"
->>>>>>> develop
-||||||| e53d2ddc
-{
-  "major": 1,
-  "minor": 0,
-  "patch": 204,
-  "last_updated": "2025-06-07"
-=======
-{
-  "major": 1,
-  "minor": 0,
-  "patch": 205,
-  "last_updated": "2025-06-07"
->>>>>>> develop
 }
