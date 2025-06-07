@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 {
   "major": 1,
   "minor": 0,
@@ -15,6 +16,19 @@
   "major": 1,
   "minor": 0,
   "patch": 203,
+  "last_updated": "2025-06-07"
+>>>>>>> develop
+||||||| e6f94897
+{
+  "major": 1,
+  "minor": 0,
+  "patch": 203,
+  "last_updated": "2025-06-07"
+=======
+{
+  "major": 1,
+  "minor": 0,
+  "patch": 204,
   "last_updated": "2025-06-07"
 >>>>>>> develop
 }

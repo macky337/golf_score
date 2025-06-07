@@ -1,7 +1,11 @@
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# モジュールのインポートパスを追加（より確実な方法）
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
 import streamlit as st
 import pandas as pd
@@ -12,19 +16,12 @@ from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
 from modules.supabase_client import get_scores_with_fallback
 
-st.set_page_config(
-    page_title="Extra Score Input - Golf Score App",
-    page_icon="➕",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 def run():
     # show_navigation(active_page="エキストラスコア入力")  # 共通ナビゲーションバーを削除
     
     col1, col2 = st.columns([0.8, 0.2])
     with col1:
-        st.title("Extra Score Input")
+        st.title("エキストラスコア入力")
     with col2:
         if st.button("🏠 Home"):
             switch_page("main")
