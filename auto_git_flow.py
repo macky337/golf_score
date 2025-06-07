@@ -1,3 +1,4 @@
+# filepath: c:\Users\user\Documents\GitHub\golf_score\auto_git_flow.py
 import subprocess
 import datetime
 import os
@@ -135,104 +136,6 @@ def generate_commit_message():
         now = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
         return f"📝 ファイル更新 ({now})"
 
-def handle_conflicts():
-    """
-    マージ競合を処理する
-    """
-    print("\n⚠️ マージ競合が検出されました！")
-    
-    # 競合ファイルのリストを取得
-    result = run_git_command(["git", "diff", "--name-only", "--diff-filter=U"])
-    conflict_files = result.stdout.strip().split('\n')
-    
-    if not conflict_files or conflict_files[0] == '':
-        print("競合ファイルが見つかりません。手動でチェックしてください。")
-        return False
-    
-    print(f"以下のファイルに競合があります: {', '.join(conflict_files)}")
-    
-    # JSONファイルの競合を自動解決する
-    for file in conflict_files:
-        if file.endswith('.json'):
-            print(f"\n自動でJSON競合を解決しようとしています: {file}")
-            try:
-                # version.jsonの場合はより高いバージョンを採用
-                if file == 'version.json':
-                    resolve_version_json_conflict()
-                else:
-                    print(f"{file}は自動解決に対応していません。手動で解決してください。")
-            except Exception as e:
-                print(f"自動解決に失敗しました: {e}")
-                return False
-        else:
-            print(f"\n{file}は自動解決に対応していません。手動で解決してください。")
-            return False
-    
-    # 解決済みファイルをステージングに追加
-    print("\n解決済みのファイルをステージングに追加します")
-    run_git_command(["git", "add", "."])
-    
-    return True
-
-def resolve_version_json_conflict():
-    """
-    version.jsonのマージ競合を解決する
-    常に大きいバージョン番号を採用する
-    """
-    try:
-        # 競合しているファイルを読み込む
-        with open('version.json', 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        # 競合マーカーで分割
-        parts = content.split('<<<<<<< HEAD')
-        if len(parts) < 2:
-            print("競合マーカーが見つかりません")
-            return False
-        
-        head_part = parts[1].split('=======')
-        ours = head_part[0].strip()
-        
-        theirs_part = head_part[1].split('>>>>>>>')
-        theirs = theirs_part[0].strip()
-        
-        # 両方のバージョンからJSONデータを抽出
-        import json
-        try:
-            ours_data = json.loads(ours)
-        except json.JSONDecodeError:
-            print("現在のバージョン情報が不正です")
-            ours_data = {"major": 0, "minor": 0, "patch": 0}
-        
-        try:
-            theirs_data = json.loads(theirs)
-        except json.JSONDecodeError:
-            print("リモートのバージョン情報が不正です")
-            theirs_data = {"major": 0, "minor": 0, "patch": 0}
-        
-        # バージョン比較
-        ours_version = (ours_data.get("major", 0), ours_data.get("minor", 0), ours_data.get("patch", 0))
-        theirs_version = (theirs_data.get("major", 0), theirs_data.get("minor", 0), theirs_data.get("patch", 0))
-        
-        # 大きい方を採用
-        if ours_version >= theirs_version:
-            resolved_data = ours_data
-        else:
-            resolved_data = theirs_data
-        
-        # 最終更新日を現在に設定
-        resolved_data["last_updated"] = datetime.datetime.now().strftime("%Y-%m-%d")
-        
-        # 整形してファイルに書き込み
-        with open('version.json', 'w', encoding='utf-8') as f:
-            json.dump(resolved_data, f, indent=2, ensure_ascii=False)
-        
-        print(f"version.jsonを解決しました: バージョン {resolved_data['major']}.{resolved_data['minor']}.{resolved_data['patch']}")
-        return True
-    except Exception as e:
-        print(f"version.jsonの競合解決中にエラーが発生しました: {e}")
-        return False
-
 def main():
     repo_dir = os.path.dirname(os.path.abspath(__file__))
     
@@ -253,34 +156,14 @@ def main():
     try:
         run_git_command(["git", "push"], cwd=repo_dir)
     except Exception as e:
-        print("\n⚠️ プッシュに失敗しました。リモートの変更を取り込みます。")
-        try:
-            # リモートの変更を取り込む
-            print("\n🔄 リモートの変更を取り込んでいます...")
-            run_git_command(["git", "pull", "--rebase"], cwd=repo_dir)
-            
-            # コンフリクトの確認
-            status_result = run_git_command(["git", "status"], cwd=repo_dir)
-            if "rebase in progress" in status_result.stdout:
-                # コンフリクトがある場合
-                if not handle_conflicts():
-                    print("\n❌ 競合の自動解決に失敗しました。手動で解決してください。")
-                    print("以下のコマンドを使用して競合を解決した後、リベースを継続できます:")
-                    print("  git rebase --continue")
-                    return
-                
-                # リベースを継続
-                print("\n🔄 リベースを継続します...")
-                run_git_command(["git", "rebase", "--continue"], cwd=repo_dir)
-            
-            # 再度プッシュを試みる
-            print("\n🔄 変更をプッシュします...")
-            run_git_command(["git", "push", "--force-with-lease"], cwd=repo_dir)
-            
-        except Exception as inner_e:
-            print(f"\n❌ リモート変更の統合に失敗しました: {inner_e}")
-            print("現在の状態を確認し、手動で修正してください。")
-            return
+        print("\n⚠️ プッシュに失敗しました。Git操作を中止します。")
+        print("現在の状態を確認し、手動で修正してください。")
+        print("以下のコマンドを実行することで、リモートの変更を取り込むことができます:")
+        print("  git pull --rebase")
+        print("コンフリクトが発生した場合は、コンフリクトを解決してから:")
+        print("  git rebase --continue")
+        print("  git push")
+        return
     
     # 4. mainブランチに切り替え
     print("\n🌟 ステップ 4: mainブランチに切り替え")
@@ -292,20 +175,7 @@ def main():
     
     # 6. developブランチをmainにマージ
     print("\n🔀 ステップ 6: developブランチをmainにマージ")
-    try:
-        run_git_command(["git", "merge", "develop"], cwd=repo_dir)
-    except Exception as e:
-        print("\n⚠️ マージ中に競合が発生しました。")
-        if not handle_conflicts():
-            print("\n❌ 競合の自動解決に失敗しました。手動で解決してください。")
-            print("競合を解決した後、以下のコマンドでマージを完了できます:")
-            print("  git add .")
-            print("  git commit -m \"マージ競合を解決\"")
-            print("  git push origin main")
-            return
-        
-        # マージを完了
-        run_git_command(["git", "commit", "-m", "マージ競合を自動解決"], cwd=repo_dir)
+    run_git_command(["git", "merge", "develop"], cwd=repo_dir)
     
     # 7. mainブランチにプッシュ
     print("\n⬆️ ステップ 7: mainブランチに変更をプッシュ")
