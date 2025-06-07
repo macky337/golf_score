@@ -2,6 +2,7 @@
   "major": 1,
   "minor": 0,
 <<<<<<< HEAD
+<<<<<<< HEAD
   "patch": 190,
   "last_updated": "2025-06-07"
 ||||||| 0acfcf14
@@ -9,6 +10,13 @@
   "last_updated": "2025-06-05"
 =======
   "patch": 191,
+  "last_updated": "2025-06-07"
+>>>>>>> develop
+||||||| 0acfcf14
+  "patch": 189,
+  "last_updated": "2025-06-05"
+=======
+  "patch": 198,
   "last_updated": "2025-06-07"
 >>>>>>> develop
 }
