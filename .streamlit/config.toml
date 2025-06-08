@@ -4,10 +4,12 @@ enableCORS = false
 enableXsrfProtection = false
 maxUploadSize = 50
 maxMessageSize = 50
+runOnSave = false
+fileWatcherType = "none"
 
 [browser]
 gatherUsageStats = false
-serverAddress = "127.0.0.1"
+serverAddress = "0.0.0.0"
 
 [theme]
 primaryColor = "#1f77b4"
@@ -17,4 +19,9 @@ textColor = "#262730"
 
 [global]
 developmentMode = false
+dataFrameSerialization = "legacy"
+
+# メディアファイル設定
+[client]
+showErrorDetails = false
 
