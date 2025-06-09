@@ -4,6 +4,8 @@ from scripts.version_manager import load_version
 import os
 from dotenv import load_dotenv
 import traceback
+from modules.url_handler import extract_media_path_from_url, is_social_media_crawler
+from modules.app_router import init_app_with_media_support
 
 # Streamlit ページ設定
 st.set_page_config(
@@ -16,6 +18,28 @@ st.set_page_config(
         'About': "Golf Score App - main"
     }
 )
+
+def handle_media_routing():
+    """URLルーティング: /media/パスへのアクセスを処理"""
+    # 高度なURL処理でメディアファイルアクセスを検出
+    filename = extract_media_path_from_url()
+    
+    if filename:
+        # メディアファイルアクセスが検出された場合
+        st.query_params['file'] = filename
+        switch_page("99_メディア")
+        return True
+    
+    # ソーシャルメディアクローラーによる特別処理
+    if is_social_media_crawler():
+        # User-Agentがソーシャルメディアクローラーの場合
+        current_url = os.getenv('REQUEST_URI', '')
+        if '/media/' in current_url or 'pdf' in current_url.lower():
+            # メディアファイルらしきアクセスの場合はメディアページに転送
+            switch_page("99_メディア")
+            return True
+    
+    return False
 
 def check_supabase_connection():
     """Supabaseの接続状況を確認する関数"""
@@ -48,6 +72,14 @@ def check_supabase_connection():
 def main():
     """メインページの表示関数"""
     try:
+        # アプリ初期化時にメディアルーティングをチェック
+        if init_app_with_media_support():
+            return  # メディアファイル処理が実行された場合は終了
+        
+        # 従来のメディアルーティングチェック（フォールバック）
+        if handle_media_routing():
+            return  # メディアハンドラーにリダイレクトされた場合は処理終了
+        
         st.title("⛳ Golf Score App")
         
         # アプリの説明とマニュアルリンク
@@ -60,7 +92,7 @@ def main():
         with col2:
             # マニュアルページへのリンク
             if st.button("📚 マニュアル", key="manual_button"):
-                switch_page("10_Manual")
+                switch_page("10_マニュアル")
 
         # メインメニューの作成
         st.subheader("📌 メインメニュー")
@@ -72,25 +104,36 @@ def main():
             st.markdown("### 📝 スコア入力")
             if st.button("ラウンド設定", key="nav_main_round_settings"): 
                 st.write("ボタン押下: ラウンド設定")
+                # デバッグ: ファイルの存在確認
+                import os
+                page_path = os.path.join("pages", "01_ラウンド設定.py")
+                st.write(f"デバッグ: ファイルパス = {page_path}")
+                st.write(f"デバッグ: ファイル存在 = {os.path.exists(page_path)}")
                 try:
-                    switch_page("01_RoundSetting")
+                    switch_page("01_ラウンド設定")
                 except Exception as e:
                     st.error(f"switch_page例外: {e}")
+                    # 他の方法も試してみる
+                    try:
+                        st.write("別の方法を試行中...")
+                        switch_page("pages/01_ラウンド設定")
+                    except Exception as e2:
+                        st.error(f"別の方法でも失敗: {e2}")
             if st.button("フロントスコア入力", key="nav_main_front"): 
                 st.write("ボタン押下: フロントスコア入力")
                 try:
-                    switch_page("02_FrontScore")
+                    switch_page("02_フロントスコア入力")
                 except Exception as e:
                     st.error(f"switch_page例外: {e}")
             if st.button("バックスコア入力", key="nav_main_back"): 
                 try:
-                    switch_page("03_BackScore")
+                    switch_page("03_バックスコア入力")
                 except Exception as e:
                     st.error(f"switch_page例外: {e}")
             if st.button("エキストラスコア入力", key="nav_main_extra"): 
                 st.write("ボタン押下: エキストラスコア入力")
                 try:
-                    switch_page("04_ExtraScore")
+                    switch_page("04_エキストラスコア入力")
                 except Exception as e:
                     st.error(f"switch_page例外: {e}")
                     
@@ -99,31 +142,31 @@ def main():
             if st.button("結果確認", key="nav_main_results"): 
                 st.write("ボタン押下: 結果確認")
                 try:
-                    switch_page("05_Result")
+                    switch_page("05_結果確認")
                 except Exception as e:
                     st.error(f"switch_page例外: {e}")
             if st.button("ポイント集計", key="nav_main_points"): 
                 st.write("ボタン押下: ポイント集計")
                 try:
-                    switch_page("06_Points")
+                    switch_page("06_ポイント集計")
                 except Exception as e:
                     st.error(f"switch_page例外: {e}")
             if st.button("管理画面", key="nav_main_admin"): 
                 st.write("ボタン押下: 管理画面")
                 try:
-                    switch_page("08_Admin")
+                    switch_page("08_管理画面")
                 except Exception as e:
                     st.error(f"switch_page例外: {e}")
             if st.button("メンバー登録", key="nav_main_members"): 
                 st.write("ボタン押下: メンバー登録")
                 try:
-                    switch_page("07_Member")
+                    switch_page("07_メンバー登録")
                 except Exception as e:
                     st.error(f"switch_page例外: {e}")
             if st.button("コース管理", key="nav_main_courses"): 
                 st.write("ボタン押下: コース管理")
                 try:
-                    switch_page("09_Course")
+                    switch_page("09_コース管理")
                 except Exception as e:
                     st.error(f"switch_page例外: {e}")
         
