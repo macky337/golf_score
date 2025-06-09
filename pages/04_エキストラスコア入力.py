@@ -19,12 +19,7 @@ from modules.supabase_client import get_scores_with_fallback
 def run():
     # show_navigation(active_page="エキストラスコア入力")  # 共通ナビゲーションバーを削除
     
-    col1, col2 = st.columns([0.8, 0.2])
-    with col1:
-        st.title("エキストラスコア入力")
-    with col2:
-        if st.button("🏠 Home"):
-            switch_page("main")
+    st.title("エキストラスコア入力")
     
     # アクティブなラウンドIDをセッション状態から取得
     if "active_round_id" not in st.session_state:
