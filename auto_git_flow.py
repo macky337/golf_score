@@ -22,6 +22,23 @@ def run_git_command(cmd, cwd=None):
         if result.returncode != 0:
             raise Exception(f"Command failed: {' '.join(cmd)}")
         return result
+    except UnicodeDecodeError as e:
+        print(f"エンコーディングエラー: {e}")
+        # エンコーディングエラーが発生した場合、バイナリモードで実行し直す
+        result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=False)
+        if result.stdout:
+            try:
+                print(result.stdout.decode('utf-8', errors='replace'))
+            except:
+                print("stdout出力をデコードできませんでした")
+        if result.stderr:
+            try:
+                print(result.stderr.decode('utf-8', errors='replace'))
+            except:
+                print("stderr出力をデコードできませんでした")
+        if result.returncode != 0:
+            raise Exception(f"Command failed: {' '.join(cmd)}")
+        return result
     except Exception as e:
         print(f"コマンド実行エラー: {e}")
         raise
