@@ -3,6 +3,7 @@
 ## [2025-06-11]
 
 ### 修正
+- Resolve manual file path issue in 10_マニュアル.py
 - Remove media_utils import from 05_結果確認.py - Complete media functionality removal
 
 ### 更新
