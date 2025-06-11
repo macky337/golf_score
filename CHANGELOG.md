@@ -3,6 +3,7 @@
 ## [2025-06-11]
 
 ### 修正
+- Enhanced manual file detection with fallback system - Add robust file search, Railway environment support, and embedded manual backup
 - Resolve StreamlitDuplicateElementId error in 10_マニュアル.py - Prevent duplicate run() calls and add unique button key
 - Resolve manual file path issue in 10_マニュアル.py
 - Remove media_utils import from 05_結果確認.py - Complete media functionality removal
