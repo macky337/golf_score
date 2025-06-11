@@ -272,40 +272,68 @@ def resolve_version_json_conflict():
             content = f.read()
         
         # 競合マーカーで分割
-        parts = content.split('<<<<<<< HEAD')
-        if len(parts) < 2:
+        if '<<<<<<< HEAD' not in content:
             print("競合マーカーが見つかりません")
             return False
         
-        head_part = parts[1].split('=======')
-        ours = head_part[0].strip()
+        # 3-way merge形式の競合マーカーに対応
+        lines = content.split('\n')
+        ours_lines = []
+        theirs_lines = []
+        current_section = None
         
-        theirs_part = head_part[1].split('>>>>>>>')
-        theirs = theirs_part[0].strip()
+        for line in lines:
+            if line.startswith('<<<<<<< HEAD'):
+                current_section = 'ours'
+                continue
+            elif line.startswith('||||||| '):
+                current_section = 'base'  # 親コミット部分をスキップ
+                continue
+            elif line.startswith('======='):
+                current_section = 'theirs'
+                continue
+            elif line.startswith('>>>>>>> '):
+                current_section = None
+                continue
+            
+            if current_section == 'ours':
+                ours_lines.append(line)
+            elif current_section == 'theirs':
+                theirs_lines.append(line)
+        
+        ours = '\n'.join(ours_lines).strip()
+        theirs = '\n'.join(theirs_lines).strip()
         
         # 両方のバージョンからJSONデータを抽出
         import json
         try:
             ours_data = json.loads(ours)
-        except json.JSONDecodeError:
-            print("現在のバージョン情報が不正です")
+        except json.JSONDecodeError as e:
+            print(f"現在のバージョン情報が不正です: {e}")
+            print(f"パース対象データ: {repr(ours)}")
             ours_data = {"major": 0, "minor": 0, "patch": 0}
         
         try:
             theirs_data = json.loads(theirs)
-        except json.JSONDecodeError:
-            print("リモートのバージョン情報が不正です")
+        except json.JSONDecodeError as e:
+            print(f"リモートのバージョン情報が不正です: {e}")
+            print(f"パース対象データ: {repr(theirs)}")
             theirs_data = {"major": 0, "minor": 0, "patch": 0}
         
         # バージョン比較
         ours_version = (ours_data.get("major", 0), ours_data.get("minor", 0), ours_data.get("patch", 0))
         theirs_version = (theirs_data.get("major", 0), theirs_data.get("minor", 0), theirs_data.get("patch", 0))
         
+        print(f"現在のバージョン: {ours_version}")
+        print(f"リモートのバージョン: {theirs_version}")
+        
         # 大きい方を採用
         if ours_version >= theirs_version:
-            resolved_data = ours_data
+            resolved_data = ours_data.copy()
+            print(f"現在のバージョンを採用: {ours_version}")
         else:
-            resolved_data = theirs_data
+            resolved_data = theirs_data.copy()
+            print(f"リモートのバージョンを採用: {theirs_version}")
         
         # 最終更新日を現在に設定
         resolved_data["last_updated"] = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -318,6 +346,8 @@ def resolve_version_json_conflict():
         return True
     except Exception as e:
         print(f"version.jsonの競合解決中にエラーが発生しました: {e}")
+        import traceback
+        print(f"詳細なエラー情報: {traceback.format_exc()}")
         return False
 
 def main():
