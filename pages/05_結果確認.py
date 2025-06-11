@@ -27,7 +27,6 @@ from modules.match_analyzer import create_match_matrix, create_detailed_match_re
 from modules.data_formatter import highlight_total_only, color_points, get_color_points_function, get_color_function_for_column, apply_ranking_colors_to_dataframe
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
-from modules.media_utils import save_temporary_file, create_download_response, cleanup_old_files
 import traceback
 
 # ▼▼▼ フォント登録（日本語対応） ▼▼▼
@@ -482,9 +481,6 @@ def run():
         st.subheader("PDF出力")
         if st.button("スコア表をPDFで出力", use_container_width=True):
             try:
-                # 古いファイルのクリーンアップ
-                cleanup_old_files()
-                
                 pdf_df = df.copy()
                 # PDF用に数値に戻す必要がある場合、各列ごとに変換してください
                 for col in pdf_df.columns:
@@ -497,9 +493,6 @@ def run():
                 
                 # PDFファイル名を生成
                 pdf_filename = get_pdf_filename(active_round)
-                
-                # 一時ファイルとして保存（クリーンアップ用）
-                file_path = save_temporary_file(pdf_buffer.getvalue(), pdf_filename, "application/pdf")
                 
                 # ダウンロードボタンを提供
                 st.download_button(
