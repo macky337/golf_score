@@ -4,8 +4,6 @@ from scripts.version_manager import load_version
 import os
 from dotenv import load_dotenv
 import traceback
-from modules.url_handler import extract_media_path_from_url, is_social_media_crawler
-from modules.app_router import init_app_with_media_support
 
 # Streamlit ページ設定
 st.set_page_config(
@@ -18,28 +16,6 @@ st.set_page_config(
         'About': "Golf Score App - main"
     }
 )
-
-def handle_media_routing():
-    """URLルーティング: /media/パスへのアクセスを処理"""
-    # 高度なURL処理でメディアファイルアクセスを検出
-    filename = extract_media_path_from_url()
-    
-    if filename:
-        # メディアファイルアクセスが検出された場合
-        st.query_params['file'] = filename
-        switch_page("99_メディア")
-        return True
-    
-    # ソーシャルメディアクローラーによる特別処理
-    if is_social_media_crawler():
-        # User-Agentがソーシャルメディアクローラーの場合
-        current_url = os.getenv('REQUEST_URI', '')
-        if '/media/' in current_url or 'pdf' in current_url.lower():
-            # メディアファイルらしきアクセスの場合はメディアページに転送
-            switch_page("99_メディア")
-            return True
-    
-    return False
 
 def check_supabase_connection():
     """Supabaseの接続状況を確認する関数"""
@@ -72,14 +48,6 @@ def check_supabase_connection():
 def main():
     """メインページの表示関数"""
     try:
-        # アプリ初期化時にメディアルーティングをチェック
-        if init_app_with_media_support():
-            return  # メディアファイル処理が実行された場合は終了
-        
-        # 従来のメディアルーティングチェック（フォールバック）
-        if handle_media_routing():
-            return  # メディアハンドラーにリダイレクトされた場合は処理終了
-        
         st.title("⛳ Golf Score App")
         
         # アプリの説明とマニュアルリンク
