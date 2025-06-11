@@ -6,6 +6,7 @@
 - Remove media_utils import from 05_結果確認.py - Complete media functionality removal
 
 ### 更新
+- chore: Update version to 1.0.222 and changelog - Media functionality removal completed
 - "🔧 機能改善: auto_git_flow.py を更新 (2025/06/11 20:27)"
 - 🗑️ メディア関連ファイルとコードを完全削除 - サイドバーからメディアページを除去
 - "🗑️ 4個のファイルを削除 (2025/06/11 20:14)"
