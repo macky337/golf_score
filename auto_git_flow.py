@@ -3,6 +3,7 @@ import datetime
 import os
 import sys
 import locale
+import json
 
 # システムのエンコーディングを確認
 system_encoding = locale.getpreferredencoding()
@@ -251,6 +252,17 @@ def handle_conflicts():
             except Exception as e:
                 print(f"自動解決に失敗しました: {e}")
                 return False
+        elif file == 'CHANGELOG.md':
+            print(f"\n自動でCHANGELOG競合を解決しようとしています: {file}")
+            try:
+                if resolve_changelog_conflict():
+                    print(f"✅ {file}の競合を自動解決しました")
+                else:
+                    print(f"❌ {file}の自動解決に失敗しました")
+                    return False
+            except Exception as e:
+                print(f"自動解決に失敗しました: {e}")
+                return False
         else:
             print(f"\n{file}は自動解決に対応していません。手動で解決してください。")
             return False
@@ -260,6 +272,92 @@ def handle_conflicts():
     run_git_command(["git", "add", "."])
     
     return True
+
+def resolve_changelog_conflict():
+    """
+    CHANGELOG.mdのマージ競合を解決する
+    両方の変更をマージして統合する
+    """
+    try:
+        # 競合しているファイルを読み込む
+        with open('CHANGELOG.md', 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # 競合マーカーで分割
+        if '<<<<<<< HEAD' not in content:
+            print("競合マーカーが見つかりません")
+            return False
+        
+        # 3-way merge形式の競合マーカーに対応
+        lines = content.split('\n')
+        resolved_lines = []
+        ours_lines = []
+        theirs_lines = []
+        base_lines = []
+        current_section = None
+        
+        for line in lines:
+            if line.startswith('<<<<<<< HEAD'):
+                current_section = 'ours'
+                continue
+            elif line.startswith('||||||| '):
+                current_section = 'base'
+                continue
+            elif line.startswith('======='):
+                current_section = 'theirs'
+                continue
+            elif line.startswith('>>>>>>> '):
+                current_section = None
+                # ここで統合処理を行う
+                merged_section = merge_changelog_sections(ours_lines, theirs_lines, base_lines)
+                resolved_lines.extend(merged_section)
+                ours_lines = []
+                theirs_lines = []
+                base_lines = []
+                continue
+            
+            if current_section == 'ours':
+                ours_lines.append(line)
+            elif current_section == 'theirs':
+                theirs_lines.append(line)
+            elif current_section == 'base':
+                base_lines.append(line)
+            else:
+                resolved_lines.append(line)
+        
+        # 解決されたコンテンツをファイルに書き込み
+        with open('CHANGELOG.md', 'w', encoding='utf-8') as f:
+            f.write('\n'.join(resolved_lines))
+        
+        print("✅ CHANGELOG.mdの競合を自動解決しました")
+        return True
+    except Exception as e:
+        print(f"CHANGELOG.mdの競合解決中にエラーが発生しました: {e}")
+        import traceback
+        print(f"詳細なエラー情報: {traceback.format_exc()}")
+        return False
+
+def merge_changelog_sections(ours_lines, theirs_lines, base_lines):
+    """
+    CHANGELOGの複数セクションをマージする
+    重複を避けて統合する
+    """
+    # 両方のセクションの内容を収集
+    all_entries = []
+    
+    # 我々の変更を追加
+    for line in ours_lines:
+        line = line.strip()
+        if line and line not in all_entries and not line.startswith('#'):
+            all_entries.append(line)
+    
+    # 相手の変更を追加（重複チェック）
+    for line in theirs_lines:
+        line = line.strip()
+        if line and line not in all_entries and not line.startswith('#'):
+            all_entries.append(line)
+    
+    return all_entries
 
 def resolve_version_json_conflict():
     """

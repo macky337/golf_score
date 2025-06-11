@@ -2,7 +2,13 @@
 
 ## [2025-06-11]
 
+### 修正
+- Remove media_utils import from 05_結果確認.py - Complete media functionality removal
+
 ### 更新
+- resolve: Fix merge conflicts in CHANGELOG.md and version.json
+- "🔧 機能改善: 2個のファイルを更新 (2025/06/11 20:51)"
+- chore: Update version to 1.0.222 and changelog - Media functionality removal completed
 - "🔧 機能改善: 2個のファイルを更新 (2025/06/11 20:27)"
 - "🔧 機能改善: auto_git_flow.py を更新 (2025/06/11 20:27)"
 - マージ競合を解決: メディア削除をmainブランチに統合
