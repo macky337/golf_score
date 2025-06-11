@@ -453,6 +453,11 @@ def main():
     
     print("🚀 Git フローを開始します...\n")
     
+    # コマンドライン引数をチェック
+    force_merge = len(sys.argv) > 1 and sys.argv[1] == "--force-merge"
+    if force_merge:
+        print("🔄 強制マージモード: 変更がなくてもmainブランチマージを実行します\n")
+    
     # 0. Git状態を確認
     print("🔍 ステップ 0: Git状態を確認")
     if not check_git_status():
@@ -467,7 +472,7 @@ def main():
     print("\n💾 ステップ 2: 変更をコミット")
     commit_msg = generate_commit_message()
     
-    if commit_msg is None:
+    if commit_msg is None and not force_merge:
         print("📝 コミットする変更がありません。プッシュのみ実行します。")
         # プッシュのみ実行
         print("\n🔄 ステップ 3: developブランチに変更をプッシュ")
@@ -477,13 +482,25 @@ def main():
             print(f"\n⚠️ プッシュに失敗しました: {e}")
         
         print("\n✅ === プッシュ完了！ ===")
+        print("⚠️ 注意: mainブランチへのマージは実行されませんでした。")
+        print("変更がない場合でも、mainブランチとの同期を行いますか？ (手動でmainブランチマージを実行してください)")
+        print("💡 ヒント: python auto_git_flow.py --force-merge で強制マージが可能です")
         return
     
-    print(f"📝 コミットメッセージ: {commit_msg}")
+    if commit_msg is None:
+        commit_msg = "sync: Synchronize develop with main branch"
+        print(f"📝 強制マージモード: コミットメッセージ = {commit_msg}")
+    else:
+        print(f"📝 コミットメッセージ: {commit_msg}")
     
     # コミットメッセージにダブルクォーテーションを追加
     commit_msg_quoted = f'"{commit_msg}"'
-    run_git_command(["git", "commit", "-m", commit_msg_quoted], cwd=repo_dir)
+    
+    # 変更がある場合のみコミット実行
+    if not force_merge:
+        run_git_command(["git", "commit", "-m", commit_msg_quoted], cwd=repo_dir)
+    else:
+        print("📝 強制マージモードのため、コミットをスキップしてマージ処理に進みます")
     
     # 3. developブランチにプッシュ
     print("\n🔄 ステップ 3: developブランチに変更をプッシュ")
