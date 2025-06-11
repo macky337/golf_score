@@ -12,7 +12,7 @@ def run():
     with col1:
         st.title("マニュアル")
     with col2:
-        if st.button("🏠 Home"):
+        if st.button("🏠 Home", key="manual_home_button"):
             switch_page("main")
     
     # マニュアルの内容を読み込んで表示
@@ -43,6 +43,6 @@ def run():
 
 if __name__ == "__main__":
     run()
-
-# Streamlit Pages用の直接実行
-run()
+else:
+    # Streamlit Pages用の直接実行
+    run()
