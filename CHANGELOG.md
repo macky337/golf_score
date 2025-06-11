@@ -6,6 +6,7 @@
 - Remove media_utils import from 05_結果確認.py - Complete media functionality removal
 
 ### 更新
+- enhance: Add CHANGELOG.md conflict auto-resolution to auto_git_flow.py
 - resolve: Fix merge conflicts in CHANGELOG.md and version.json
 - "🔧 機能改善: 2個のファイルを更新 (2025/06/11 20:51)"
 - chore: Update version to 1.0.222 and changelog - Media functionality removal completed
