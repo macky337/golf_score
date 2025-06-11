@@ -2,6 +2,9 @@
 
 ## [2025-06-11]
 
+### 修正
+- Remove media_utils import from 05_結果確認.py - Complete media functionality removal
+
 ### 更新
 - "🔧 機能改善: auto_git_flow.py を更新 (2025/06/11 20:27)"
 - 🗑️ メディア関連ファイルとコードを完全削除 - サイドバーからメディアページを除去
