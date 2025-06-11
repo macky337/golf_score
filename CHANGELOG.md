@@ -3,6 +3,7 @@
 ## [2025-06-11]
 
 ### 修正
+- Resolve IndentationError in 10_マニュアル.py - Recreate manual page with proper structure
 - Enhanced manual file detection with fallback system - Add robust file search, Railway environment support, and embedded manual backup
 - Resolve StreamlitDuplicateElementId error in 10_マニュアル.py - Prevent duplicate run() calls and add unique button key
 - Resolve manual file path issue in 10_マニュアル.py
