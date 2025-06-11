@@ -17,12 +17,32 @@ def run():
     
     # マニュアルの内容を読み込んで表示
     try:
-        manual_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "マニュアル.md")
-        with open(manual_path, "r", encoding='utf-8') as f:
-            manual_content = f.read()
-        st.markdown(manual_content)
-    except FileNotFoundError:
+        # 複数のパスを試行する（より堅牢なファイル検索）
+        possible_paths = [
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "マニュアル.md"),
+            os.path.join(os.getcwd(), "マニュアル.md"),
+            r"C:\Users\user\Documents\GitHub\golf_score\マニュアル.md",
+            "マニュアル.md"
+        ]
+        
+        manual_content = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                with open(path, "r", encoding='utf-8') as f:
+                    manual_content = f.read()
+                break
+        
+        if manual_content:
+            st.markdown(manual_content)
+        else:
+            raise FileNotFoundError("マニュアルファイルが見つかりませんでした")
+            
+    except Exception as e:
         st.error("マニュアルファイルが見つかりません。")
+        st.info("管理者にお問い合わせください。")
 
 if __name__ == "__main__":
     run()
+
+# Streamlit Pages用の直接実行
+run()
