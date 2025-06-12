@@ -168,8 +168,23 @@ def main():
         connection_status = "✅ 接続済み" if supabase_connected else f"❌ 未接続 ({message})"
         connection_color = "green" if supabase_connected else "red"
         
-        # バージョン情報の表示
-        version_info = load_version()
+        # バージョン情報の表示（複数のフォールバック対応）
+        try:
+            version_info = load_version()
+        except Exception as e:
+            # フォールバック1: version.pyから読み込み
+            try:
+                from version import VERSION
+                version_info = VERSION
+            except Exception:
+                # フォールバック2: 固定値
+                version_info = {
+                    'major': 1,
+                    'minor': 0, 
+                    'patch': 237,
+                    'last_updated': '2025-06-11'
+                }
+        
         st.markdown("---")
         st.markdown(f"""
         <div style='text-align: right; color: gray; font-size: 0.8em;'>

@@ -906,7 +906,8 @@ def score_edit_tab():
                     edited_scores[member_id]["front_putt"] = st.number_input(
                         "フロントパット", 
                         min_value=0, 
-                        max_value=50,                        value=score.get('front_putt', 0) or 0,
+                        max_value=50,
+                        value=score.get('front_putt', 0) or 0,
                         key=f"front_putt_{member_id}"
                     )
                     edited_scores[member_id]["front_game_pt"] = st.number_input(
@@ -926,7 +927,8 @@ def score_edit_tab():
                         value=score.get('back_score', 0) or 0,
                         key=f"back_score_{member_id}"
                     )
-                    edited_scores[member_id]["back_putt"] = st.number_input(                        "バックパット", 
+                    edited_scores[member_id]["back_putt"] = st.number_input(
+                        "バックパット", 
                         min_value=0, 
                         max_value=50, 
                         value=score.get('back_putt', 0) or 0,
@@ -951,7 +953,8 @@ def score_edit_tab():
                             key=f"extra_score_{member_id}"
                         )
                         edited_scores[member_id]["extra_putt"] = st.number_input(
-                            "エキストラパット",                            min_value=0, 
+                            "エキストラパット",
+                            min_value=0, 
                             max_value=50, 
                             value=score.get('extra_putt', 0) or 0,
                             key=f"extra_putt_{member_id}"
