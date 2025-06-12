@@ -3,8 +3,8 @@ import datetime
 VERSION = {
     'major': 1,  # メジャーアップデート（大きな機能追加や破壊的変更）
     'minor': 0,  # マイナーアップデート（後方互換性のある機能追加）
-    'patch': 0,  # パッチ（バグ修正）
-    'last_updated': '2025-02-25'  # 最終更新日
+    'patch': 237,  # パッチ（バグ修正）
+    'last_updated': '2025-06-11'  # 最終更新日
 }
 
 def get_version_string():

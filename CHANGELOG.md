@@ -6,12 +6,15 @@
 - Add timeout functionality to git commands in auto_git_flow.py
 
 ### 修正
+- Resolve IndentationError in 10_マニュアル.py - Recreate manual page with proper structure
 - Enhanced manual file detection with fallback system - Add robust file search, Railway environment support, and embedded manual backup
 - Resolve StreamlitDuplicateElementId error in 10_マニュアル.py - Prevent duplicate run() calls and add unique button key
 - Resolve manual file path issue in 10_マニュアル.py
 - Remove media_utils import from 05_結果確認.py - Complete media functionality removal
 
 ### 更新
+- マージ競合を自動解決
+- "🔧 機能改善: "pages/10_\343\203\236\343\203\213\343\203\245\343\202\242\343\203\253.py" を更新 (2025/06/11 22:26)"
 - "🔧 機能改善: 2個のファイルを更新 (2025/06/11 22:12)"
 - enhance: Improve auto_git_flow.py with force-merge option and better debugging
 - "🔧 機能改善: 2個のファイルを更新 (2025/06/11 21:06)"
