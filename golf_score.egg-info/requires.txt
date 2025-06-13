@@ -1,6 +1,0 @@
-streamlit
-pandas
-supabase
-python-dotenv
-reportlab
-streamlit-extras
