@@ -1,7 +1,7 @@
 import streamlit as st
 import sys
 import os
-from streamlit_extras.switch_page_button import switch_page
+from modules.page_utils import switch_page
 
 # モジュールのインポートパスを追加
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

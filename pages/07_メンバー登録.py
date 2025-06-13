@@ -6,7 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import streamlit as st
 import pandas as pd
 from modules.db import supabase
-from streamlit_extras.switch_page_button import switch_page
+from modules.page_utils import switch_page
 from modules.models import get_members_list
 
 # ページ設定

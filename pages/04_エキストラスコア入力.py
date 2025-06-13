@@ -10,7 +10,7 @@ if parent_dir not in sys.path:
 import streamlit as st
 import pandas as pd
 from modules.db import supabase
-from streamlit_extras.switch_page_button import switch_page
+from modules.page_utils import switch_page
 # 追加: 必要なモジュールをインポート
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results

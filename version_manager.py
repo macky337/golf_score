@@ -6,7 +6,7 @@ class VersionManager:
     def __init__(self):
         self.version_file = 'version.json'
         self.load_version()
-      def load_version(self):
+    def load_version(self):
         if os.path.exists(self.version_file):
             with open(self.version_file, 'r') as f:
                 self.version = json.load(f)
