@@ -181,8 +181,8 @@ def main():
                 version_info = {
                     'major': 1,
                     'minor': 0, 
-                    'patch': 237,
-                    'last_updated': '2025-06-11'
+                    'patch': 246,
+                    'last_updated': '2025-06-14'
                 }
         
         st.markdown("---")
