@@ -1,21 +1,5 @@
 import streamlit as st
-# from streamlit_extras.switch_page_button import switch_page
-import streamlit as st
-
-# switch_page の代替実装
-def switch_page(page_name):
-    """ページ遷移の代替実装"""
-    # ページ名からファイル名を推測
-    if page_name.startswith("pages/"):
-        page_file = page_name
-    elif page_name.endswith(".py"):
-        page_file = f"pages/{page_name}"
-    else:
-        page_file = f"pages/{page_name}.py"
-    
-    # セッション状態を使用してページ遷移をシミュレート
-    st.session_state.current_page = page_name
-    st.rerun()
+from modules.page_utils import switch_page
 from scripts.version_manager import load_version
 import os
 from dotenv import load_dotenv
