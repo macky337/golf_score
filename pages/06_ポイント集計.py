@@ -14,7 +14,7 @@ import numpy as np
 from modules.db import supabase
 from modules.supabase_client import get_supabase_client  # supabase_client から直接インポート
 import calendar
-from streamlit_extras.switch_page_button import switch_page
+from modules.page_utils import switch_page
 import plotly.express as px
 import plotly.graph_objects as go
 

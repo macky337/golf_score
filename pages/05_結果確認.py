@@ -14,7 +14,7 @@ import pandas as pd
 import os
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from streamlit_extras.switch_page_button import switch_page
+from modules.page_utils import switch_page
 
 # ▼▼▼ 必要モジュールのインポート ▼▼▼
 from modules.supabase_client import (

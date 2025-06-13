@@ -1,21 +1,5 @@
 import streamlit as st
-# from streamlit_extras.switch_page_button import switch_page
-import streamlit as st
-
-# switch_page の代替実装
-def switch_page(page_name):
-    """ページ遷移の代替実装"""
-    # ページ名からファイル名を推測
-    if page_name.startswith("pages/"):
-        page_file = page_name
-    elif page_name.endswith(".py"):
-        page_file = f"pages/{page_name}"
-    else:
-        page_file = f"pages/{page_name}.py"
-    
-    # セッション状態を使用してページ遷移をシミュレート
-    st.session_state.current_page = page_name
-    st.rerun()
+from streamlit import switch_page
 from scripts.version_manager import load_version
 import os
 from dotenv import load_dotenv
@@ -76,7 +60,7 @@ def main():
         with col2:
             # マニュアルページへのリンク
             if st.button("📚 マニュアル", key="manual_button"):
-                switch_page("10_マニュアル")
+                switch_page("09_マニュアル")
 
         # メインメニューの作成
         st.subheader("📌 メインメニュー")
@@ -88,21 +72,10 @@ def main():
             st.markdown("### 📝 スコア入力")
             if st.button("ラウンド設定", key="nav_main_round_settings"): 
                 st.write("ボタン押下: ラウンド設定")
-                # デバッグ: ファイルの存在確認
-                import os
-                page_path = os.path.join("pages", "01_ラウンド設定.py")
-                st.write(f"デバッグ: ファイルパス = {page_path}")
-                st.write(f"デバッグ: ファイル存在 = {os.path.exists(page_path)}")
                 try:
                     switch_page("01_ラウンド設定")
                 except Exception as e:
                     st.error(f"switch_page例外: {e}")
-                    # 他の方法も試してみる
-                    try:
-                        st.write("別の方法を試行中...")
-                        switch_page("pages/01_ラウンド設定")
-                    except Exception as e2:
-                        st.error(f"別の方法でも失敗: {e2}")
             if st.button("フロントスコア入力", key="nav_main_front"): 
                 st.write("ボタン押下: フロントスコア入力")
                 try:
@@ -117,7 +90,7 @@ def main():
             if st.button("エキストラスコア入力", key="nav_main_extra"): 
                 st.write("ボタン押下: エキストラスコア入力")
                 try:
-                    switch_page("04_エキストラスコア入力")
+                    switch_page("05_エキストラスコア入力")
                 except Exception as e:
                     st.error(f"switch_page例外: {e}")
                     
@@ -126,13 +99,13 @@ def main():
             if st.button("結果確認", key="nav_main_results"): 
                 st.write("ボタン押下: 結果確認")
                 try:
-                    switch_page("05_結果確認")
+                    switch_page("06_結果確認")
                 except Exception as e:
                     st.error(f"switch_page例外: {e}")
             if st.button("ポイント集計", key="nav_main_points"): 
                 st.write("ボタン押下: ポイント集計")
                 try:
-                    switch_page("06_ポイント集計")
+                    switch_page("07_ポイント集計")
                 except Exception as e:
                     st.error(f"switch_page例外: {e}")
             if st.button("管理画面", key="nav_main_admin"): 
@@ -144,7 +117,7 @@ def main():
             if st.button("メンバー登録", key="nav_main_members"): 
                 st.write("ボタン押下: メンバー登録")
                 try:
-                    switch_page("07_メンバー登録")
+                    switch_page("08_メンバー登録")
                 except Exception as e:
                     st.error(f"switch_page例外: {e}")
             if st.button("コース管理", key="nav_main_courses"): 

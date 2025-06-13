@@ -6,7 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import streamlit as st
 import datetime
 from modules.db import supabase
-from streamlit_extras.switch_page_button import switch_page
+from modules.page_utils import switch_page
 from modules.models import get_course_list, get_or_create_course, get_course_by_id, get_members_list
 
 

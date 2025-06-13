@@ -44,7 +44,7 @@ except ImportError as e:
     # エラー時の代替処理用
     supabase = None
 
-from streamlit_extras.switch_page_button import switch_page
+from modules.page_utils import switch_page
 
 # パスワード取得関数を完全にインライン化
 def get_admin_password():
