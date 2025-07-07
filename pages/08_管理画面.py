@@ -124,7 +124,7 @@ def run():
         st.title("管理画面")
     with col2:
         if st.button("🏠 Home"):
-            st.switch_page("app.py")
+            st.switch_page("main.py")
     
     if not check_password():
         return

@@ -84,7 +84,7 @@ def run():
         st.title("ラウンド設定")
     with col2:
         if st.button("🏠 Home"):
-            st.switch_page("app.py")
+            st.switch_page("main.py")
 
     # メンバー一覧の取得（ID順） 
     members = get_members_list()

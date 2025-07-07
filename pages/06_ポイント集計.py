@@ -32,7 +32,7 @@ def run():
         st.title("ポイント集計")
     with col2:
         if st.button("🏠 Home"):
-            st.switch_page("app.py")
+            st.switch_page("main.py")
 
     # Supabaseクライアントを取得
     supabase = ensure_supabase()

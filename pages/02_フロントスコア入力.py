@@ -29,7 +29,9 @@ def run():
     if "active_round_id" not in st.session_state:
         st.error("ラウンドが選択されていません。ホーム画面から選択してください。")
         if st.button("ホームに戻る"):
-            st.switch_page("app.py")
+            # セッション状態をクリアしてホームページに戻る
+            st.session_state.clear()
+            st.switch_page("main.py")
         return
     
     round_id = st.session_state.active_round_id

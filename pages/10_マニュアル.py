@@ -13,7 +13,7 @@ def run():
         st.title("マニュアル")
     with col2:
         if st.button("🏠 Home", key="manual_home_button"):
-            st.switch_page("app.py")
+            st.switch_page("main.py")
     
     # マニュアルの内容を表示
     display_embedded_manual()

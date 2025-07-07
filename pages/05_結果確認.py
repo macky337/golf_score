@@ -132,7 +132,7 @@ def run():
             st.title("結果確認")
         with col2:
             if st.button("🏠 Home"):
-                st.switch_page("app.py")
+                st.switch_page("main.py")
 
         # CSSスタイルを追加 - プレイヤー名の表示問題を修正
         st.markdown(

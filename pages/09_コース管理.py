@@ -25,7 +25,7 @@ def run():
         st.title("コース管理")
     with col2:
         if st.button("🏠 Home"):
-            st.switch_page("app.py")
+            st.switch_page("main.py")
             
     # 既存コースの一覧を表示
     courses = get_course_list()

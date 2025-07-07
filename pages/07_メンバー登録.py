@@ -26,7 +26,7 @@ def run():
         st.title("メンバー登録")
     with col2:
         if st.button("🏠 Home"):
-            st.switch_page("app.py")
+            st.switch_page("main.py")
 
     # 既存メンバーの表示（ID昇順で取得するように変更）
     members = get_members_list()
