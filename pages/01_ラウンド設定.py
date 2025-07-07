@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 import datetime
-from modules.db import supabase
+from modules.db import ensure_supabase
 from modules.page_utils import switch_page
 from modules.models import get_course_list, get_or_create_course, get_course_by_id, get_members_list
 
@@ -27,6 +27,7 @@ def create_score_records(supabase, round_id, member_ids):
         return False
     
     for member_id in member_ids:
+        player_name = f"Player {member_id}"  # デフォルト値を設定
         try:
             # メンバー情報を取得してプレイヤー名をログに表示
             member_info = supabase.table('member').select('name').eq('member_id', member_id).execute()
@@ -64,6 +65,7 @@ def create_score_records(supabase, round_id, member_ids):
 
 def run():
     # ▼▼▼ 未確定ラウンド選択セクション ▼▼▼
+    supabase = ensure_supabase()
     unfinalized_rounds = supabase.table('rounds').select('round_id', 'date_played', 'course_name').eq('finalized', False).order('date_played', desc=True).execute().data
     if unfinalized_rounds:
         st.write('### 未確定ラウンドの選択')
@@ -82,7 +84,7 @@ def run():
         st.title("ラウンド設定")
     with col2:
         if st.button("🏠 Home"):
-            switch_page("main")
+            st.switch_page("app.py")
 
     # メンバー一覧の取得（ID順） 
     members = get_members_list()

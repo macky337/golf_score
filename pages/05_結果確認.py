@@ -17,6 +17,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from modules.page_utils import switch_page
 
 # ▼▼▼ 必要モジュールのインポート ▼▼▼
+from modules.db import ensure_supabase
 from modules.supabase_client import (
     get_supabase_client,
     get_scores_with_fallback,
@@ -122,14 +123,8 @@ def initialize_player_data(scores, round_results):
 def run():
     """結果確認画面のメイン関数"""
     try:
-        # エラーハンドリングを追加
-        if 'supabase' not in st.session_state:
-            supabase = get_supabase_client()
-            if supabase is None:
-                st.error("データベースに接続できません。しばらくしてから再度お試しください。")
-                return
-        else:
-            supabase = st.session_state.supabase
+        # Supabaseクライアントを取得
+        supabase = ensure_supabase()
 
         # タイトルとホームボタンのレイアウト
         col1, col2 = st.columns([0.8, 0.2])
@@ -137,7 +132,7 @@ def run():
             st.title("結果確認")
         with col2:
             if st.button("🏠 Home"):
-                switch_page("main")
+                st.switch_page("app.py")
 
         # CSSスタイルを追加 - プレイヤー名の表示問題を修正
         st.markdown(
@@ -253,6 +248,12 @@ def run():
 
         # ラウンド情報を取得
         round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
+        
+        # 変数の初期化（広いスコープで定義）
+        handicaps = {}
+        total_only_set = set()
+        match_results = None
+        match_matrix = None
         active_round = round_result.data[0] if round_result.data else None
         if not active_round:
             st.error("選択されたラウンドが見つかりません。")
@@ -303,6 +304,8 @@ def run():
                 return
         except Exception as e:
             st.error(f"データ取得中にエラーが発生しました: {str(e)}")
+            # より詳細なエラー情報を表示
+            import traceback
             st.error(traceback.format_exc())
             return
 
@@ -321,7 +324,7 @@ def run():
         player_ids = sorted(list(player_data.keys()))
         
         if handicaps_data:
-            # ハンディキャップ辞書作成
+            # ハンディキャップ辞書作成（グローバル変数を更新）
             handicaps = {}
             total_only_set = set()
             for h in handicaps_data:
@@ -390,7 +393,10 @@ def run():
         # 列ごとに適切な色付け関数を適用
         styled_df = df.style.apply(highlight_total_only, axis=1)
         
-        if use_ranking_colors and 'ranking_column' in locals():
+        # ranking_columnの初期化
+        ranking_column = None
+        
+        if use_ranking_colors and 'ranking_column' in locals() and ranking_column is not None:
             # 順位ベースグラデーションを適用
             ranking_colors = apply_ranking_colors_to_dataframe(df, ranking_column)
             styled_df = styled_df.apply(lambda x: ranking_colors, axis=0, subset=[ranking_column])
@@ -422,6 +428,9 @@ def run():
         
         # マッチ対戦表の作成と表示
         if handicaps_data:
+            # 変数の初期化（既に定義済みのhandicapsとtotal_only_setを使用）
+            color_func = get_color_points_function()
+            
             match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
             match_matrix_reset = match_matrix.reset_index()
             match_matrix_reset.rename(columns={'index': 'Player'}, inplace=True)
@@ -486,7 +495,7 @@ def run():
                 for col in pdf_df.columns:
                     pdf_df[col] = pd.to_numeric(pdf_df[col], errors='coerce').fillna(0)
                 
-                if handicaps_data:
+                if handicaps_data and 'match_results' in locals() and 'match_matrix' in locals():
                     pdf_buffer = generate_pdf(pdf_df, match_results, match_matrix, active_round)
                 else:
                     pdf_buffer = generate_pdf(pdf_df, None, None, active_round)
@@ -533,7 +542,7 @@ def run():
             
             if st.button("このラウンドを確定する", type="primary"):
                 try:
-                    if handicaps_data:
+                    if handicaps_data and 'handicaps' in locals() and 'total_only_set' in locals():
                         updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
                     else:
                         updated_player_data = player_data

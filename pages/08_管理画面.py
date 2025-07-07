@@ -30,21 +30,44 @@ if os.path.exists(modules_path) and modules_path not in sys.path:
     sys.path.insert(0, modules_path)
 
 try:
-    from modules.db import supabase
-    
+    from modules.db import get_supabase, ensure_supabase
     from modules.models import *
     from modules.game_points import calculate_game_pt
     from modules.calculation_logic import calculate_player_points
     from modules.round_results import save_round_results, get_round_results
-    from modules.supabase_client import get_supabase_client
     import_success = True
+    # Supabaseクライアントを取得
+    supabase = get_supabase()
+    if not supabase:
+        supabase = ensure_supabase()
 except ImportError as e:
     st.error(f"モジュールのインポートエラー: {e}")
     import_success = False
     # エラー時の代替処理用
     supabase = None
+    # 代替のensure_supabase関数を定義
+    def ensure_supabase():
+        from modules.supabase_client import get_supabase_client
+        client = get_supabase_client()
+        if not client:
+            st.error("⚠️ データベース接続エラー")
+            st.stop()
+        return client
+    
+    # 代替の関数を定義
+    def calculate_player_points(*args, **kwargs):
+        st.error("calculation_logicモジュールが利用できません")
+        return {}, {}, {}, {}
+    
+    def save_round_results(*args, **kwargs):
+        st.error("round_resultsモジュールが利用できません")
+        return False
+    
+    def get_round_results(*args, **kwargs):
+        st.error("round_resultsモジュールが利用できません")
+        return {}
 
-from modules.page_utils import switch_page
+# from modules.page_utils import switch_page  # 未使用のため削除
 
 # パスワード取得関数を完全にインライン化
 def get_admin_password():
@@ -101,7 +124,7 @@ def run():
         st.title("管理画面")
     with col2:
         if st.button("🏠 Home"):
-            switch_page("main")
+            st.switch_page("app.py")
     
     if not check_password():
         return
@@ -141,6 +164,11 @@ def recalculate_single_round(round_id):
 def recalculate_scores(round_id):
     """ラウンドのスコアを再計算する"""
     try:
+        # Supabaseクライアントを取得
+        supabase = ensure_supabase()
+        if not supabase:
+            raise Exception("Supabaseクライアントが初期化できません")
+        
         # ラウンドのスコアデータを取得
         scores = supabase.table('score').select('*').eq('round_id', round_id).execute().data
         
@@ -262,6 +290,9 @@ def recalculate_scores(round_id):
 def show_score_editor():
     st.subheader("スコア修正")
     
+    # Supabaseクライアントを取得
+    supabase = ensure_supabase()
+    
     # ラウンドデータの取得
     rounds_result = supabase.table('rounds').select('*').order('date_played', desc=True).execute()
     rounds = rounds_result.data
@@ -308,8 +339,9 @@ def show_score_editor():
                     
                 except Exception as e:
                     st.error(f"ラウンドの削除中にエラーが発生しました: {str(e)}")
-                    if hasattr(e, 'details'):
-                        st.error(f"エラーの詳細: {e.details}")
+                    # 詳細なエラー情報を表示（安全な方法）
+                    import traceback
+                    st.error(f"エラーの詳細: {traceback.format_exc()}")
         
         if round_data:
             # スコアデータの取得
@@ -411,6 +443,9 @@ def show_score_editor():
 
 def show_handicap_editor():
     st.subheader("ハンディキャップ修正")
+    
+    # Supabaseクライアントを取得
+    supabase = ensure_supabase()
     
     # ラウンドデータの取得
     rounds_result = supabase.table('rounds').select('*').order('date_played', desc=True).execute()
@@ -528,6 +563,9 @@ def show_handicap_editor():
 def show_member_manager():
     st.subheader("メンバー管理")
     
+    # Supabaseクライアントを取得
+    supabase = ensure_supabase()
+    
     # メンバーデータの取得 (ID昇順)
     members_result = supabase.table('member').select('*').order('member_id').execute()
     members = members_result.data
@@ -630,6 +668,9 @@ def show_backup_restore():
             if st.form_submit_button("バックアップを作成"):
                 try:
                     with st.spinner("バックアップを作成中..."):
+                        # Supabaseクライアントを取得
+                        supabase = ensure_supabase()
+                        
                         # 全テーブルのデータを取得
                         rounds = supabase.table('rounds').select('*').execute().data
                         scores = supabase.table('score').select('*').execute().data
@@ -677,6 +718,9 @@ def show_backup_restore():
                     if st.form_submit_button("リストアを実行"):
                         try:
                             with st.spinner("リストア中..."):
+                                # Supabaseクライアントを取得
+                                supabase = ensure_supabase()
+                                
                                 result = supabase.table('backups').select('*').eq('backup_id', selected_backup['id']).execute()
                                 
                                 if not result.data:
@@ -732,6 +776,10 @@ def show_backup_restore():
                                     
                                     if valid_scores:
                                         supabase.table('score').insert(valid_scores).execute()
+                                else:
+                                    # スコアデータがない場合も空のvalid_round_idsを定義
+                                    rounds_result = supabase.table('rounds').select('round_id').execute()
+                                    valid_round_ids = {r['round_id'] for r in rounds_result.data}
                                 
                                 if backup_data.get('handicap_matches'):
                                     st.write("ハンディキャップデータを復元中...")
@@ -753,8 +801,9 @@ def show_backup_restore():
                                 st.rerun()
                         except Exception as e:
                             st.error(f"リストア中にエラーが発生しました: {str(e)}")
-                            if hasattr(e, 'details'):
-                                st.error(f"エラーの詳細: {e.details}")
+                            # 詳細なエラー情報を表示（安全な方法）
+                            import traceback
+                            st.error(f"エラーの詳細: {traceback.format_exc()}")
             else:
                 st.info("バックアップが見つかりません")
         except Exception as e:
@@ -762,6 +811,8 @@ def show_backup_restore():
 
 def save_backup_to_supabase(backup_data):
     """バックアップデータをSupabaseに保存（最新5件まで）"""
+    supabase = ensure_supabase()
+    
     try:
         # 既存のバックアップを取得
         existing_backups = supabase.table('backups').select('*').order('created_at', desc=True).execute()
@@ -792,6 +843,7 @@ def save_backup_to_supabase(backup_data):
 
 def get_backups_from_supabase():
     """Supabaseからバックアップ一覧を取得"""
+    supabase = ensure_supabase()
     result = supabase.table('backups').select('*').order('created_at', desc=True).execute()
     return result.data
 
@@ -800,7 +852,7 @@ def score_edit_tab():
     st.header("スコア修正")
     
     # ラウンド選択
-    supabase = get_supabase_client()
+    supabase = ensure_supabase()
     rounds_result = supabase.table('rounds').select('round_id', 'date_played', 'course_name').order('date_played', desc=True).execute()
     
     if not rounds_result.data:
@@ -857,8 +909,9 @@ def score_edit_tab():
                 
             except Exception as e:
                 st.error(f"ラウンドの削除中にエラーが発生しました: {str(e)}")
-                if hasattr(e, 'details'):
-                    st.error(f"エラーの詳細: {e.details}")
+                # 詳細なエラー情報を表示（安全な方法）
+                import traceback
+                st.error(f"エラーの詳細: {traceback.format_exc()}")
     
     # 選択されたラウンドのスコア情報を取得
     scores_result = supabase.table('score').select('*, member:member_id(name)').eq('round_id', round_id).execute()
@@ -869,6 +922,11 @@ def score_edit_tab():
     
     # ラウンド情報を取得（確定状態の表示用）
     round_info = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
+    
+    # 変数の初期化
+    is_finalized = False
+    has_extra = False
+    
     if round_info.data:
         is_finalized = round_info.data[0].get('finalized', False)
         has_extra = round_info.data[0].get('has_extra', False)
@@ -1078,14 +1136,17 @@ def score_edit_tab():
     st.markdown("---")
     if st.button("結果確認画面へ移動", use_container_width=True):
         st.session_state.active_round_id = round_id
-        switch_page("06_結果確認")
+        st.switch_page("pages/05_結果確認.py")
 
 def show_balance_diagnostics():
     """ポイントバランス診断と修復機能"""
     st.header("ポイントバランス診断")
     
     # 現在のポイントバランスを確認
-    try:        # 全ラウンドの合計ポイントを計算
+    supabase = ensure_supabase()
+    
+    try:        
+        # 全ラウンドの合計ポイントを計算
         all_rounds = supabase.table('rounds').select('*').execute().data
         total_balance = 0
         round_details = []
@@ -1167,8 +1228,10 @@ def show_balance_diagnostics():
         import traceback
         st.error(traceback.format_exc())
 
-def recalculate_single_round(round_id):
-    """単一ラウンドのポイントを再計算する"""
+def recalculate_single_round_v2(round_id):
+    """単一ラウンドのポイントを再計算する（別実装）"""
+    supabase = ensure_supabase()
+    
     try:
         # ラウンドのスコアデータを取得
         scores = supabase.table('score').select('*').eq('round_id', round_id).execute().data
@@ -1194,7 +1257,7 @@ def recalculate_single_round(round_id):
             
             # ゲームポイントを計算
             front_gp, back_gp, extra_gp, total_pt = calculate_player_points(
-                round_id, member_id, player_ids, handicap_map
+                round_id, member_id, player_ids, handicap_map, active_round={'round_id': round_id}
             )
             
             # スコアを更新
@@ -1225,6 +1288,8 @@ def show_detailed_balance_report(round_details):
     
     if problematic_rounds:
         st.warning(f"{len(problematic_rounds)}個のラウンドで不均衡が検出されました")
+        
+        supabase = ensure_supabase()
         
         for round_info in problematic_rounds:
             with st.expander(f"ラウンド {round_info['round_id']} - {round_info['date']} ({round_info['round_total']:+d}pt)"):

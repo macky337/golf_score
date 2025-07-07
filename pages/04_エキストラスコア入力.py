@@ -9,7 +9,7 @@ if parent_dir not in sys.path:
 
 import streamlit as st
 import pandas as pd
-from modules.db import supabase
+from modules.db import ensure_supabase
 from modules.page_utils import switch_page
 # 追加: 必要なモジュールをインポート
 from modules.calculation_logic import calculate_player_points
@@ -21,11 +21,14 @@ def run():
     
     st.title("エキストラスコア入力")
     
+    # Supabaseクライアントを取得
+    supabase = ensure_supabase()
+    
     # アクティブなラウンドIDをセッション状態から取得
     if "active_round_id" not in st.session_state:
         st.error("ラウンドが選択されていません。ホーム画面から選択してください。")
         if st.button("ホームに戻る"):
-            switch_page("main")
+            st.switch_page("app.py")
         return
     
     round_id = st.session_state.active_round_id
@@ -161,10 +164,10 @@ def run():
         save_success = True
         save_errors = []        # スコア情報を更新
         for score in scores_data:
+            member_id = score['member_id']
+            member_name = score['member']['name'] if score['member'] else f"Player {member_id}"
+            
             try:
-                member_id = score['member_id']
-                member_name = score['member']['name'] if score['member'] else f"Player {member_id}"
-                
                 # セッション状態から値を取得
                 extra_score_key = f"extra_score_{member_id}"
                 extra_putt_key = f"extra_putt_{member_id}" 

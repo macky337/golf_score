@@ -9,7 +9,7 @@ if parent_dir not in sys.path:
 
 import streamlit as st
 import pandas as pd
-from modules.db import supabase
+from modules.db import ensure_supabase
 from modules.page_utils import switch_page
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
@@ -18,11 +18,14 @@ from modules.supabase_client import get_scores_with_fallback
 def run():
     st.title("バックスコア入力")
     
+    # Supabaseクライアントを取得
+    supabase = ensure_supabase()
+    
     # アクティブなラウンドIDをセッション状態から取得
     if "active_round_id" not in st.session_state:
         st.error("ラウンドが選択されていません。ホーム画面から選択してください。")
         if st.button("ホームに戻る"):
-            switch_page("main")
+            st.switch_page("app.py")
         return
     
     round_id = st.session_state.active_round_id
@@ -259,7 +262,7 @@ def run():
         if hasattr(_st, "rerun"):
             _st.rerun()
         else:
-            _st.experimental_rerun()
+            st.rerun()
 
 if __name__ == "__main__":
     run()
