@@ -202,6 +202,16 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
         d["Total Pt"] = d["Game Pt"] + d["Match Pt"] + d["Putt Pt"]
 
     round_id = active_round.get('round_id')
+    
+    # round_idの型安全チェック
+    if isinstance(round_id, str):
+        try:
+            round_id = int(round_id)
+        except ValueError:
+            round_id = 0  # 無効な場合はデフォルト値
+    elif round_id is None:
+        round_id = 0
+    
     is_test_round = round_id > 900 or active_round.get('is_test', False)  # テストフラグも確認
     
     if round_id and not is_test_round:  # テストモードではデータを保存しない
