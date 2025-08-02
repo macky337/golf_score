@@ -1,8 +1,14 @@
 import sys
 import os
 
-# モジュールのインポートパスを追加
-current_dir = os.path.dirname(os.path.abspath(__file__))
+# モジュールのインポートパスを追加（__file__の代替手法を使用）
+try:
+    # Streamlit環境での実行時
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+except NameError:
+    # テスト環境などで__file__が未定義の場合
+    current_dir = os.getcwd()
+    
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
@@ -14,8 +20,6 @@ import json
 
 # 既存ロジックのインポート
 from modules.calculation_logic import calculate_player_points
-from modules.data_formatter import initialize_player_data
-from modules.round_results import save_round_results, get_round_results
 
 def main():
     st.set_page_config(
@@ -112,28 +116,37 @@ def main():
     
     # メインタブ（エキストラホール対応）
     round_info = st.session_state['round_info']
-    if round_info.get('has_extra', False):
+    has_extra = round_info.get('has_extra', False)
+    
+    if has_extra:
         tab1, tab2, tab3, tab4, tab5 = st.tabs(["⛳ スコア入力", "🎯 ハンディキャップ設定", "🎉 エキストラホール", "📊 リアルタイム結果", "📄 PDF出力"])
-    else:
-        tab1, tab2, tab3, tab4 = st.tabs(["⛳ スコア入力", "🎯 ハンディキャップ設定", "📊 リアルタイム結果", "📄 PDF出力"])
-    
-    with tab1:
-        show_score_input()
-    
-    with tab2:
-        show_handicap_settings()
-    
-    # エキストラホールタブ（条件付き表示）
-    if round_info.get('has_extra', False):
+        
+        with tab1:
+            show_score_input()
+        
+        with tab2:
+            show_handicap_settings()
+        
         with tab3:
             show_extra_hole_input()
+        
         with tab4:
             show_realtime_results()
+        
         with tab5:
             show_pdf_export()
     else:
+        tab1, tab2, tab3, tab4 = st.tabs(["⛳ スコア入力", "🎯 ハンディキャップ設定", "📊 リアルタイム結果", "📄 PDF出力"])
+        
+        with tab1:
+            show_score_input()
+        
+        with tab2:
+            show_handicap_settings()
+        
         with tab3:
             show_realtime_results()
+        
         with tab4:
             show_pdf_export()
 

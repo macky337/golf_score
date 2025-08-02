@@ -14,6 +14,25 @@ from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
 from modules.supabase_client import get_scores_with_fallback
 
+def get_score_color(value, score_type):
+    """スコアタイプに応じた色を返す"""
+    if score_type == "score":
+        if value <= 40: return '#28a745'    # 緑 - 素晴らしい
+        elif value <= 45: return '#17a2b8'  # 水色 - 良い
+        elif value <= 50: return '#ffc107'  # 黄 - 普通
+        elif value <= 55: return '#fd7e14'  # オレンジ - 要改善
+        else: return '#dc3545'              # 赤 - 困難
+    elif score_type == "putt":
+        if value <= 14: return '#28a745'    # 素晴らしい
+        elif value <= 18: return '#17a2b8'  # 良い
+        elif value <= 20: return '#ffc107'  # 普通
+        else: return '#fd7e14'              # 改善余地あり
+    else:  # game_pt
+        if value >= 20: return '#28a745'    # 大勝利
+        elif value >= 0: return '#17a2b8'   # プラス
+        elif value >= -10: return '#ffc107' # 小さなマイナス
+        else: return '#fd7e14'              # 大きなマイナス
+
 def create_mobile_score_input(label, current_value, key, score_type="score"):
     """モバイル最適化されたスコア入力UI"""
     
@@ -21,37 +40,12 @@ def create_mobile_score_input(label, current_value, key, score_type="score"):
     if score_type == "score":
         typical_range = list(range(35, 65, 5))  # 35, 40, 45, 50, 55, 60
         min_val, max_val = 25, 80
-        color_scheme = {
-            'excellent': '#28a745',  # 緑
-            'good': '#17a2b8',       # 水色
-            'average': '#ffc107',    # 黄
-            'challenging': '#fd7e14', # オレンジ
-            'difficult': '#dc3545'   # 赤
-        }
-        def get_color(score):
-            if score <= 40: return color_scheme['excellent']
-            elif score <= 45: return color_scheme['good']
-            elif score <= 50: return color_scheme['average']
-            elif score <= 55: return color_scheme['challenging']
-            else: return color_scheme['difficult']
-            
     elif score_type == "putt":
         typical_range = list(range(12, 25, 2))  # 12, 14, 16, 18, 20, 22, 24
         min_val, max_val = 8, 30
-        def get_color(putts):
-            if putts <= 14: return '#28a745'    # 素晴らしい
-            elif putts <= 18: return '#17a2b8'  # 良い
-            elif putts <= 20: return '#ffc107'  # 普通
-            else: return '#fd7e14'              # 改善余地あり
-            
     else:  # game_pt
         typical_range = [-30, -20, -10, 0, 10, 20, 30]
         min_val, max_val = -100, 100
-        def get_color(game_pts):
-            if game_pts >= 20: return '#28a745'      # 大勝利
-            elif game_pts >= 0: return '#17a2b8'     # プラス
-            elif game_pts >= -10: return '#ffc107'   # 小さなマイナス
-            else: return '#fd7e14'              # 大きなマイナス
     
     # ラベル表示
     st.markdown(f"""
@@ -61,7 +55,7 @@ def create_mobile_score_input(label, current_value, key, score_type="score"):
     """, unsafe_allow_html=True)
     
     # 現在の値の大きな表示
-    current_color = get_color(current_value)
+    current_color = get_score_color(current_value, score_type)
     st.markdown(f"""
     <div style='text-align: center; font-size: 32px; font-weight: bold; 
                 background: linear-gradient(135deg, {current_color}, {current_color}dd); 
@@ -77,7 +71,7 @@ def create_mobile_score_input(label, current_value, key, score_type="score"):
     cols = st.columns(len(typical_range))
     for i, val in enumerate(typical_range):
         with cols[i]:
-            button_color = get_color(val)
+            button_color = get_score_color(val, score_type)
             if st.button(
                 str(val), 
                 key=f"{key}_quick_{val}",
