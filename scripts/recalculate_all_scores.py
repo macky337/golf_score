@@ -198,10 +198,10 @@ def recalculate_all_rounds():
                     try:
                         score_id = update.pop('score_id')
                         # 更新データの内容を表示（デバッグ用）
-                        print(f"スコアID {score_id} の更新データ:")
+                        print(f"レコードID {score_id} の更新データ:")
                         for key, value in update.items():
                             print(f"  {key}: {value}")
-                        result = supabase.table('score').update(update).eq('score_id', score_id).execute()
+                        result = supabase.table('score').update(update).eq('id', score_id).execute()
                     except Exception as e:
                         print(f"スコアID {score_id} の更新に失敗: {str(e)}")
                         if hasattr(e, 'details'):

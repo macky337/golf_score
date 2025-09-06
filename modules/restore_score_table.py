@@ -81,7 +81,7 @@ def restore_combined_score_table():
         
         # スコアテーブルを一度クリア
         st.warning("スコアテーブルのデータを削除中...")
-        supabase.table('score').delete().neq('score_id', -1).execute()
+        supabase.table('score').delete().neq('id', -1).execute()
         
         # マージしたスコアデータの挿入
         st.info("スコアデータを復元中...")

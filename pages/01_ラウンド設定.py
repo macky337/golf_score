@@ -14,27 +14,14 @@ def create_score_records(supabase, round_id, member_ids):
     """選択されたメンバーのスコアレコードを作成"""
     success = True
     
-    # 最大のscore_idを取得して、新しいIDを作成
-    try:
-        max_id_result = supabase.table('score').select('score_id').order('score_id', desc=True).limit(1).execute()
-        next_score_id = 1
-        if max_id_result.data:
-            next_score_id = max_id_result.data[0]['score_id'] + 1
-        
-        print(f"次のスコアIDから開始: {next_score_id}")
-    except Exception as e:
-        print(f"スコアID取得エラー: {e}")
-        return False
-    
     for member_id in member_ids:
         try:
             # メンバー情報を取得してプレイヤー名をログに表示
             member_info = supabase.table('member').select('name').eq('member_id', member_id).execute()
             player_name = member_info.data[0]['name'] if member_info.data else f"Player {member_id}"
             
-            # スコアレコード作成 - score テーブルに存在するカラムのみを指定
+            # スコアレコード作成 - score テーブルに存在するカラムのみを指定（idは自動生成される）
             score_data = {
-                'score_id': next_score_id,  # 新しいスコアIDを明示的に指定
                 'round_id': round_id,
                 'member_id': member_id,
                 'front_score': 0,
@@ -51,7 +38,7 @@ def create_score_records(supabase, round_id, member_ids):
             
             # スコア追加
             supabase.table('score').insert(score_data).execute()
-            print(f"{player_name} のスコアレコードを作成しました (ID: {next_score_id})")
+            print(f"{player_name} のスコアレコードを作成しました")
             
             # 次のスコアIDに進む
             next_score_id += 1

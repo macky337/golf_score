@@ -56,7 +56,7 @@ def restore_data():
         # Clear existing data first
         print("\nClearing existing data...")
         supabase.table('handicap_match').delete().neq('id', -1).execute()
-        supabase.table('score').delete().neq('score_id', -1).execute()
+        supabase.table('score').delete().neq('id', -1).execute()
         supabase.table('rounds').delete().neq('round_id', -1).execute()
         
         # 1. Restore rounds first
