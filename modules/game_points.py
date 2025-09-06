@@ -4,11 +4,11 @@
 ユーザーが手動で入力し、最終的なGame Ptのみを計算します。
 """
 
-def calculate_game_pt(player_pts, other_pts):
+def calculate_game_pt(player_pt, other_pts):
     """3人プレイ時の最終ゲームポイントを計算する
     
     Args:
-        player_pts (int): プレイヤーの一時的なゲームポイント合計
+        player_pt (int): プレイヤーの一時的なゲームポイント合計
         other_pts (list): 他のプレイヤーの一時的なゲームポイント合計のリスト
     
     Returns:
@@ -19,8 +19,8 @@ def calculate_game_pt(player_pts, other_pts):
         4人プレーの場合：そのままのポイント
     """
     if len(other_pts) == 2:  # 3人プレー
-        return player_pts * 2 - sum(other_pts)
-    return player_pts  # 4人プレー
+        return player_pt * 2 - sum(other_pts)
+    return player_pt  # 4人プレー
 
 def calculate_total_game_points(front_gp, back_gp, extra_gp, n_players):
     """最終的なGame Ptを計算する

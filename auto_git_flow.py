@@ -9,13 +9,13 @@ import json
 system_encoding = locale.getpreferredencoding()
 print(f"システムのエンコーディング: {system_encoding}")
 
-def run_git_command(cmd, cwd=None):
+def run_git_command(cmd, cwd=None, timeout=60):
     print(f"$ {' '.join(cmd)}")
     try:
         # Windows環境では errors='replace' を使用してエンコーディングエラーを回避
         encoding = 'cp932' if sys.platform == 'win32' else 'utf-8'
         result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, 
-                              encoding=encoding, errors='replace')
+                              encoding=encoding, errors='replace', timeout=timeout)
         if result.stdout:
             print(result.stdout)
         if result.stderr:
@@ -23,10 +23,14 @@ def run_git_command(cmd, cwd=None):
         if result.returncode != 0:
             raise Exception(f"Command failed: {' '.join(cmd)}")
         return result
+    except subprocess.TimeoutExpired:
+        print(f"⏰ コマンドがタイムアウトしました ({timeout}秒): {' '.join(cmd)}")
+        print("ネットワーク接続やリモートリポジトリの状態を確認してください")
+        raise Exception(f"Command timeout: {' '.join(cmd)}")
     except UnicodeDecodeError as e:
         print(f"エンコーディングエラー: {e}")
         # エンコーディングエラーが発生した場合、バイナリモードで実行し直す
-        result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=False)
+        result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=False, timeout=timeout)
         if result.stdout:
             try:
                 print(result.stdout.decode('utf-8', errors='replace'))
@@ -505,13 +509,13 @@ def main():
     # 3. developブランチにプッシュ
     print("\n🔄 ステップ 3: developブランチに変更をプッシュ")
     try:
-        run_git_command(["git", "push"], cwd=repo_dir)
+        run_git_command(["git", "push"], cwd=repo_dir, timeout=120)  # プッシュは2分
     except Exception as e:
         print("\n⚠️ プッシュに失敗しました。リモートの変更を取り込みます。")
         try:
             # リモートの変更を取り込む
             print("\n🔄 リモートの変更を取り込んでいます...")
-            run_git_command(["git", "pull", "--rebase"], cwd=repo_dir)
+            run_git_command(["git", "pull", "--rebase"], cwd=repo_dir, timeout=120)  # プルも2分
             
             # コンフリクトの確認
             status_result = run_git_command(["git", "status"], cwd=repo_dir)
@@ -529,7 +533,7 @@ def main():
             
             # 再度プッシュを試みる
             print("\n🔄 変更をプッシュします...")
-            run_git_command(["git", "push", "--force-with-lease"], cwd=repo_dir)
+            run_git_command(["git", "push", "--force-with-lease"], cwd=repo_dir, timeout=120)
             
         except Exception as inner_e:
             print(f"\n❌ リモート変更の統合に失敗しました: {inner_e}")
@@ -542,7 +546,7 @@ def main():
     
     # 5. mainブランチの最新版を取得
     print("\n⬇️ ステップ 5: mainブランチの最新版を取得")
-    run_git_command(["git", "pull", "origin", "main"], cwd=repo_dir)
+    run_git_command(["git", "pull", "origin", "main"], cwd=repo_dir, timeout=120)
     
     # 6. developブランチをmainにマージ
     print("\n🔀 ステップ 6: developブランチをmainにマージ")
@@ -563,7 +567,7 @@ def main():
     
     # 7. mainブランチにプッシュ
     print("\n⬆️ ステップ 7: mainブランチに変更をプッシュ")
-    run_git_command(["git", "push", "origin", "main"], cwd=repo_dir)
+    run_git_command(["git", "push", "origin", "main"], cwd=repo_dir, timeout=120)
     
     # 8. developブランチに戻る
     print("\n🔄 ステップ 8: developブランチに戻る")

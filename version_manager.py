@@ -15,7 +15,7 @@ class VersionManager:
             self.version = {
                 'major': 1,
                 'minor': 0,
-                'patch': 246,
+                'patch': 248,
                 'last_updated': datetime.date.today().isoformat()
             }
             self.save_version()

@@ -11,7 +11,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 import numpy as np
-from modules.db import supabase
+from modules.db import ensure_supabase
 from modules.supabase_client import get_supabase_client  # supabase_client から直接インポート
 import calendar
 from modules.page_utils import switch_page
@@ -32,7 +32,10 @@ def run():
         st.title("ポイント集計")
     with col2:
         if st.button("🏠 Home"):
-            switch_page("main")
+            st.switch_page("main.py")
+
+    # Supabaseクライアントを取得
+    supabase = ensure_supabase()
 
     # 3つのタブを作成
     tab1, tab2, tab3, tab4 = st.tabs(["通算成績", "年度別集計", "月間集計", "集計検証"])
@@ -52,6 +55,9 @@ def run():
 def get_all_scores():
     """すべての確定済みスコアデータを取得"""
     try:
+        # Supabaseクライアントを取得
+        supabase = ensure_supabase()
+        
         # スコアデータとround_resultsデータを取得（確定済みラウンドのみに絞り込み）
         # スコアデータ取得
         scores = supabase.table('score').select(
@@ -393,7 +399,17 @@ def show_yearly_statistics():
             monthly_pivot = monthly_pivot[existing_months]
             
             # 月名に変更
-            monthly_pivot.columns = [month_names[m] for m in monthly_pivot.columns]
+            new_columns = []
+            for m in monthly_pivot.columns.tolist():
+                try:
+                    month_num = int(m) if isinstance(m, str) and m.isdigit() else m
+                    if isinstance(month_num, int) and month_num in month_names:
+                        new_columns.append(month_names[month_num])
+                    else:
+                        new_columns.append(f"月{m}")
+                except (ValueError, TypeError):
+                    new_columns.append(f"月{m}")
+            monthly_pivot.columns = new_columns
             
             # 合計列を追加
             monthly_pivot['合計'] = monthly_pivot.sum(axis=1)

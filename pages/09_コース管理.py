@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 import pandas as pd
-from modules.db import supabase
+from modules.db import ensure_supabase
 from modules.page_utils import switch_page
 from modules.models import get_course_list, create_course, is_course_in_use, update_rounds_course_references, get_unused_courses, delete_unused_courses
 
@@ -17,12 +17,15 @@ st.set_page_config(
 )
 
 def run():
+    # Supabaseクライアントを取得
+    supabase = ensure_supabase()
+    
     col1, col2 = st.columns([0.8, 0.2])
     with col1:
         st.title("コース管理")
     with col2:
         if st.button("🏠 Home"):
-            switch_page("main")
+            st.switch_page("main.py")
             
     # 既存コースの一覧を表示
     courses = get_course_list()

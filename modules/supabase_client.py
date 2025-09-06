@@ -1,5 +1,6 @@
 import os
 import time
+from typing import Optional
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import streamlit as st
@@ -7,36 +8,48 @@ import streamlit as st
 # .env から環境変数をロード
 load_dotenv()
 
-def get_supabase_client() -> Client:
+# グローバルクライアント変数
+_supabase_client: Optional[Client] = None
+
+def get_supabase_client() -> Optional[Client]:
     """Supabaseクライアントを取得する"""
-    # Streamlitのセッションステートからクライアントを取得（既に初期化済みの場合）
-    if "supabase" in st.session_state:
-        return st.session_state.supabase
+    global _supabase_client
+    
+    # 既にクライアントが初期化されている場合はそれを返す
+    if _supabase_client is not None:
+        return _supabase_client
     
     # 認証情報の取得 (環境変数 → Streamlit secrets)
     supabase_url = os.getenv("SUPABASE_URL") or None
     supabase_key = os.getenv("SUPABASE_KEY") or None
+    
     if not supabase_url or not supabase_key:
         try:
             supabase_url = st.secrets["supabase"]["url"]
             supabase_key = st.secrets["supabase"]["key"]
         except Exception:
-            st.warning("Supabase接続情報が環境変数またはsecretsから取得できません。")
+            try:
+                supabase_url = st.secrets.get("SUPABASE_URL")
+                supabase_key = st.secrets.get("SUPABASE_KEY")
+            except Exception:
+                pass
+    
     if not supabase_url or not supabase_key:
-        st.error("Supabase URL または KEY が設定されていません。環境変数または Streamlit secrets を確認してください。")
         return None
     
     # クライアントを初期化
-    client = create_client(supabase_url, supabase_key)
-    
-    # セッションステートに保存
-    st.session_state.supabase = client
-    return client
+    try:
+        _supabase_client = create_client(supabase_url, supabase_key)
+        return _supabase_client
+    except Exception as e:
+        return None
 
 # スコア関連の操作
 def save_score(round_id, player_id, hole_number, score_data):
     """スコアデータを保存する"""
     client = get_supabase_client()
+    if client is None:
+        return None
     
     # 既存のスコアを確認
     existing = client.table("score").select("*").eq("round_id", round_id) \
@@ -61,6 +74,8 @@ def save_score(round_id, player_id, hole_number, score_data):
 def get_player_scores(round_id, player_id):
     """プレイヤーの全スコアを取得する"""
     client = get_supabase_client()
+    if client is None:
+        return None
     return client.table("score").select("*") \
                 .eq("round_id", round_id) \
                 .eq("player_id", player_id) \
@@ -70,6 +85,8 @@ def get_player_scores(round_id, player_id):
 def safe_update_score(round_id, member_id, update_data, retry_count=3):
     """エラーハンドリングとリトライ機能を備えたスコア更新"""
     client = get_supabase_client()
+    if client is None:
+        return None
     
     for attempt in range(retry_count):
         try:
@@ -98,6 +115,8 @@ def safe_update_score(round_id, member_id, update_data, retry_count=3):
 def cache_scores_in_session(round_id):
     """計算済みスコアをセッションに保存"""
     client = get_supabase_client()
+    if client is None:
+        return []
     try:
         result = client.table("score").select("*").eq("round_id", round_id).execute()
         if result.data:
@@ -114,6 +133,8 @@ def get_scores_with_fallback(round_id):
     """DBからスコア取得、失敗時はキャッシュから取得"""
     try:
         client = get_supabase_client()
+        if client is None:
+            return []
         # member情報を結合して取得するよう修正
         result = client.table("score").select("*, member:member_id(name)").eq("round_id", round_id).execute()
         
@@ -160,6 +181,8 @@ def update_scores_batch(round_id, update_data):
             filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
             
             try:
+                if supabase is None:
+                    continue
                 result = supabase.table('score').update(filtered_data).eq('round_id', round_id).eq('member_id', member_id).execute()
                 success_count += 1
             except Exception as e:
@@ -181,6 +204,11 @@ def update_score_total_pts():
     """
     try:
         supabase = get_supabase_client()
+        if supabase is None:
+            return {
+                'success': False,
+                'error': 'Supabase client is not available'
+            }
         
         # 確定済みのラウンドに紐づくround_resultsを全て取得
         results_query = supabase.table('round_results').select(
@@ -225,6 +253,9 @@ def recalculate_all_past_rounds():
     進捗状況と結果をユーザーに表示
     """
     client = get_supabase_client()
+    if client is None:
+        st.error("Supabaseクライアントが利用できません。")
+        return False
     
     try:
         # すべての確定済みラウンドを取得

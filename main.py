@@ -5,18 +5,6 @@ import os
 from dotenv import load_dotenv
 import traceback
 
-# Streamlit ページ設定
-st.set_page_config(
-    page_title="Golf Score App", 
-    page_icon="⛳",
-    layout="wide",
-    menu_items={
-        'Get Help': 'https://github.com/your-repo',
-        'Report a bug': 'https://github.com/your-repo/issues',
-        'About': "Golf Score App - main"
-    }
-)
-
 def check_supabase_connection():
     """Supabaseの接続状況を確認する関数"""
     load_dotenv()
@@ -25,8 +13,21 @@ def check_supabase_connection():
     supabase_url = os.getenv('SUPABASE_URL')
     supabase_key = os.getenv('SUPABASE_KEY')
     
+    # 環境変数が設定されていない場合はStreamlit secretsから読み込み
     if not supabase_url or not supabase_key:
-        return False, "環境変数が設定されていません"
+        st.warning("環境変数 SUPABASE_URL または SUPABASE_KEY が設定されていません。secrets から読み込みます。")
+        try:
+            supabase_url = st.secrets.get('SUPABASE_URL')
+            supabase_key = st.secrets.get('SUPABASE_KEY')
+        except:
+            pass
+    
+    if not supabase_url or not supabase_key:
+        return False, "Supabase接続情報が環境変数またはsecretsから取得できません。"
+    
+    # URLの検証
+    if not supabase_url.startswith('https://'):
+        return False, f"無効なSupabase URL: {supabase_url}"
     
     try:
         # Supabaseクライアントのインポートを試行
@@ -35,11 +36,18 @@ def check_supabase_connection():
         # クライアントの作成を試行
         supabase = create_client(supabase_url, supabase_key)
         
-        # 実際に存在するテーブルを使用して接続テスト
-        # existsメソッドを使用してテーブルの存在チェックのみを行う（データ取得は不要）
-        response = supabase.table('rounds').select('count').limit(1).execute()
+        # 基本的な接続テスト
+        try:
+            response = supabase.table('rounds').select('round_id').limit(1).execute()
+            return True, "接続成功"
+        except Exception as table_error:
+            # roundsテーブルが存在しない場合は、他のテーブルで試す
+            try:
+                response = supabase.table('members').select('member_id').limit(1).execute()
+                return True, "接続成功（membersテーブル経由）"
+            except Exception as members_error:
+                return False, f"テーブルアクセスエラー: {str(table_error)}"
         
-        return True, "接続成功"
     except ImportError:
         return False, "supabaseモジュールがインストールされていません"
     except Exception as e:
@@ -181,7 +189,7 @@ def main():
                 version_info = {
                     'major': 1,
                     'minor': 0, 
-                    'patch': 246,
+                    'patch': 248,
                     'last_updated': '2025-06-14'
                 }
         

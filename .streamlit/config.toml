@@ -19,7 +19,6 @@ textColor = "#262730"
 
 [global]
 developmentMode = false
-dataFrameSerialization = "legacy"
 
 # メディアファイル設定
 [client]

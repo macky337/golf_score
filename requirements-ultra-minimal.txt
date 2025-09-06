@@ -1,6 +1,0 @@
-# 超最小限依存関係 - 最高速デプロイ用
-streamlit==1.45.1
-pandas==2.2.3
-supabase==2.15.1
-python-dotenv==1.1.0
-requests==2.32.3

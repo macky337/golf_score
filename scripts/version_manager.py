@@ -30,7 +30,7 @@ def get_default_version():
     return {
         'major': 1,
         'minor': 0,
-        'patch': 246,
+        'patch': 248,
         'last_updated': datetime.datetime.now(pytz.timezone('Asia/Tokyo')).strftime('%Y-%m-%d')
     }
 

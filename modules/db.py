@@ -1,22 +1,26 @@
 import os
 from dotenv import load_dotenv
-from modules.supabase_client import get_supabase_client
+import streamlit as st
+from typing import Optional
 
 # 環境変数の読み込み
 load_dotenv()
 
-# Supabaseの接続設定
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-if not SUPABASE_URL or not SUPABASE_KEY:
-    # 環境変数が未設定の場合は Streamlit secrets を利用
-    import streamlit as st
-    st.warning("環境変数 SUPABASE_URL または SUPABASE_KEY が設定されていません。secrets から読み込みます。")
+def get_supabase():
+    """Supabaseクライアントを取得する関数"""
+    try:
+        from modules.supabase_client import get_supabase_client
+        return get_supabase_client()
+    except Exception:
+        return None
+
+def ensure_supabase():
+    """Supabaseクライアントを確実に取得し、エラーハンドリングを行う"""
+    client = get_supabase()
+    if client is None:
+        st.error("❌ Supabaseクライアントが利用できません。環境変数を確認してください。")
+        st.stop()
+    return client
 
 # インポートの簡略化のために、supabase クライアントを直接エクスポート
-supabase = None
-try:
-    supabase = get_supabase_client()
-except Exception:
-    # get_supabase_client内部で警告を表示済み
-    supabase = None
+supabase = get_supabase()
