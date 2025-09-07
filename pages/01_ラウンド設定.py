@@ -40,9 +40,7 @@ def create_score_records(supabase, round_id, member_ids):
             # スコア追加
             supabase.table('score').insert(score_data).execute()
             print(f"{player_name} のスコアレコードを作成しました")
-            
-            # 次のスコアIDに進む
-            next_score_id += 1
+            # score テーブルの id は DB 側で自動生成されるため、ローカルでの増分は不要
             
         except Exception as e:
             print(f"{player_name} のスコア作成エラー: {e}")
