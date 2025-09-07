@@ -33,3 +33,6 @@ Thumbs.db
 
 # Railway設定（問題防止）
 nixpacks.toml
+# Local runtime artifacts
+*.pid
+*.log
