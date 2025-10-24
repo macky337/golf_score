@@ -36,3 +36,6 @@ nixpacks.toml
 # Local runtime artifacts
 *.pid
 *.log
+
+# Streamlit secrets
+.streamlit/secrets.toml
