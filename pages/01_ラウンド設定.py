@@ -14,6 +14,12 @@ def create_score_records(supabase, round_id, member_ids):
     """選択されたメンバーのスコアレコードを作成"""
     success = True
     
+    # 最大のscore_idを取得
+    max_score_id_result = supabase.table('score').select('score_id').order('score_id', desc=True).limit(1).execute()
+    next_score_id = 1
+    if max_score_id_result.data:
+        next_score_id = max_score_id_result.data[0]['score_id'] + 1
+    
     for member_id in member_ids:
         player_name = f"Player {member_id}"  # デフォルト値を設定
         try:
@@ -21,8 +27,9 @@ def create_score_records(supabase, round_id, member_ids):
             member_info = supabase.table('member').select('name').eq('member_id', member_id).execute()
             player_name = member_info.data[0]['name'] if member_info.data else f"Player {member_id}"
             
-            # スコアレコード作成 - score テーブルに存在するカラムのみを指定（idは自動生成される）
+            # スコアレコード作成 - score_idを明示的に指定
             score_data = {
+                'score_id': next_score_id,
                 'round_id': round_id,
                 'member_id': member_id,
                 'front_score': 0,
@@ -39,8 +46,8 @@ def create_score_records(supabase, round_id, member_ids):
             
             # スコア追加
             supabase.table('score').insert(score_data).execute()
-            print(f"{player_name} のスコアレコードを作成しました")
-            # score テーブルの id は DB 側で自動生成されるため、ローカルでの増分は不要
+            print(f"{player_name} のスコアレコードを作成しました (score_id: {next_score_id})")
+            next_score_id += 1
             
         except Exception as e:
             print(f"{player_name} のスコア作成エラー: {e}")

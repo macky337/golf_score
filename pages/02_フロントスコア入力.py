@@ -123,27 +123,31 @@ def run():
     # 入力内容の確認と保存
     if st.session_state.form_submitted:
         st.success("スコアを保存しました！")
-        
+
         # スコア情報を更新
+        # 変更点: 各プレイヤーの更新データをローカルリストにまとめ、一括 upsert を行う
+        records = []
         for score in scores_data:
             member_id = score['member_id']
             front_score = st.session_state[f"front_score_{member_id}"]
             front_putt = st.session_state[f"front_putt_{member_id}"]
             front_game_pt = st.session_state[f"front_game_pt_{member_id}"]
-            
-            # back_score が既存の場合は取得
             back_score = score.get('back_score', 0) or 0
-            
-            # 更新データを作成
-            update_data = {
+            rec = {
+                'member_id': member_id,
                 'front_score': front_score,
                 'front_putt': front_putt,
                 'front_game_pt': front_game_pt,
-                'total_score': front_score + back_score  # total_score を計算して保存
+                'total_score': front_score + back_score
             }
-            
-            # データベース更新
-            supabase.table('score').update(update_data).eq('round_id', round_id).eq('member_id', member_id).execute()
+            records.append(rec)
+
+        from modules.supabase_client import upsert_scores_batch
+        ok, res = upsert_scores_batch(round_id, records)
+        if not ok:
+            st.error(f"一括保存に失敗しました: {res}")
+        else:
+            st.success("一括でスコアを保存しました")
         
         # ▼▼▼ 追加: 計算結果をround_resultsに保存 ▼▼▼
         try:

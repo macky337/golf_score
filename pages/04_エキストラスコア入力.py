@@ -159,63 +159,46 @@ def run():
       # 入力内容の確認と保存
     if st.session_state.extra_form_submitted:
         st.success("スコアを保存しました！")
-        
-        # 保存結果を記録
-        save_success = True
-        save_errors = []        # スコア情報を更新
+
+        # バッチレコード作成
+        records = []
+        errors = []
         for score in scores_data:
             member_id = score['member_id']
             member_name = score['member']['name'] if score['member'] else f"Player {member_id}"
-            
-            try:
-                # セッション状態から値を取得
-                extra_score_key = f"extra_score_{member_id}"
-                extra_putt_key = f"extra_putt_{member_id}" 
-                extra_game_pt_key = f"extra_game_pt_{member_id}"
-                
-                extra_score = st.session_state.get(extra_score_key, 0)
-                extra_putt = st.session_state.get(extra_putt_key, 0)
-                extra_game_pt = st.session_state.get(extra_game_pt_key, 0)
-                
-                # 入力値の検証
-                if extra_score < 0 or extra_score > 100:
-                    raise ValueError(f"エキストラスコア ({extra_score}) が範囲外です")
-                if extra_putt < 0 or extra_putt > 40:
-                    raise ValueError(f"エキストラパット ({extra_putt}) が範囲外です")
-                if extra_game_pt < -300 or extra_game_pt > 300:
-                    raise ValueError(f"エキストラゲームポイント ({extra_game_pt}) が範囲外です")
-                
-                # 更新データを作成
-                update_data = {
-                    'extra_score': extra_score,
-                    'extra_putt': extra_putt,
-                    'extra_game_pt': extra_game_pt
-                }
-                
-                # データベース更新
-                result = supabase.table('score').update(update_data).eq('round_id', round_id).eq('member_id', member_id).execute()
-                
-                # 更新結果を確認
-                if not result.data:
-                    raise Exception(f"データベース更新に失敗しました（結果が空）")
-                
-                # 個別の成功メッセージは削除
-                # st.write(f"✓ {member_name} のエキストラスコアを保存しました")
-                
-            except Exception as e:
-                save_success = False
-                error_msg = f"{member_name}: {str(e)}"
-                save_errors.append(error_msg)
-                st.error(f"❌ {error_msg}")
-        
-        # 保存結果のサマリー
-        if save_success:
-            st.success("全プレイヤーのエキストラスコアが正常に保存されました")
+            extra_score = st.session_state.get(f"extra_score_{member_id}", 0)
+            extra_putt = st.session_state.get(f"extra_putt_{member_id}", 0)
+            extra_game_pt = st.session_state.get(f"extra_game_pt_{member_id}", 0)
+            # 入力値の検証
+            if extra_score < 0 or extra_score > 100:
+                errors.append(f"{member_name}: エキストラスコア範囲外")
+                continue
+            if extra_putt < 0 or extra_putt > 40:
+                errors.append(f"{member_name}: エキストラパット範囲外")
+                continue
+            if extra_game_pt < -300 or extra_game_pt > 300:
+                errors.append(f"{member_name}: エキストラゲームポイント範囲外")
+                continue
+            rec = {
+                'member_id': member_id,
+                'extra_score': extra_score,
+                'extra_putt': extra_putt,
+                'extra_game_pt': extra_game_pt
+            }
+            records.append(rec)
+
+        if errors:
+            for e in errors:
+                st.error(e)
+            return
+
+        from modules.supabase_client import upsert_scores_batch
+        ok, res = upsert_scores_batch(round_id, records)
+        if not ok:
+            st.error(f"一括保存に失敗しました: {res}")
+            return
         else:
-            st.error("一部のプレイヤーのスコア保存に失敗しました")
-            for error in save_errors:
-                st.error(f"- {error}")
-            return  # エラーがある場合は計算処理をスキップ        
+            st.success("一括でスコアを保存しました")
         # ▼▼▼ 追加: 計算結果をround_resultsに保存 ▼▼▼
         try:
             # --- 進捗コメント出力をすべて削除 ---
@@ -305,7 +288,7 @@ def run():
     
     # 結果確認ページへのリンク
     if st.button("結果確認へ", use_container_width=True):
-        switch_page("06_結果確認")
+        switch_page("05_結果確認")
 
 if __name__ == "__main__":
     run()
