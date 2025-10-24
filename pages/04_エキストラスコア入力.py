@@ -15,6 +15,7 @@ from modules.page_utils import switch_page
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
 from modules.supabase_client import get_scores_with_fallback
+from modules.input_helpers import toggle_input_mode, smart_number_input
 
 def run():
     # show_navigation(active_page="エキストラスコア入力")  # 共通ナビゲーションバーを削除
@@ -40,6 +41,9 @@ def run():
     
     active_round = round_result.data[0]
     st.write(f"### {active_round['date_played']} - {active_round['course_name']}")
+    
+    # 入力モード切り替えボタン
+    toggle_input_mode()
     
     # has_extraフラグを更新
     if not active_round.get('has_extra'):
@@ -123,30 +127,33 @@ def run():
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                st.number_input(
+                smart_number_input(
                     "エキストラスコア", 
+                    key=f"extra_score_{member_id}",
                     min_value=0, 
                     max_value=100,
-                    key=f"extra_score_{member_id}",
-                    help=f"現在: {current_extra_score}"
+                    default_value=st.session_state.get(f"extra_score_{member_id}", 0),
+                    step_buttons=[-5, -1, 1, 5]
                 )
             
             with col2:
-                st.number_input(
+                smart_number_input(
                     "エキストラパット",
+                    key=f"extra_putt_{member_id}",
                     min_value=0,
                     max_value=40,
-                    key=f"extra_putt_{member_id}",
-                    help=f"現在: {current_extra_putt}"
+                    default_value=st.session_state.get(f"extra_putt_{member_id}", 0),
+                    step_buttons=[-2, -1, 1, 2]
                 )
             
             with col3:
-                st.number_input(
+                smart_number_input(
                     "エキストラゲームポイント",
+                    key=f"extra_game_pt_{member_id}",
                     min_value=-300,
                     max_value=300,
-                    key=f"extra_game_pt_{member_id}",
-                    help=f"現在: {current_extra_game_pt}"
+                    default_value=st.session_state.get(f"extra_game_pt_{member_id}", 0),
+                    step_buttons=[-10, -1, 1, 10]
                 )
             
             st.write("---")  # プレイヤー間の区切り線

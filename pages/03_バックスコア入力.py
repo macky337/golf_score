@@ -14,6 +14,7 @@ from modules.page_utils import switch_page
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
 from modules.supabase_client import get_scores_with_fallback
+from modules.input_helpers import toggle_input_mode, smart_number_input
 
 def run():
     st.title("バックスコア入力")
@@ -38,6 +39,9 @@ def run():
     
     active_round = round_result.data[0]
     st.write(f"### {active_round['date_played']} - {active_round['course_name']}")
+    
+    # 入力モード切り替えボタン
+    toggle_input_mode()
     
     # スコア情報を取得
     scores = supabase.table('score').select('*, member:member_id(name)').eq('round_id', round_id).execute()
@@ -81,27 +85,33 @@ def run():
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                st.number_input(
+                smart_number_input(
                     "バックスコア", 
+                    key=f"back_score_{member_id}",
                     min_value=0, 
                     max_value=100,
-                    key=f"back_score_{member_id}"
+                    default_value=st.session_state.get(f"back_score_{member_id}", 0),
+                    step_buttons=[-5, -1, 1, 5]
                 )
             
             with col2:
-                st.number_input(
+                smart_number_input(
                     "バックパット",
+                    key=f"back_putt_{member_id}",
                     min_value=0,
                     max_value=40,
-                    key=f"back_putt_{member_id}"
+                    default_value=st.session_state.get(f"back_putt_{member_id}", 0),
+                    step_buttons=[-2, -1, 1, 2]
                 )
             
             with col3:
-                st.number_input(
+                smart_number_input(
                     "バックゲームポイント",
+                    key=f"back_game_pt_{member_id}",
                     min_value=-300,
                     max_value=300,
-                    key=f"back_game_pt_{member_id}"
+                    default_value=st.session_state.get(f"back_game_pt_{member_id}", 0),
+                    step_buttons=[-10, -1, 1, 10]
                 )
             
             st.write("---")  # プレイヤー間の区切り線
