@@ -8,6 +8,7 @@ import datetime
 from modules.db import ensure_supabase
 from modules.page_utils import switch_page
 from modules.models import get_course_list, get_or_create_course, get_course_by_id, get_members_list
+from modules.input_helpers import inject_numeric_keyboard_css
 
 
 def create_score_records(supabase, round_id, member_ids):
@@ -56,6 +57,9 @@ def create_score_records(supabase, round_id, member_ids):
     return success
 
 def run():
+    # テンキー表示用のCSS/JSを注入
+    inject_numeric_keyboard_css()
+    
     # ▼▼▼ 未確定ラウンド選択セクション ▼▼▼
     supabase = ensure_supabase()
     unfinalized_rounds = supabase.table('rounds').select('round_id', 'date_played', 'course_name').eq('finalized', False).order('date_played', desc=True).execute().data
@@ -183,7 +187,7 @@ def run():
             with col1:
                 h1to2 = st.number_input(
                     f"{player1} → {player2} ハンディキャップ",
-                    min_value=0, max_value=50, step=1, 
+                    min_value=-50, max_value=50, step=1, 
                     value=st.session_state.handicaps[pair_key]["h1to2"],
                     key=f"h1to2_{player1}_{player2}"
                 )
@@ -192,7 +196,7 @@ def run():
             with col2:
                 h2to1 = st.number_input(
                     f"{player2} → {player1} ハンディキャップ",
-                    min_value=0, max_value=50, step=1,
+                    min_value=-50, max_value=50, step=1,
                     value=st.session_state.handicaps[pair_key]["h2to1"],
                     key=f"h2to1_{player1}_{player2}"
                 )
