@@ -57,6 +57,18 @@ def run():
       # 並び替え: member_idでソート
     scores_data = sorted(scores.data, key=lambda x: x['member_id'])
     
+    # ラウンドIDが変更された場合、セッション状態をクリア
+    if 'last_round_id' not in st.session_state or st.session_state.last_round_id != round_id:
+        # 古いスコアデータのセッション状態をクリア
+        keys_to_remove = [key for key in st.session_state.keys() if 
+                         isinstance(key, str) and (
+                         key.startswith('front_score_') or 
+                         key.startswith('front_putt_') or 
+                         key.startswith('front_game_pt_'))]
+        for key in keys_to_remove:
+            del st.session_state[key]
+        st.session_state.last_round_id = round_id
+    
     # セッション状態の初期化（フォーム実行前に必ず実行）
     for score in scores_data:
         member_id = score['member_id']

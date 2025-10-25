@@ -50,6 +50,18 @@ def run():
         return    # 並び替え: member_idでソート
     scores_data = sorted(scores.data, key=lambda x: x['member_id'])
     
+    # ラウンドIDが変更された場合、セッション状態をクリア
+    if 'last_round_id_back' not in st.session_state or st.session_state.last_round_id_back != round_id:
+        # 古いスコアデータのセッション状態をクリア
+        keys_to_remove = [key for key in st.session_state.keys() if 
+                         isinstance(key, str) and (
+                         key.startswith('back_score_') or 
+                         key.startswith('back_putt_') or 
+                         key.startswith('back_game_pt_'))]
+        for key in keys_to_remove:
+            del st.session_state[key]
+        st.session_state.last_round_id_back = round_id
+    
     # フロントスコアがまだ入力されていない場合の警告
     front_scores_missing = any(score.get('front_score', 0) == 0 for score in scores_data)
     if front_scores_missing:

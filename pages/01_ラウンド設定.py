@@ -250,6 +250,22 @@ def run():
 
                 # アクティブなラウンドIDをセッション状態に保存
                 st.session_state.active_round_id = round_id
+                
+                # 新規ラウンドのため、古いスコアデータのセッション状態をクリア
+                # 前回のラウンドのスコアが残っている場合があるため削除
+                keys_to_remove = [key for key in st.session_state.keys() if 
+                                 isinstance(key, str) and (
+                                 key.startswith('front_score_') or 
+                                 key.startswith('front_putt_') or 
+                                 key.startswith('front_game_pt_') or
+                                 key.startswith('back_score_') or 
+                                 key.startswith('back_putt_') or 
+                                 key.startswith('back_game_pt_') or
+                                 key.startswith('extra_score_') or 
+                                 key.startswith('extra_putt_') or 
+                                 key.startswith('extra_game_pt_'))]
+                for key in keys_to_remove:
+                    del st.session_state[key]
 
                 # スコアの作成（新しい実装に置き換え）
                 member_ids = [member_dict[name] for name in selected_members]

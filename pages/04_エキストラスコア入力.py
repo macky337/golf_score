@@ -80,7 +80,25 @@ def run():
                 st.session_state['skip_back_warning'] = True
                 st.rerun()
         
-        return  # 警告表示中はフォームを表示しない    # セッション状態の初期化（データベース値を一度だけ設定）
+        return  # 警告表示中はフォームを表示しない    
+    
+    # ラウンドIDが変更された場合、セッション状態をクリア
+    if 'last_round_id_extra' not in st.session_state or st.session_state.last_round_id_extra != round_id:
+        # 古いスコアデータのセッション状態をクリア
+        keys_to_remove = [key for key in st.session_state.keys() if 
+                         isinstance(key, str) and (
+                         key.startswith('extra_score_') or 
+                         key.startswith('extra_putt_') or 
+                         key.startswith('extra_game_pt_'))]
+        for key in keys_to_remove:
+            del st.session_state[key]
+        st.session_state.last_round_id_extra = round_id
+        # 初期化フラグもリセット
+        initialization_key_temp = f"extra_initialized_{round_id}"
+        if initialization_key_temp in st.session_state:
+            del st.session_state[initialization_key_temp]
+    
+    # セッション状態の初期化（データベース値を一度だけ設定）
     initialization_key = f"extra_initialized_{round_id}"
     if initialization_key not in st.session_state:
         st.session_state[initialization_key] = True
