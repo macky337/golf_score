@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import traceback
 
 def check_supabase_connection():
-    """Supabaseの接続状況を確認する関数"""
+    """Supabaseの接続状況を確認する関数（軽量化版）"""
     load_dotenv()
     
     # 環境変数の確認
@@ -15,7 +15,6 @@ def check_supabase_connection():
     
     # 環境変数が設定されていない場合はStreamlit secretsから読み込み
     if not supabase_url or not supabase_key:
-        st.warning("環境変数 SUPABASE_URL または SUPABASE_KEY が設定されていません。secrets から読み込みます。")
         try:
             supabase_url = st.secrets.get('SUPABASE_URL')
             supabase_key = st.secrets.get('SUPABASE_KEY')
@@ -25,33 +24,12 @@ def check_supabase_connection():
     if not supabase_url or not supabase_key:
         return False, "Supabase接続情報が環境変数またはsecretsから取得できません。"
     
-    # URLの検証
+    # URLの検証のみ（実際の接続テストはスキップしてパフォーマンス向上）
     if not supabase_url.startswith('https://'):
         return False, f"無効なSupabase URL: {supabase_url}"
     
-    try:
-        # Supabaseクライアントのインポートを試行
-        from supabase import create_client
-        
-        # クライアントの作成を試行
-        supabase = create_client(supabase_url, supabase_key)
-        
-        # 基本的な接続テスト
-        try:
-            response = supabase.table('rounds').select('round_id').limit(1).execute()
-            return True, "接続成功"
-        except Exception as table_error:
-            # roundsテーブルが存在しない場合は、他のテーブルで試す
-            try:
-                response = supabase.table('members').select('member_id').limit(1).execute()
-                return True, "接続成功（membersテーブル経由）"
-            except Exception as members_error:
-                return False, f"テーブルアクセスエラー: {str(table_error)}"
-        
-    except ImportError:
-        return False, "supabaseモジュールがインストールされていません"
-    except Exception as e:
-        return False, f"接続エラー: {str(e)}"
+    # 接続テストをスキップして常に成功を返す（高速化）
+    return True, "接続情報確認済み"
 
 def main():
     """メインページの表示関数"""

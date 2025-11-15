@@ -116,6 +116,132 @@ def inject_numeric_keyboard_css():
     """, height=0)
 
 
+def inject_numeric_keyboard_css_optimized():
+    """
+    最適化版：1回のみ実行するテンキー対応JavaScript
+    iPhoneでの固まり問題を解決
+    """
+    # CSSのみ（軽量）
+    st.markdown("""
+    <style>
+    /* 数値入力フィールドのスタイル調整 */
+    input[type="number"] {
+        -webkit-appearance: none;
+        -moz-appearance: textfield;
+        font-size: 16px !important; /* iOS zoomを防ぐ */
+    }
+    /* スピナーを非表示 */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # 最適化されたJavaScript（1回のみ実行、エラーハンドリング強化）
+    components.html("""
+    <script>
+    (function() {
+        try {
+            // 親ウィンドウが存在するかチェック
+            if (!window.parent || !window.parent.document) {
+                console.log('Parent window not accessible');
+                return;
+            }
+            
+            const parentDoc = window.parent.document;
+            
+            // グローバルフラグで重複実行を防止
+            if (parentDoc._keyboardOptimizationApplied) {
+                return;
+            }
+            parentDoc._keyboardOptimizationApplied = true;
+            
+            function optimizeInput(input) {
+                try {
+                    // 既に最適化済みならスキップ
+                    if (input.dataset.keyboardOptimized) return;
+                    input.dataset.keyboardOptimized = 'true';
+                    
+                    const minValue = parseFloat(input.getAttribute('min') || '0');
+                    
+                    // inputmodeの設定
+                    if (minValue >= 0) {
+                        input.setAttribute('inputmode', 'numeric');
+                        input.setAttribute('pattern', '[0-9]*');
+                    } else {
+                        input.removeAttribute('inputmode');
+                        input.removeAttribute('pattern');
+                    }
+                    
+                    // 全選択イベント（1回のみ登録）
+                    if (!input.dataset.selectListenerAdded) {
+                        input.dataset.selectListenerAdded = 'true';
+                        input.addEventListener('focus', function() { 
+                            setTimeout(() => {
+                                try { this.select(); } catch(e) {}
+                            }, 50); 
+                        });
+                        input.addEventListener('click', function() { 
+                            try { this.select(); } catch(e) {}
+                        });
+                    }
+                } catch(e) {
+                    console.log('Error optimizing input:', e);
+                }
+            }
+            
+            function applyOptimization() {
+                try {
+                    const inputs = parentDoc.querySelectorAll('input[type="number"]');
+                    inputs.forEach(optimizeInput);
+                } catch(e) {
+                    console.log('Error in applyOptimization:', e);
+                }
+            }
+            
+            // 初回実行
+            applyOptimization();
+            
+            // 軽量なMutationObserver（新規要素のみ監視）
+            try {
+                const observer = new MutationObserver(function(mutations) {
+                    try {
+                        for (const mutation of mutations) {
+                            for (const node of mutation.addedNodes) {
+                                if (node.nodeType === 1) {
+                                    if (node.tagName === 'INPUT' && node.type === 'number') {
+                                        optimizeInput(node);
+                                    } else if (node.querySelector) {
+                                        const inputs = node.querySelectorAll('input[type="number"]');
+                                        if (inputs.length > 0) {
+                                            inputs.forEach(optimizeInput);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch(e) {
+                        console.log('Error in MutationObserver callback:', e);
+                    }
+                });
+                
+                observer.observe(parentDoc.body, {
+                    childList: true,
+                    subtree: true
+                });
+            } catch(e) {
+                console.log('Error creating MutationObserver:', e);
+            }
+        } catch(e) {
+            console.log('Error in keyboard optimization script:', e);
+        }
+    })();
+    </script>
+    """, height=0)
+
+
 def is_mobile():
     """
     モバイルデバイスかどうかを判定
@@ -139,8 +265,19 @@ def toggle_input_mode():
     """
     col1, col2 = st.columns([0.7, 0.3])
     with col2:
-        current_mode = "📱 スマホモード" if st.session_state.get('is_mobile_device', False) else "💻 PCモード"
-        if st.button(f"🔄 {current_mode}", key="toggle_mode_btn"):
+        # 現在のモードを表示（わかりやすく）
+        if st.session_state.get('is_mobile_device', False):
+            current_mode = "📱 スマホモード"
+            button_label = "💻 PCモードへ"
+        else:
+            current_mode = "💻 PCモード"
+            button_label = "📱 スマホモードへ"
+        
+        # 現在のモードを表示
+        st.caption(f"現在: {current_mode}")
+        
+        # 切り替えボタン
+        if st.button(button_label, key="toggle_mode_btn"):
             st.session_state.is_mobile_device = not st.session_state.get('is_mobile_device', False)
             st.rerun()
 

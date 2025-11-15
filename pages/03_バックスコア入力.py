@@ -14,11 +14,9 @@ from modules.page_utils import switch_page
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
 from modules.supabase_client import get_scores_with_fallback
-from modules.input_helpers import toggle_input_mode, smart_number_input, inject_numeric_keyboard_css
+from modules.input_helpers import toggle_input_mode, smart_number_input
 
 def run():
-    # テンキー表示用のCSS/JSを注入
-    inject_numeric_keyboard_css()
     
     st.title("バックスコア入力")
     

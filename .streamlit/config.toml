@@ -1,26 +1,10 @@
 [server]
+port = 8502
+address = "0.0.0.0"
 headless = true
 enableCORS = false
 enableXsrfProtection = false
-maxUploadSize = 50
-maxMessageSize = 50
-runOnSave = false
-fileWatcherType = "none"
 
 [browser]
-gatherUsageStats = false
-serverAddress = "0.0.0.0"
-
-[theme]
-primaryColor = "#1f77b4"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f0f2f6"
-textColor = "#262730"
-
-[global]
-developmentMode = false
-
-# メディアファイル設定
-[client]
-showErrorDetails = false
-
+serverAddress = "192.168.3.9"
+serverPort = 8502
