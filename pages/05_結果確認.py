@@ -123,6 +123,9 @@ def initialize_player_data(scores, round_results):
 def run():
     """結果確認画面のメイン関数"""
     try:
+        # スマホでサイドバーを自動的に閉じる
+        close_sidebar_on_mobile()
+        
         # Supabaseクライアントを取得
         supabase = ensure_supabase()
 

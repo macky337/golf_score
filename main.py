@@ -1,6 +1,7 @@
 import streamlit as st
 from modules.page_utils import switch_page
 from scripts.version_manager import load_version
+from modules.input_helpers import close_sidebar_on_mobile
 import os
 from dotenv import load_dotenv
 import traceback
@@ -34,6 +35,9 @@ def check_supabase_connection():
 def main():
     """メインページの表示関数"""
     try:
+        # スマホでサイドバーを自動的に閉じる
+        close_sidebar_on_mobile()
+        
         st.title("⛳ Golf Score App")
         
         # アプリの説明とマニュアルリンク

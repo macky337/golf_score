@@ -1,4 +1,5 @@
 import streamlit as st
+from modules.input_helpers import close_sidebar_on_mobile
 import sys
 import os
 from modules.page_utils import switch_page
@@ -7,6 +8,9 @@ from modules.page_utils import switch_page
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def run():
+    # スマホでサイドバーを自動的に閉じる
+    close_sidebar_on_mobile()
+    
     # タイトルとホームボタンを横に配置
     col1, col2 = st.columns([0.8, 0.2])
     with col1:

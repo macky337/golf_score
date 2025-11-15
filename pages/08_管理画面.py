@@ -15,6 +15,7 @@ import json
 import pytz
 import time
 from dotenv import load_dotenv
+from modules.input_helpers import close_sidebar_on_mobile
 
 # モジュールのインポートパスを追加（確実な方法）
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -118,6 +119,9 @@ def check_password():
     return True
 
 def run():
+    # スマホでサイドバーを自動的に閉じる
+    close_sidebar_on_mobile()
+    
     # タイトルとホームボタンを横に配置
     col1, col2 = st.columns([0.8, 0.2])
     with col1:

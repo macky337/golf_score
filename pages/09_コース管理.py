@@ -17,6 +17,9 @@ st.set_page_config(
 )
 
 def run():
+    # スマホでサイドバーを自動的に閉じる
+    close_sidebar_on_mobile()
+    
     # Supabaseクライアントを取得
     supabase = ensure_supabase()
     

@@ -5,6 +5,64 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 
+def close_sidebar_on_mobile():
+    """
+    スマホでページ遷移後にサイドバーを自動的に閉じるJavaScript
+    """
+    components.html("""
+    <script>
+    (function() {
+        try {
+            // 親ウィンドウが存在するかチェック
+            if (!window.parent || !window.parent.document) {
+                return;
+            }
+            
+            const parentDoc = window.parent.document;
+            
+            // モバイルデバイスかどうかを判定
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
+                            window.parent.innerWidth <= 768;
+            
+            if (isMobile) {
+                // サイドバーを閉じる処理
+                setTimeout(() => {
+                    try {
+                        // Streamlitのサイドバー閉じるボタンを探してクリック
+                        const sidebarCloseBtn = parentDoc.querySelector('[data-testid="collapsedControl"]');
+                        const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
+                        
+                        // サイドバーが開いている場合のみ閉じる
+                        if (sidebar) {
+                            const isExpanded = sidebar.getAttribute('aria-expanded') === 'true' ||
+                                             !sidebar.classList.contains('st-emotion-cache-1gwvy71');
+                            
+                            if (isExpanded) {
+                                // より確実にサイドバーを閉じる方法
+                                const closeButton = parentDoc.querySelector('[kind="header"] button[aria-label*="Close"]') ||
+                                                  parentDoc.querySelector('[data-testid="baseButton-header"] button');
+                                
+                                if (closeButton) {
+                                    closeButton.click();
+                                } else if (sidebarCloseBtn) {
+                                    // フォールバック：collapsedControlボタンをクリック
+                                    sidebarCloseBtn.click();
+                                }
+                            }
+                        }
+                    } catch(e) {
+                        console.log('Error closing sidebar:', e);
+                    }
+                }, 300); // ページ読み込み後に実行
+            }
+        } catch(e) {
+            console.log('Error in sidebar auto-close:', e);
+        }
+    })();
+    </script>
+    """, height=0)
+
+
 def inject_numeric_keyboard_css():
     """
     スマホでテンキーを表示させるためのメタタグとCSSを注入
@@ -285,6 +343,7 @@ def toggle_input_mode():
 def smart_number_input(label, key, min_value=0, max_value=100, default_value=0, step_buttons=None):
     """
     スマホ/PC対応の数値入力ウィジェット
+    自動的にテンキーを表示
     
     Parameters:
     -----------
@@ -316,6 +375,11 @@ def smart_number_input(label, key, min_value=0, max_value=100, default_value=0, 
             step_buttons = [-5, -1, 1, 5]
         else:
             step_buttons = [-10, -1, 1, 10]
+    
+    # テンキー表示用のJavaScriptを注入（1回のみ実行）
+    if '_keyboard_injected' not in st.session_state:
+        inject_numeric_keyboard_css()
+        st.session_state._keyboard_injected = True
     
     if is_mobile():
         # スマホモード: テンキー対応の入力フィールド

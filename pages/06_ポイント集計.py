@@ -15,6 +15,7 @@ from modules.db import ensure_supabase
 from modules.supabase_client import get_supabase_client  # supabase_client から直接インポート
 import calendar
 from modules.page_utils import switch_page
+from modules.input_helpers import close_sidebar_on_mobile
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -27,6 +28,9 @@ st.set_page_config(
 )
 
 def run():
+    # スマホでサイドバーを自動的に閉じる
+    close_sidebar_on_mobile()
+    
     col1, col2 = st.columns([0.8, 0.2])
     with col1:
         st.title("ポイント集計")
