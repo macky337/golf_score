@@ -508,20 +508,68 @@ def show_handicap_editor():
                 except Exception as e:
                     st.error(f"クリーンアップ中にエラーが発生しました: {str(e)}")
 
-        # 既存のハンディキャップ表示
+        # 既存のハンディキャップ表示と編集
         if handicaps:
             st.write("### 現在のハンディキャップ設定")
-            handicap_df = pd.DataFrame([
-                {
-                    'プレーヤー1': h['player1']['name'],
-                    'プレーヤー2': h['player2']['name'],
-                    'P1→P2': h['player_1_to_2'],
-                    'P2→P1': h['player_2_to_1'],
-                    'Total Only': 'はい' if h['total_only'] else 'いいえ'
-                }
-                for h in handicaps
-            ])
-            st.dataframe(handicap_df)
+            
+            # 各ハンディキャップの編集フォーム
+            for idx, h in enumerate(handicaps):
+                with st.expander(f"📝 {h['player1']['name']} vs {h['player2']['name']}"):
+                    with st.form(f"edit_handicap_form_{h['id']}"):
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            st.write(f"**プレーヤー1:** {h['player1']['name']}")
+                            st.write(f"**プレーヤー2:** {h['player2']['name']}")
+                        
+                        with col2:
+                            new_p1_to_2 = st.number_input(
+                                f"{h['player1']['name']} → {h['player2']['name']} ハンディ",
+                                value=h['player_1_to_2'],
+                                min_value=-50,
+                                max_value=50,
+                                key=f"edit_p1_to_2_{h['id']}"
+                            )
+                            new_p2_to_1 = st.number_input(
+                                f"{h['player2']['name']} → {h['player1']['name']} ハンディ",
+                                value=h['player_2_to_1'],
+                                min_value=-50,
+                                max_value=50,
+                                key=f"edit_p2_to_1_{h['id']}"
+                            )
+                        
+                        with col3:
+                            new_total_only = st.checkbox(
+                                "Total Only",
+                                value=h['total_only'],
+                                key=f"edit_total_only_{h['id']}"
+                            )
+                        
+                        col_update, col_delete = st.columns(2)
+                        
+                        with col_update:
+                            if st.form_submit_button("更新", type="primary", use_container_width=True):
+                                try:
+                                    supabase.table('handicap_match').update({
+                                        'player_1_to_2': new_p1_to_2,
+                                        'player_2_to_1': new_p2_to_1,
+                                        'total_only': new_total_only
+                                    }).eq('id', h['id']).execute()
+                                    st.success("ハンディキャップを更新しました")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"更新エラー: {str(e)}")
+                        
+                        with col_delete:
+                            if st.form_submit_button("削除", use_container_width=True):
+                                try:
+                                    supabase.table('handicap_match').delete().eq('id', h['id']).execute()
+                                    st.success("ハンディキャップを削除しました")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"削除エラー: {str(e)}")
+        else:
+            st.info("このラウンドにはハンディキャップ設定がありません。")
 
         # 新規ハンディキャップ設定の追加フォーム
         with st.form(f"add_handicap_form_{round_id}"):
@@ -549,18 +597,36 @@ def show_handicap_editor():
             if st.form_submit_button("ハンディキャップ設定を追加"):
                 if player1[0] != player2[0]:
                     try:
-                        supabase.table('handicap_match').insert({
-                            'round_id': round_id,
-                            'player_1_id': player1[0],
-                            'player_2_id': player2[0],
-                            'player_1_to_2': p1_to_2,
-                            'player_2_to_1': p2_to_1,
-                            'total_only': total_only
-                        }).execute()
-                        st.success("ハンディキャップ設定を追加しました")
-                        st.rerun()
+                        # 既存のハンディキャップ設定を確認
+                        existing = supabase.table('handicap_match').select('*').eq('round_id', round_id).eq('player_1_id', player1[0]).eq('player_2_id', player2[0]).execute()
+                        
+                        if existing.data:
+                            st.warning("この組み合わせのハンディキャップ設定は既に存在します。既存の設定を編集してください。")
+                        else:
+                            # 最大のIDを取得して次のIDを決定
+                            max_id_result = supabase.table('handicap_match').select('id').order('id', desc=True).limit(1).execute()
+                            next_id = 1
+                            if max_id_result.data:
+                                next_id = max_id_result.data[0]['id'] + 1
+                            
+                            # 新規追加（idを明示的に指定）
+                            insert_data = {
+                                'id': next_id,
+                                'round_id': round_id,
+                                'player_1_id': player1[0],
+                                'player_2_id': player2[0],
+                                'player_1_to_2': p1_to_2,
+                                'player_2_to_1': p2_to_1,
+                                'total_only': total_only
+                            }
+                            result = supabase.table('handicap_match').insert(insert_data).execute()
+                            st.success("ハンディキャップ設定を追加しました")
+                            st.rerun()
                     except Exception as e:
                         st.error(f"追加中にエラーが発生しました: {str(e)}")
+                        # デバッグ情報を表示
+                        with st.expander("エラー詳細"):
+                            st.code(str(e))
                 else:
                     st.error("同じプレーヤーは選択できません")
 

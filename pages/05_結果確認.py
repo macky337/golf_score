@@ -23,6 +23,7 @@ from modules.supabase_client import (
     get_scores_with_fallback,
     update_scores_batch,
 )
+from modules.input_helpers import close_sidebar_on_mobile
 from modules.pdf_generator import generate_pdf, set_font, get_pdf_filename
 from modules.match_analyzer import create_match_matrix, create_detailed_match_results
 from modules.data_formatter import highlight_total_only, color_points, get_color_points_function, get_color_function_for_column, apply_ranking_colors_to_dataframe
