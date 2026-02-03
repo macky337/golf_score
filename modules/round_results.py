@@ -84,10 +84,10 @@ def save_round_results(round_id, player_data):
             
             # scoreテーブルのデータを保存するために既存データを確認
             try:
-                # 既存のスコアレコードを確認（idカラムを使用）
-                existing_score = client.table('score').select('id').eq('round_id', round_id).eq('member_id', player_id).execute()
+                # 既存のスコアレコードを確認（score_idカラムを使用）
+                existing_score = client.table('score').select('score_id').eq('round_id', round_id).eq('member_id', player_id).execute()
                 
-                # スコアデータを作成（idカラムは挿入時に指定しない - 自動生成させる）
+                # スコアデータを作成（score_idカラムは挿入時に指定しない - 自動生成させる）
                 score_data = {
                     'round_id': round_id,
                     'member_id': player_id,
@@ -105,12 +105,12 @@ def save_round_results(round_id, player_data):
                 
                 # スコアの挿入または更新
                 if existing_score.data:
-                    # 既存のレコードを更新（idで検索）
-                    record_id = existing_score.data[0]['id']
-                    score_response = client.table('score').update(score_data).eq('id', record_id).execute()
+                    # 既存のレコードを更新（score_idで検索）
+                    record_id = existing_score.data[0]['score_id']
+                    score_response = client.table('score').update(score_data).eq('score_id', record_id).execute()
                     print(f"既存のスコアレコードを更新しました (ID: {record_id})")
                 else:
-                    # 新しいレコードを挿入（idは自動生成される）
+                    # 新しいレコードを挿入（score_idは自動生成される）
                     score_response = client.table('score').insert(score_data).execute()
                     print(f"新しいスコアレコードを作成しました")
                 
