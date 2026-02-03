@@ -72,7 +72,7 @@ def recalculate_all_rounds(progress_callback=None):
                 # ゲームポイントは既存のものを保持
                 
                 # データを更新
-                supabase.table('score').update(update_data).eq('id', score['id']).execute()
+                supabase.table('score').update(update_data).eq('score_id', score['score_id']).execute()
             
             success_count += 1
             

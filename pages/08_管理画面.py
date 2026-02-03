@@ -250,7 +250,7 @@ def recalculate_scores(round_id):
             # マッチポイントの更新
             supabase.table('score').update({
                 'match_pt': total_match_points
-            }).eq('id', score['id']).execute()
+            }).eq('score_id', score['score_id']).execute()
 
         # プレイヤー数を確認
         player_count = len(scores)
@@ -266,27 +266,13 @@ def recalculate_scores(round_id):
                 ]
                 final_game_pt = calculate_game_pt(temp_gp, others_gp)
                 
-                # total_ptの計算（Game Pt + Match Pt + Putt Pt）
-                total_pt = final_game_pt + score['match_pt'] + (score['put_pt'] or 0)
-                
-                # Game PtとTotal Ptの更新
-                supabase.table('score').update({
-                    'game_pt': final_game_pt,
-                    'total_pt': total_pt
-                }).eq('id', score['id']).execute()
+                # total_ptとgame_ptはround_resultsテーブルで管理されるため、ここでは更新しない
+                # scoreテーブルにはfront_game_pt, back_game_pt, extra_game_ptのみ保存
         else:
             # 4人の場合は各セクションの合計をそのまま使用
-            for score in scores:
-                final_game_pt = (score['front_game_pt'] or 0) + (score['back_game_pt'] or 0) + (score['extra_game_pt'] or 0)
-                
-                # total_ptの計算（Game Pt + Match Pt + Putt Pt）
-                total_pt = final_game_pt + score['match_pt'] + (score['put_pt'] or 0)
-                
-                # Game PtとTotal Ptの更新
-                supabase.table('score').update({
-                    'game_pt': final_game_pt,
-                    'total_pt': total_pt
-                }).eq('id', score['id']).execute()
+            # 4人の場合も、game_ptとtotal_ptはround_resultsテーブルで管理されるため、
+            # scoreテーブルには保存しない
+            pass
 
     except Exception as e:
         raise Exception(f"スコアの再計算中にエラーが発生しました: {str(e)}")
@@ -367,72 +353,72 @@ def show_score_editor():
                             front_score = st.number_input(
                                 "Front Score",
                                 value=score['front_score'],
-                                key=f"front_{score['id']}"
+                                key=f"front_{score['score_id']}"
                             )
                             front_putt = st.number_input(
                                 "Front Putt",
                                 value=score['front_putt'] or 0,
-                                key=f"front_putt_{score['id']}"
+                                key=f"front_putt_{score['score_id']}"
                             )
                         
                         with col2:
                             back_score = st.number_input(
                                 "Back Score",
                                 value=score['back_score'],
-                                key=f"back_{score['id']}"
+                                key=f"back_{score['score_id']}"
                             )
                             back_putt = st.number_input(
                                 "Back Putt",
                                 value=score['back_putt'] or 0,
-                                key=f"back_putt_{score['id']}"
+                                key=f"back_putt_{score['score_id']}"
                             )
                         
                         with col3:
                             extra_score = st.number_input(
                                 "Extra Score",
                                 value=score['extra_score'] or 0,
-                                key=f"extra_{score['id']}"
+                                key=f"extra_{score['score_id']}"
                             )
                             extra_putt = st.number_input(
                                 "Extra Putt",
                                 value=score['extra_putt'] or 0,
-                                key=f"extra_putt_{score['id']}"
+                                key=f"extra_putt_{score['score_id']}"
                             )
                         
                         with col4:
                             front_game_pt = st.number_input(
                                 "Front Game Pt",
                                 value=score['front_game_pt'] or 0,
-                                key=f"front_game_{score['id']}"
+                                key=f"front_game_{score['score_id']}"
                             )
                             back_game_pt = st.number_input(
                                 "Back Game Pt",
                                 value=score['back_game_pt'] or 0,
-                                key=f"back_game_{score['id']}"
+                                key=f"back_game_{score['score_id']}"
                             )
                             extra_game_pt = st.number_input(
                                 "Extra Game Pt",
                                 value=score['extra_game_pt'] or 0,
-                                key=f"extra_game_{score['id']}"
+                                key=f"extra_game_{score['score_id']}"
                             )
                         
                         # 更新データの準備
-                        updated_scores[score['id']] = {
-                            'front_score': st.session_state[f"front_{score['id']}"],
-                            'front_putt': st.session_state[f"front_putt_{score['id']}"],
-                            'back_score': st.session_state[f"back_{score['id']}"],
-                            'back_putt': st.session_state[f"back_putt_{score['id']}"],
-                            'extra_score': st.session_state[f"extra_{score['id']}"],
-                            'extra_putt': st.session_state[f"extra_putt_{score['id']}"],
-                            'front_game_pt': st.session_state[f"front_game_{score['id']}"],
-                            'back_game_pt': st.session_state[f"back_game_{score['id']}"],
-                            'extra_game_pt': st.session_state[f"extra_game_{score['id']}"]
+                        updated_scores[score['score_id']] = {
+                            'front_score': st.session_state[f"front_{score['score_id']}"],
+                            'front_putt': st.session_state[f"front_putt_{score['score_id']}"],
+                            'back_score': st.session_state[f"back_{score['score_id']}"],
+                            'back_putt': st.session_state[f"back_putt_{score['score_id']}"],
+                            'extra_score': st.session_state[f"extra_{score['score_id']}"],
+                            'extra_putt': st.session_state[f"extra_putt_{score['score_id']}"],
+                            'front_game_pt': st.session_state[f"front_game_{score['score_id']}"],
+                            'back_game_pt': st.session_state[f"back_game_{score['score_id']}"],
+                            'extra_game_pt': st.session_state[f"extra_game_{score['score_id']}"]
                         }
                     
                     if st.form_submit_button("スコアを更新"):
                         try:
                             for record_id, new_values in updated_scores.items():
-                                supabase.table('score').update(new_values).eq('id', record_id).execute()
+                                supabase.table('score').update(new_values).eq('score_id', record_id).execute()
                             
                             if round_data['finalized']:
                                 with st.spinner("スコアを再計算中..."):
@@ -1122,12 +1108,12 @@ def score_edit_tab():
                         })
                     
                     # score IDを取得するためのクエリ
-                    record_result = supabase.table('score').select('id').eq('round_id', round_id).eq('member_id', member_id).execute()
+                    record_result = supabase.table('score').select('score_id').eq('round_id', round_id).eq('member_id', member_id).execute()
                     if record_result.data:
-                        record_id = record_result.data[0]['id']
+                        record_id = record_result.data[0]['score_id']
                         
                         # スコアを更新
-                        supabase.table('score').update(update_data).eq('id', record_id).execute()
+                        supabase.table('score').update(update_data).eq('score_id', record_id).execute()
                         success_count += 1
                     else:
                         st.error(f"プレイヤーID {member_id} のスコアレコードが見つかりません。")
@@ -1179,20 +1165,19 @@ def score_edit_tab():
                     if save_success:
                         st.success("ラウンド結果の再計算と保存が完了しました。")
                         
-                        # Score テーブルにも最終ポイントを更新
+                        # Score テーブルにゲームポイントを更新
                         for mid in player_ids:
                             data = updated_player_data[mid]
                             score_update = {
                                 'front_game_pt': data.get('Front GP', 0),
                                 'back_game_pt': data.get('Back GP', 0),
-                                'extra_game_pt': data.get('Extra GP', 0) if has_extra else 0,
-                                'total_pt': data.get('Total Pt', 0)
+                                'extra_game_pt': data.get('Extra GP', 0) if has_extra else 0
                             }
                             # score IDを取得して更新
-                            record_result = supabase.table('score').select('id').eq('round_id', round_id).eq('member_id', mid).execute()
+                            record_result = supabase.table('score').select('score_id').eq('round_id', round_id).eq('member_id', mid).execute()
                             if record_result.data:
-                                record_id = record_result.data[0]['id']
-                                supabase.table('score').update(score_update).eq('id', record_id).execute()
+                                record_id = record_result.data[0]['score_id']
+                                supabase.table('score').update(score_update).eq('score_id', record_id).execute()
                     else:
                         st.error("ラウンド結果の保存に失敗しました。")
                 except Exception as e:
@@ -1331,15 +1316,14 @@ def recalculate_single_round_v2(round_id):
                 round_id, member_id, player_ids, handicap_map, active_round={'round_id': round_id}
             )
             
-            # スコアを更新
+            # スコアを更新（total_ptはround_resultsで管理）
             update_data = {
                 'front_game_pt': front_gp,
                 'back_game_pt': back_gp,
-                'extra_game_pt': extra_gp,
-                'total_pt': total_pt
+                'extra_game_pt': extra_gp
             }
             
-            supabase.table('score').update(update_data).eq('id', score['id']).execute()
+            supabase.table('score').update(update_data).eq('score_id', score['score_id']).execute()
             updated_scores.append({**score, **update_data})
         
         # ラウンド結果も更新
