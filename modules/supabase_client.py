@@ -45,41 +45,38 @@ def get_supabase_client() -> Optional[Client]:
         return None
 
 # スコア関連の操作
-def save_score(round_id, player_id, hole_number, score_data):
-    """スコアデータを保存する"""
+def save_score(round_id, member_id, score_data):
+    """メンバー単位のスコアデータを保存する。"""
     client = get_supabase_client()
     if client is None:
         return None
-    
+
     # 既存のスコアを確認
     existing = client.table("score").select("*").eq("round_id", round_id) \
-                    .eq("player_id", player_id) \
-                    .eq("hole_number", hole_number).execute()
-    
+                    .eq("member_id", member_id).execute()
+
     if len(existing.data) > 0:
         # 更新
         return client.table("score").update(score_data) \
                     .eq("round_id", round_id) \
-                    .eq("player_id", player_id) \
-                    .eq("hole_number", hole_number).execute()
+                    .eq("member_id", member_id).execute()
     else:
         # 新規作成
-        score_data.update({
+        insert_data = dict(score_data)
+        insert_data.update({
             "round_id": round_id,
-            "player_id": player_id,
-            "hole_number": hole_number,
+            "member_id": member_id,
         })
-        return client.table("score").insert(score_data).execute()
+        return client.table("score").insert(insert_data).execute()
 
-def get_player_scores(round_id, player_id):
-    """プレイヤーの全スコアを取得する"""
+def get_player_scores(round_id, member_id):
+    """メンバーのスコアを取得する。"""
     client = get_supabase_client()
     if client is None:
         return None
     return client.table("score").select("*") \
                 .eq("round_id", round_id) \
-                .eq("player_id", player_id) \
-                .order("hole_number").execute()
+                .eq("member_id", member_id).execute()
 
 # 新規追加: エラーハンドリング付きのデータ保存・取得関数
 def safe_update_score(round_id, member_id, update_data, retry_count=3):

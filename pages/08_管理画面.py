@@ -14,8 +14,12 @@ import datetime
 import json
 import pytz
 import time
+import logging
 from dotenv import load_dotenv
 from modules.input_helpers import close_sidebar_on_mobile
+from modules.backup_restore import restore_backup_atomic
+
+logger = logging.getLogger(__name__)
 
 # モジュールのインポートパスを追加（確実な方法）
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -73,8 +77,9 @@ except ImportError as e:
 # パスワード取得関数を完全にインライン化
 def get_admin_password():
     """管理画面用のパスワードを取得する
-    
-    環境変数 > Streamlit secrets > デフォルトパスワード の順で探索
+
+    環境変数 > Streamlit secrets の順で探索する。
+    未設定時は管理機能を無効化し、既定パスワードにはフォールバックしない。
     """
     # 1. 環境変数から取得
     if 'ADMIN_PASSWORD' in os.environ:
@@ -87,8 +92,7 @@ def get_admin_password():
     except Exception:
         pass  # secretsがない場合は無視
     
-    # 3. デフォルトパスワード
-    return "golf_score_admin"
+    return None
 
 def calculate_game_pt(player_pt, other_pts):
     """ゲームポイントを計算する
@@ -106,10 +110,14 @@ def check_password():
         st.session_state.password_correct = False
 
     if not st.session_state.password_correct:
+        admin_password = get_admin_password()
+        if not admin_password:
+            st.error("管理者パスワードが設定されていないため、管理機能は無効です。")
+            st.info("Railway Variables または Streamlit secrets に ADMIN_PASSWORD を設定してください。")
+            return False
+
         pwd = st.text_input("パスワードを入力してください", type="password")
         if pwd:
-            # 管理者パスワードを取得
-            admin_password = get_admin_password()
             if pwd == admin_password:
                 st.session_state.password_correct = True
                 st.rerun()
@@ -328,10 +336,8 @@ def show_score_editor():
                     st.rerun()  # 画面を再読み込み
                     
                 except Exception as e:
+                    logger.exception("ラウンドの削除に失敗しました")
                     st.error(f"ラウンドの削除中にエラーが発生しました: {str(e)}")
-                    # 詳細なエラー情報を表示（安全な方法）
-                    import traceback
-                    st.error(f"エラーの詳細: {traceback.format_exc()}")
         
         if round_data:
             # スコアデータの取得
@@ -732,12 +738,14 @@ def show_backup_restore():
                         scores = supabase.table('score').select('*').execute().data
                         members = supabase.table('member').select('*').execute().data
                         handicaps = supabase.table('handicap_match').select('*').execute().data
+                        round_results = supabase.table('round_results').select('*').execute().data
 
                         backup_data = {
                             'rounds': rounds,
                             'scores': scores,
                             'members': members,
-                            'handicap_matches': handicaps
+                            'handicap_matches': handicaps,
+                            'round_results': round_results
                         }
 
                         # バックアップの保存
@@ -770,9 +778,16 @@ def show_backup_restore():
                     )
 
                     st.warning("⚠️ この操作は取り消せません")
-                    
+                    restore_confirmation = st.text_input(
+                        "確認のため RESTORE と入力してください"
+                    )
+
                     if st.form_submit_button("リストアを実行"):
                         try:
+                            if restore_confirmation != "RESTORE":
+                                st.error("確認文字が一致しません")
+                                st.stop()
+
                             with st.spinner("リストア中..."):
                                 # Supabaseクライアントを取得
                                 supabase = ensure_supabase()
@@ -783,83 +798,16 @@ def show_backup_restore():
                                     raise ValueError("バックアップが見つかりません")
                                     
                                 backup_data = result.data[0]['data']
-                                
-                                # 既存のデータを依存関係の逆順で削除
-                                st.write("既存のデータを削除中...")
-                                supabase.table('handicap_match').delete().neq('id', -1).execute()
-                                supabase.table('score').delete().neq('id', -1).execute()
-                                supabase.table('rounds').delete().neq('round_id', -1).execute()
-                                supabase.table('member').delete().neq('member_id', -1).execute()
-                                
-                                # データの復元
-                                st.write("データを復元中...")
-                                if backup_data.get('members'):
-                                    st.write("メンバーデータを復元中...")
-                                    supabase.table('member').insert(backup_data['members']).execute()
-                                
-                                if backup_data.get('rounds'):
-                                    st.write("ラウンドデータを復元中...")
-                                    rounds_to_insert = []
-                                    for round_data in backup_data['rounds']:
-                                        player_count = len([
-                                            s for s in backup_data['scores'] 
-                                            if s['round_id'] == round_data['round_id']
-                                        ])
-                                        
-                                        round_to_insert = {
-                                            'round_id': round_data['round_id'],
-                                            'date': round_data['date_played'],
-                                            'date_played': round_data['date_played'],
-                                            'course_name': round_data['course_name'],
-                                            'num_players': player_count,
-                                            'has_extra': round_data.get('has_extra', False),
-                                            'finalized': round_data.get('finalized', False)
-                                        }
-                                        rounds_to_insert.append(round_to_insert)
-                                    
-                                    if rounds_to_insert:
-                                        supabase.table('rounds').insert(rounds_to_insert).execute()
-                                
-                                if backup_data.get('scores'):
-                                    st.write("スコアデータを復元中...")
-                                    rounds_result = supabase.table('rounds').select('round_id').execute()
-                                    valid_round_ids = {r['round_id'] for r in rounds_result.data}
-                                    
-                                    valid_scores = [
-                                        score for score in backup_data['scores']
-                                        if score['round_id'] in valid_round_ids
-                                    ]
-                                    
-                                    if valid_scores:
-                                        supabase.table('score').insert(valid_scores).execute()
-                                else:
-                                    # スコアデータがない場合も空のvalid_round_idsを定義
-                                    rounds_result = supabase.table('rounds').select('round_id').execute()
-                                    valid_round_ids = {r['round_id'] for r in rounds_result.data}
-                                
-                                if backup_data.get('handicap_matches'):
-                                    st.write("ハンディキャップデータを復元中...")
-                                    members_result = supabase.table('member').select('member_id').execute()
-                                    valid_member_ids = {m['member_id'] for m in members_result.data}
-                                    
-                                    valid_handicaps = [
-                                        h for h in backup_data['handicap_matches']
-                                        if h['round_id'] in valid_round_ids and
-                                        h['player_1_id'] in valid_member_ids and
-                                        h['player_2_id'] in valid_member_ids
-                                    ]
-                                    
-                                    if valid_handicaps:
-                                        supabase.table('handicap_match').insert(valid_handicaps).execute()
+
+                                # PostgreSQL側の単一トランザクションで削除・復元する
+                                restore_backup_atomic(supabase, backup_data)
                                 
                                 st.success("リストアが完了しました。ページをリロードします...")
                                 time.sleep(1)
                                 st.rerun()
-                        except Exception as e:
-                            st.error(f"リストア中にエラーが発生しました: {str(e)}")
-                            # 詳細なエラー情報を表示（安全な方法）
-                            import traceback
-                            st.error(f"エラーの詳細: {traceback.format_exc()}")
+                        except Exception:
+                            logger.exception("バックアップの復元に失敗しました")
+                            st.error("リストアに失敗しました。データは変更されていません。")
             else:
                 st.info("バックアップが見つかりません")
         except Exception as e:
@@ -964,10 +912,8 @@ def score_edit_tab():
                 st.rerun()  # 画面を再読み込み
                 
             except Exception as e:
+                logger.exception("ラウンドの削除に失敗しました")
                 st.error(f"ラウンドの削除中にエラーが発生しました: {str(e)}")
-                # 詳細なエラー情報を表示（安全な方法）
-                import traceback
-                st.error(f"エラーの詳細: {traceback.format_exc()}")
     
     # 選択されたラウンドのスコア情報を取得
     scores_result = supabase.table('score').select('*, member:member_id(name)').eq('round_id', round_id).execute()
@@ -1181,9 +1127,8 @@ def score_edit_tab():
                     else:
                         st.error("ラウンド結果の保存に失敗しました。")
                 except Exception as e:
+                    logger.exception("ラウンド結果の再計算に失敗しました")
                     st.error(f"ラウンド結果の再計算中にエラーが発生しました: {str(e)}")
-                    import traceback
-                    st.error(traceback.format_exc())
             
             if failure_count > 0:
                 st.warning(f"{failure_count}人のプレイヤーのスコア更新に失敗しました。")
@@ -1280,9 +1225,8 @@ def show_balance_diagnostics():
             st.success("ポイントバランスは正常です！")
             
     except Exception as e:
+        logger.exception("ポイントバランスの診断に失敗しました")
         st.error(f"診断中にエラーが発生しました: {str(e)}")
-        import traceback
-        st.error(traceback.format_exc())
 
 def recalculate_single_round_v2(round_id):
     """単一ラウンドのポイントを再計算する（別実装）"""

@@ -5,14 +5,15 @@ Supabase接続テストスクリプト
 import os
 from dotenv import load_dotenv
 
-def test_supabase_connection():
+def check_supabase_connection():
+    """手動でSupabase疎通を確認する（pytestの自動テスト対象外）。"""
     load_dotenv()
     
     supabase_url = os.getenv('SUPABASE_URL')
     supabase_key = os.getenv('SUPABASE_KEY')
     
-    print(f"SUPABASE_URL: {supabase_url}")
-    print(f"SUPABASE_KEY: {supabase_key[:20]}..." if supabase_key else "SUPABASE_KEY: None")
+    print(f"SUPABASE_URL configured: {bool(supabase_url)}")
+    print(f"SUPABASE_KEY configured: {bool(supabase_key)}")
     
     if not supabase_url or not supabase_key:
         print("Error: 環境変数が設定されていません")
@@ -41,4 +42,4 @@ def test_supabase_connection():
         return False
 
 if __name__ == "__main__":
-    test_supabase_connection()
+    raise SystemExit(0 if check_supabase_connection() else 1)

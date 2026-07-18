@@ -1,21 +1,9 @@
-import os
 import json
 import datetime
+import os
 import streamlit as st
-from supabase import create_client, Client
-from dotenv import load_dotenv
 
-def get_supabase_client() -> Client:
-    """Supabaseクライアントを取得する"""
-    load_dotenv()
-    
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_KEY")
-    
-    if not url or not key:
-        raise ValueError("SUPABASE_URLまたはSUPABASE_KEYが設定されていません")
-    
-    return create_client(url, key)
+from modules.supabase_client import get_supabase_client
 
 def load_backup_data(filename):
     """指定されたバックアップファイルからデータを読み込む"""
