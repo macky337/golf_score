@@ -1,22 +1,8 @@
-import os
 import streamlit as st
 import pandas as pd
-from dotenv import load_dotenv
-from supabase import create_client
 from modules.match_analyzer import create_match_matrix, create_detailed_match_results
 from modules.calculation_logic import calculate_player_points
-
-def get_supabase_client():
-    """Supabaseクライアントを取得する"""
-    load_dotenv()
-    
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_KEY")
-    
-    if not url or not key:
-        raise ValueError("SUPABASE_URLまたはSUPABASE_KEYが設定されていません")
-    
-    return create_client(url, key)
+from modules.supabase_client import get_supabase_client
 
 def recalculate_all_rounds(progress_callback=None):
     """すべてのラウンドのスコアを再計算する"""

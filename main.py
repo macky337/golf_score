@@ -1,10 +1,19 @@
 import streamlit as st
+
+st.set_page_config(
+    page_title="Golf Score App",
+    page_icon="⛳",
+    layout="wide",
+)
+
 from modules.page_utils import switch_page
 from scripts.version_manager import load_version
 from modules.input_helpers import close_sidebar_on_mobile
 import os
+import logging
 from dotenv import load_dotenv
-import traceback
+
+logger = logging.getLogger(__name__)
 
 def check_supabase_connection():
     """Supabaseの接続状況を確認する関数（軽量化版）"""
@@ -60,73 +69,27 @@ def main():
         
         with col1:
             st.markdown("### 📝 スコア入力")
-            if st.button("ラウンド設定", key="nav_main_round_settings"): 
-                st.write("ボタン押下: ラウンド設定")
-                # デバッグ: ファイルの存在確認
-                import os
-                page_path = os.path.join("pages", "01_ラウンド設定.py")
-                st.write(f"デバッグ: ファイルパス = {page_path}")
-                st.write(f"デバッグ: ファイル存在 = {os.path.exists(page_path)}")
-                try:
-                    switch_page("01_ラウンド設定")
-                except Exception as e:
-                    st.error(f"switch_page例外: {e}")
-                    # 他の方法も試してみる
-                    try:
-                        st.write("別の方法を試行中...")
-                        switch_page("pages/01_ラウンド設定")
-                    except Exception as e2:
-                        st.error(f"別の方法でも失敗: {e2}")
-            if st.button("フロントスコア入力", key="nav_main_front"): 
-                st.write("ボタン押下: フロントスコア入力")
-                try:
-                    switch_page("02_フロントスコア入力")
-                except Exception as e:
-                    st.error(f"switch_page例外: {e}")
-            if st.button("バックスコア入力", key="nav_main_back"): 
-                try:
-                    switch_page("03_バックスコア入力")
-                except Exception as e:
-                    st.error(f"switch_page例外: {e}")
-            if st.button("エキストラスコア入力", key="nav_main_extra"): 
-                st.write("ボタン押下: エキストラスコア入力")
-                try:
-                    switch_page("04_エキストラスコア入力")
-                except Exception as e:
-                    st.error(f"switch_page例外: {e}")
+            if st.button("ラウンド設定", key="nav_main_round_settings"):
+                switch_page("01_ラウンド設定")
+            if st.button("フロントスコア入力", key="nav_main_front"):
+                switch_page("02_フロントスコア入力")
+            if st.button("バックスコア入力", key="nav_main_back"):
+                switch_page("03_バックスコア入力")
+            if st.button("エキストラスコア入力", key="nav_main_extra"):
+                switch_page("04_エキストラスコア入力")
                     
         with col2:
             st.markdown("### 📊 集計・確認")
-            if st.button("結果確認", key="nav_main_results"): 
-                st.write("ボタン押下: 結果確認")
-                try:
-                    switch_page("05_結果確認")
-                except Exception as e:
-                    st.error(f"switch_page例外: {e}")
-            if st.button("ポイント集計", key="nav_main_points"): 
-                st.write("ボタン押下: ポイント集計")
-                try:
-                    switch_page("06_ポイント集計")
-                except Exception as e:
-                    st.error(f"switch_page例外: {e}")
-            if st.button("管理画面", key="nav_main_admin"): 
-                st.write("ボタン押下: 管理画面")
-                try:
-                    switch_page("08_管理画面")
-                except Exception as e:
-                    st.error(f"switch_page例外: {e}")
-            if st.button("メンバー登録", key="nav_main_members"): 
-                st.write("ボタン押下: メンバー登録")
-                try:
-                    switch_page("07_メンバー登録")
-                except Exception as e:
-                    st.error(f"switch_page例外: {e}")
-            if st.button("コース管理", key="nav_main_courses"): 
-                st.write("ボタン押下: コース管理")
-                try:
-                    switch_page("09_コース管理")
-                except Exception as e:
-                    st.error(f"switch_page例外: {e}")
+            if st.button("結果確認", key="nav_main_results"):
+                switch_page("05_結果確認")
+            if st.button("ポイント集計", key="nav_main_points"):
+                switch_page("06_ポイント集計")
+            if st.button("管理画面", key="nav_main_admin"):
+                switch_page("08_管理画面")
+            if st.button("メンバー登録", key="nav_main_members"):
+                switch_page("07_メンバー登録")
+            if st.button("コース管理", key="nav_main_courses"):
+                switch_page("09_コース管理")
         
         # 使い方ガイド
         with st.expander("💡 使い方ガイド"):
@@ -185,78 +148,27 @@ def main():
         """, unsafe_allow_html=True)
         
     except Exception as e:
-        st.error(f"アプリケーションの初期化中にエラーが発生しました: {str(e)}")
+        logger.exception("アプリケーションの初期化に失敗しました")
+        st.error("アプリケーションの初期化中にエラーが発生しました。")
         st.error("ページを再読み込みしてください。問題が続く場合は管理者にお問い合わせください。")
-        with st.expander("詳細なエラー情報"):
-            st.code(traceback.format_exc())
 
 def show_changelog():
     try:
         with st.expander("📋 更新履歴"):
-            # 複数のパスで CHANGELOG.md を検索
-            possible_paths = [
-                # 1. スクリプトと同じディレクトリ
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), "CHANGELOG.md"),
-                # 2. 現在の作業ディレクトリ
-                os.path.join(os.getcwd(), "CHANGELOG.md"),
-                # 3. Railway環境での絶対パス
-                "/app/CHANGELOG.md",
-                # 4. 相対パス
-                "CHANGELOG.md",
-                # 5. 一つ上のディレクトリ
-                os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "CHANGELOG.md")
-            ]
-            
-            changelog_path = None
-            for path in possible_paths:
-                if os.path.exists(path):
-                    changelog_path = path
-                    break
-            
-            if changelog_path:
+            changelog_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "CHANGELOG.md"
+            )
+
+            if os.path.exists(changelog_path):
                 with open(changelog_path, "r", encoding="utf-8") as f:
                     changelog = f.read()
                 st.markdown(changelog)
-                st.caption(f"📍 読み込み元: {changelog_path}")
             else:
                 st.warning("📋 更新履歴ファイルが見つかりません")
-                # フォールバック: 基本的な更新情報を表示
-                st.markdown("""
-                ### 🚀 最新の更新内容
-                - ✅ Railway デプロイエラー解決
-                - ⚡ 超高速デプロイ最適化 (2-3分)
-                - 📦 依存関係96%削減 (129個→5個)
-                - 🔧 CHANGELOG読み込み問題修正
-                """)
-    except Exception as e:
+    except Exception:
+        logger.exception("更新履歴の読み込みに失敗しました")
         with st.expander("📋 更新履歴"):
-            st.error(f"更新履歴の読み込みに失敗しました: {str(e)}")
-            # デバッグ情報を追加
-            st.subheader("🔍 デバッグ情報")
-            st.code(f"現在の作業ディレクトリ: {os.getcwd()}")
-            st.code(f"スクリプトの場所: {os.path.abspath(__file__)}")
-            
-            # 利用可能なファイルを表示
-            try:
-                current_files = os.listdir(os.getcwd())
-                md_files = [f for f in current_files if f.endswith('.md')]
-                st.code(f"現在のディレクトリのMDファイル: {md_files}")
-                
-                script_dir = os.path.dirname(os.path.abspath(__file__))
-                if os.path.exists(script_dir):
-                    script_files = os.listdir(script_dir)
-                    script_md_files = [f for f in script_files if f.endswith('.md')]
-                    st.code(f"スクリプトディレクトリのMDファイル: {script_md_files}")
-            except Exception as debug_e:
-                st.code(f"ディレクトリ情報取得エラー: {str(debug_e)}")
-            
-            # フォールバック情報
-            st.markdown("""
-            ### 🚀 主要な更新内容
-            - ✅ Railway デプロイエラー解決
-            - ⚡ 超高速デプロイ最適化
-            - 📦 依存関係大幅削減
-            """)
+            st.error("更新履歴を読み込めませんでした。")
 
 if __name__ == "__main__":
     main()

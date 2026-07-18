@@ -1,5 +1,6 @@
 import sys
 import os
+import logging
 
 # モジュールのインポートパスを追加（より確実な方法）
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,7 +30,7 @@ from modules.match_analyzer import create_match_matrix, create_detailed_match_re
 from modules.data_formatter import highlight_total_only, color_points, get_color_points_function, get_color_function_for_column, apply_ranking_colors_to_dataframe
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
-import traceback
+logger = logging.getLogger(__name__)
 
 # ▼▼▼ フォント登録（日本語対応） ▼▼▼
 FONT_NAME = "Helvetica"
@@ -63,19 +64,6 @@ for font_path in font_paths:
 
 if not font_found:
     st.warning("⚠️ 日本語フォント(ipaexg.ttf)が見つかりません。PDF出力は英語フォント(Helvetica)となり、日本語文字が正しく表示されない可能性があります。")
-    # デバッグ情報を表示
-    with st.expander("🔍 フォント検索詳細情報（トラブルシューティング用）"):
-        st.write("**検索したパス:**")
-        for i, path in enumerate(font_paths):
-            exists = os.path.exists(path)
-            icon = "✅" if exists else "❌"
-            st.write(f"{icon} `{path}` - {'存在する' if exists else '存在しない'}")
-        st.write("**システム情報:**")
-        st.write(f"- 現在のファイル位置: `{os.path.abspath(__file__)}`")
-        st.write(f"- 現在の作業ディレクトリ: `{os.getcwd()}`")
-        st.write(f"- プロジェクトルート: `{project_root}`")
-        st.write(f"現在のファイル位置: {os.path.abspath(__file__)}")
-        st.write(f"現在の作業ディレクトリ: {os.getcwd()}")
 
 
 def initialize_player_data(scores, round_results):
@@ -307,10 +295,8 @@ def run():
                         switch_page("02_フロントスコア入力")
                 return
         except Exception as e:
+            logger.exception("結果確認用データの取得に失敗しました")
             st.error(f"データ取得中にエラーが発生しました: {str(e)}")
-            # より詳細なエラー情報を表示
-            import traceback
-            st.error(traceback.format_exc())
             return
 
         # round_results を取得（必ず実行）
@@ -533,9 +519,8 @@ def run():
                     """)
                     
             except Exception as e:
+                logger.exception("PDFの生成に失敗しました")
                 st.error(f"PDFの生成中にエラーが発生しました: {str(e)}")
-                import traceback
-                st.error(traceback.format_exc())
 
         # ラウンド確定機能
         if not active_round['finalized']:
@@ -589,11 +574,9 @@ def run():
         st.markdown("---")
 
     except Exception as e:
+        logger.exception("結果確認ページの読み込みに失敗しました")
         st.error(f"ページの読み込み中にエラーが発生しました: {str(e)}")
         st.error("ページを再読み込みしてください。問題が続く場合は管理者にお問い合わせください。")
-        import traceback
-        with st.expander("詳細なエラー情報"):
-            st.code(traceback.format_exc())
 
 if __name__ == "__main__":
     st.set_page_config(
