@@ -73,6 +73,10 @@ def _validate_offline_package(payload):
         raise ValueError("ラウンドIDが不正です")
     if not isinstance(players, list) or not players:
         raise ValueError("プレイヤーデータがありません")
+    if not payload.get("sync_exported_at"):
+        raise ValueError(
+            "開始用ファイルです。入力画面の「入力後：同期用ファイルを出力」から保存した -sync.json を選んでください"
+        )
     return round_data["round_id"], players
 
 
@@ -113,9 +117,8 @@ def run():
     st.caption("電波が弱い場所でも、端末内にスコアを保存できます。")
 
     st.info(
-        "1. 開始前にラウンドデータをダウンロード  →  "
-        "2. PWAでオフライン入力  →  "
-        "3. 終了後に同期ファイルを読み込み"
+        "1. 開始用JSONを保存  →  2. 下の入力画面で開始用JSONを読み込む  →  "
+        "3. 終了後に -sync.json を出力  →  4. このページ下部で同期"
     )
 
     supabase = ensure_supabase()
@@ -140,17 +143,18 @@ def run():
     package = _create_offline_package(supabase, selected_round_id)
 
     st.download_button(
-        "1. ラウンドデータを保存",
+        "1. 開始用JSONを保存",
         data=json.dumps(package, ensure_ascii=False, indent=2),
         file_name=f"golf-round-{selected_round_id}.json",
         mime="application/json",
         use_container_width=True,
     )
-    st.caption("下の入力画面でダウンロードしたJSONを読み込みます。ラウンド中はそのまま開き続けてください。")
+    st.caption("下の入力画面の「1. ここを押して開始用JSONを選ぶ」から、今保存したファイルを読み込みます。")
     render_offline_score_pwa()
     st.divider()
-    st.subheader("3. 同期ファイルを保存")
-    uploaded_file = st.file_uploader("オフライン入力から出力したJSON", type=["json"])
+    st.subheader("4. -sync.json を読み込んでDBへ同期")
+    st.warning("ここには「入力後：同期用ファイルを出力」から保存した **-sync.json** だけを選びます。開始用の golf-round-72.json は選びません。")
+    uploaded_file = st.file_uploader("入力後に出力した -sync.json", type=["json"])
     confirmed = st.checkbox("現在のスコアをオフライン入力の内容で更新する")
     if st.button("一括同期", type="primary", disabled=not (uploaded_file and confirmed)):
         try:
