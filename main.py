@@ -9,6 +9,7 @@ st.set_page_config(
 from modules.page_utils import switch_page
 from scripts.version_manager import load_version
 from modules.input_helpers import close_sidebar_on_mobile
+from modules.auth import require_login
 import os
 import logging
 from dotenv import load_dotenv
@@ -43,6 +44,8 @@ def check_supabase_connection():
 
 def main():
     """メインページの表示関数"""
+    require_login()
+
     try:
         # スマホでサイドバーを自動的に閉じる
         close_sidebar_on_mobile()

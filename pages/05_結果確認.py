@@ -30,6 +30,7 @@ from modules.match_analyzer import create_match_matrix, create_detailed_match_re
 from modules.data_formatter import highlight_total_only, color_points, get_color_points_function, get_color_function_for_column, apply_ranking_colors_to_dataframe
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
+from modules.auth import require_login
 logger = logging.getLogger(__name__)
 
 # ▼▼▼ フォント登録（日本語対応） ▼▼▼
@@ -110,6 +111,8 @@ def initialize_player_data(scores, round_results):
 
 
 def run():
+    require_login()
+
     """結果確認画面のメイン関数"""
     try:
         # スマホでサイドバーを自動的に閉じる

@@ -16,6 +16,7 @@ from modules.supabase_client import get_supabase_client  # supabase_client か�
 import calendar
 from modules.page_utils import switch_page
 from modules.input_helpers import close_sidebar_on_mobile
+from modules.auth import require_login
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -28,6 +29,8 @@ st.set_page_config(
 )
 
 def run():
+    require_login()
+
     # スマホでサイドバーを自動的に閉じる
     close_sidebar_on_mobile()
     

@@ -9,6 +9,7 @@ from modules.db import ensure_supabase
 from modules.page_utils import switch_page
 from modules.models import get_members_list
 from modules.input_helpers import close_sidebar_on_mobile
+from modules.auth import require_login
 
 # ページ設定
 st.set_page_config(
@@ -19,6 +20,8 @@ st.set_page_config(
 )
 
 def run():
+    require_login()
+
     # スマホでサイドバーを自動的に閉じる
     close_sidebar_on_mobile()
     
