@@ -16,14 +16,22 @@ const exportButton = document.querySelector("#export-file");
 
 function storageKey() { return `${STORAGE_PREFIX}${packageData?.round?.round_id || "draft"}`; }
 function setStatus(message) { status.textContent = message; }
+function readDraft(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function writeDraft(key, value) {
+  try { localStorage.setItem(key, value); return true; } catch { return false; }
+}
 
 function saveLocal(checkpoint) {
   if (!packageData) return;
   packageData.updated_at = new Date().toISOString();
   packageData.checkpoints = packageData.checkpoints || {};
   if (checkpoint) packageData.checkpoints[checkpoint] = packageData.updated_at;
-  localStorage.setItem(storageKey(), JSON.stringify(packageData));
-  setStatus(`${checkpoint || "全入力"}を端末に保存しました: ${new Date().toLocaleTimeString("ja-JP")}`);
+  const saved = writeDraft(storageKey(), JSON.stringify(packageData));
+  setStatus(saved
+    ? `${checkpoint || "全入力"}を端末に保存しました: ${new Date().toLocaleTimeString("ja-JP")}`
+    : "このブラウザでは自動保存できないため、終了後に同期ファイルを必ず出力してください。");
 }
 
 function numberValue(value) {
@@ -90,7 +98,7 @@ document.querySelector("#import-file").addEventListener("change", async (event) 
   try {
     const parsed = JSON.parse(await file.text());
     if (parsed.format !== "golf-score-offline-v1" || !parsed.round?.round_id || !Array.isArray(parsed.players)) throw new Error("format");
-    const saved = localStorage.getItem(`${STORAGE_PREFIX}${parsed.round.round_id}`);
+    const saved = readDraft(`${STORAGE_PREFIX}${parsed.round.round_id}`);
     packageData = saved ? JSON.parse(saved) : parsed;
     render();
   } catch {
@@ -110,5 +118,3 @@ exportButton.onclick = () => {
   link.click();
   URL.revokeObjectURL(link.href);
 };
-
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");
