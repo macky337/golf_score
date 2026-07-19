@@ -31,6 +31,7 @@ from modules.data_formatter import highlight_total_only, color_points, get_color
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
 from modules.auth import require_login
+from modules.round_validation import validate_round
 logger = logging.getLogger(__name__)
 
 # ▼▼▼ フォント登録（日本語対応） ▼▼▼
@@ -240,6 +241,7 @@ def run():
             return
 
         round_id = int(selected_round_str.split("ID: ")[1].rstrip(")"))
+        st.session_state.active_round_id = round_id
 
         # ラウンド情報を取得
         round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
@@ -278,7 +280,7 @@ def run():
                         st.session_state.active_round_id = round_id
                         st.session_state.admin_selected_round_id = round_id
                         st.session_state.has_extra = True
-                        switch_page("05_エキストラスコア入力")
+                        switch_page("04_エキストラスコア入力")
 
         # スコア取得
         try:
@@ -481,7 +483,9 @@ def run():
             
         # PDF出力機能
         st.subheader("PDF出力")
-        if st.button("スコア表をPDFで出力", use_container_width=True):
+        if not active_round['finalized']:
+            st.info("PDFはラウンド確定後の結果から生成できます。先に内容を確認してラウンドを確定してください。")
+        elif st.button("確定結果のPDFを生成", use_container_width=True):
             try:
                 pdf_df = df.copy()
                 # PDF用に数値に戻す必要がある場合、各列ごとに変換してください
@@ -531,8 +535,21 @@ def run():
             st.subheader("ラウンド確定")
             st.warning("⚠️ 確定すると、以降はスコア入力画面からの修正ができなくなります。")
             st.info("確定後にスコアの修正が必要な場合は、管理画面のスコア修正タブから行ってください。")
+
+            validation_errors = validate_round(supabase, round_id)
+            if validation_errors:
+                st.error("入力内容を確認してください。問題がある間は確定できません。")
+                for validation_error in validation_errors:
+                    st.markdown(f"- {validation_error}")
+            else:
+                st.success("参加者全員のOUT・INスコアを確認しました。")
             
-            if st.button("このラウンドを確定する", type="primary"):
+            if st.button(
+                "このラウンドを確定する",
+                type="primary",
+                disabled=bool(validation_errors),
+                use_container_width=True,
+            ):
                 try:
                     if handicaps_data and 'handicaps' in locals() and 'total_only_set' in locals():
                         updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
@@ -552,12 +569,20 @@ def run():
                         
                         success, updates, failures = update_scores_batch(round_id, update_data)
                         if success:
-                            # Finalizedフラグを更新
-                            supabase.table('rounds').update({'finalized': True}).eq('round_id', round_id).execute()
-                            st.success("🎉 ラウンドを確定しました！")
-                            st.info("今後スコアの修正が必要な場合は、管理画面のスコア修正タブから行ってください。")
-                            # 画面を再読み込み
-                            st.rerun()
+                            result_errors = validate_round(
+                                supabase, round_id, require_results=True
+                            )
+                            if result_errors:
+                                st.error("計算結果の整合性を確認できないため、確定を中止しました。")
+                                for result_error in result_errors:
+                                    st.markdown(f"- {result_error}")
+                            else:
+                                # Finalizedフラグを更新
+                                supabase.table('rounds').update({'finalized': True}).eq('round_id', round_id).execute()
+                                st.success("🎉 ラウンドを確定しました！")
+                                st.info("今後スコアの修正が必要な場合は、管理画面のスコア修正タブから行ってください。")
+                                # 画面を再読み込み
+                                st.rerun()
                         else:
                             st.warning(f"一部のスコア更新に成功しましたが、{len(failures)}件の失敗がありました。")
                             for failure in failures:

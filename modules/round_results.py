@@ -35,6 +35,7 @@ def save_round_results(round_id, player_data):
     """ラウンド結果をround_resultsテーブルとscoreテーブルに保存"""
     try:
         client = get_supabase_client()
+        all_success = True
          # テーブルカラムの確認
         round_results_columns = get_table_columns('round_results')
         score_columns = get_table_columns('score')
@@ -47,7 +48,8 @@ def save_round_results(round_id, player_data):
             client.table('round_results').delete().eq('round_id', round_id).execute()
             print(f"既存のround_resultsデータを削除しました (round_id: {round_id})")
         except Exception as e:
-            print(f"既存データの削除エラー（続行します）: {e}")
+            print(f"既存データの削除エラー: {e}")
+            return False
         
         # プレイヤーごとにデータを保存
         for player_id, data in player_data.items():
@@ -81,6 +83,7 @@ def save_round_results(round_id, player_data):
                 
             except Exception as e:
                 print(f"Error saving round results for player {player_id}: {e}")
+                all_success = False
             
             # scoreテーブルのデータを保存するために既存データを確認
             try:
@@ -118,8 +121,9 @@ def save_round_results(round_id, player_data):
                 
             except Exception as score_e:
                 print(f"Score data save error for player {player_id}: {score_e}")
-        
-        return True
+                all_success = False
+
+        return all_success
     except Exception as e:
         print(f"Error saving round results: {e}")
         return False
