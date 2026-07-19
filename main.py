@@ -64,6 +64,10 @@ def main():
             if st.button("📚 マニュアル", key="manual_button"):
                 switch_page("10_マニュアル")
 
+        st.info("📶 電波が弱いゴルフ場では「オフラインスコア入力」をご利用ください。端末に保存して、通信復帰後にまとめて同期できます。")
+        if st.button("📱 電波が弱い場所用：オフラインスコア入力", key="nav_offline_score_primary", type="primary", use_container_width=True):
+            switch_page("11_オフライン入力")
+        
         # メインメニューの作成
         st.subheader("📌 メインメニュー")
         
