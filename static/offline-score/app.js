@@ -75,7 +75,7 @@ function render() {
       </div>
       <div class="score-row">
         <label for="game-${index}">ゲームPt</label>
-        <input id="game-${index}" type="number" min="-1000" max="1000" inputmode="numeric" value="${Number.parseInt(player[section.game], 10) || 0}" />
+        <input id="game-${index}" type="number" min="-1000" max="1000" inputmode="text" value="${Number.parseInt(player[section.game], 10) || 0}" />
       </div>`;
     card.querySelector(`#score-${index}`).oninput = (event) => { player[section.score] = numberValue(event.target.value); updateTotals(); saveLocal(); };
     card.querySelector(`#putt-${index}`).oninput = (event) => { player[section.putt] = numberValue(event.target.value); updateTotals(); saveLocal(); };
