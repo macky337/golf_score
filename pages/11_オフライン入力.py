@@ -5,9 +5,13 @@ import json
 import streamlit as st
 
 from modules.auth import require_login
+from modules.calculation_logic import calculate_player_points
 from modules.db import ensure_supabase
+from modules.data_formatter import initialize_player_data
 from modules.input_helpers import close_sidebar_on_mobile
 from modules.offline_score_pwa import render_offline_score_pwa
+from modules.round_results import get_round_results, save_round_results
+from modules.supabase_client import get_scores_with_fallback
 
 
 SCORE_FIELDS = (
@@ -80,6 +84,48 @@ def _validate_offline_package(payload):
     return round_data["round_id"], players
 
 
+def _recalculate_round_results(supabase, round_id):
+    """通常のスコア入力と同じポイント計算を、同期後に実行する。"""
+    scores = get_scores_with_fallback(round_id)
+    if not scores:
+        raise ValueError("同期後のスコアデータを取得できませんでした")
+
+    round_result = (
+        supabase.table("rounds").select("*").eq("round_id", round_id).execute()
+    )
+    if not round_result.data:
+        raise ValueError("ラウンド情報を取得できませんでした")
+
+    handicaps_result = (
+        supabase.table("handicap_match")
+        .select("*")
+        .eq("round_id", round_id)
+        .execute()
+    )
+    handicaps = {}
+    total_only_set = set()
+    for handicap in handicaps_result.data or []:
+        player_1_id = handicap["player_1_id"]
+        player_2_id = handicap["player_2_id"]
+        handicaps[(player_1_id, player_2_id)] = handicap["player_1_to_2"]
+        handicaps[(player_2_id, player_1_id)] = handicap["player_2_to_1"]
+        if handicap.get("total_only"):
+            total_only_set.add(frozenset((player_1_id, player_2_id)))
+
+    player_data = initialize_player_data(scores, get_round_results(round_id))
+    player_ids = sorted(player_data)
+    updated_player_data = calculate_player_points(
+        player_data,
+        player_ids,
+        handicaps,
+        total_only_set,
+        round_result.data[0],
+    )
+    if not save_round_results(round_id, updated_player_data):
+        raise ValueError("計算結果を保存できませんでした")
+    return len(updated_player_data)
+
+
 def _sync_offline_package(supabase, payload):
     round_id, players = _validate_offline_package(payload)
     existing_scores = (
@@ -107,7 +153,8 @@ def _sync_offline_package(supabase, payload):
         ).execute()
         updated_count += 1
 
-    return round_id, updated_count
+    calculated_count = _recalculate_round_results(supabase, round_id)
+    return round_id, updated_count, calculated_count
 
 
 def run():
@@ -159,8 +206,11 @@ def run():
     if st.button("一括同期", type="primary", disabled=not (uploaded_file and confirmed)):
         try:
             payload = json.loads(uploaded_file.getvalue().decode("utf-8"))
-            round_id, updated_count = _sync_offline_package(supabase, payload)
-            st.success(f"ラウンド {round_id} の {updated_count}人分を同期しました。結果確認で最終計算を実行できます。")
+            round_id, updated_count, calculated_count = _sync_offline_package(supabase, payload)
+            st.success(
+                f"ラウンド {round_id} の {updated_count}人分を同期し、{calculated_count}人分の "
+                "マッチ対戦・パット・合計ポイントを再計算しました。"
+            )
         except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
             st.error(f"同期できませんでした: {error}")
         except Exception:
