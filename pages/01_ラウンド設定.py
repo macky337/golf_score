@@ -191,7 +191,7 @@ def run():
                 
             st.write(f"#### {player1} vs {player2}")
             
-            col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
             with col1:
                 h1to2 = st.number_input(
                     f"{player1} → {player2} ハンディキャップ",
@@ -210,13 +210,12 @@ def run():
                 )
                 st.session_state.handicaps[pair_key]["h2to1"] = h2to1
                 
-            with col3:
-                total_only = st.checkbox(
-                    "total scoreのみで戦う",
-                    value=st.session_state.handicaps[pair_key]["total_only"],
-                    key=f"total_only_{player1}_{player2}"
-                )
-                st.session_state.handicaps[pair_key]["total_only"] = total_only
+            total_only = st.checkbox(
+                "この組み合わせはトータルスコアのみで対戦",
+                value=st.session_state.handicaps[pair_key]["total_only"],
+                key=f"total_only_{player1}_{player2}"
+            )
+            st.session_state.handicaps[pair_key]["total_only"] = total_only
             
             # この対戦カードのハンディキャップ情報を保存
             match_handicaps.append({

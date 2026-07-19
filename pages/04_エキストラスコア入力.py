@@ -16,8 +16,9 @@ from modules.page_utils import switch_page
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
 from modules.supabase_client import get_scores_with_fallback
-from modules.input_helpers import toggle_input_mode, smart_number_input, close_sidebar_on_mobile
+from modules.input_helpers import smart_number_input, close_sidebar_on_mobile
 from modules.auth import require_login
+from modules.round_context import select_editable_round
 
 logger = logging.getLogger(__name__)
 
@@ -34,30 +35,23 @@ def run():
     # Supabaseクライアントを取得
     supabase = ensure_supabase()
     
-    # アクティブなラウンドIDをセッション状態から取得
-    if "active_round_id" not in st.session_state:
-        st.error("ラウンドが選択されていません。ホーム画面から選択してください。")
-        if st.button("ホームに戻る"):
-            st.switch_page("main.py")
+    active_round = select_editable_round(supabase, "extra_active_round")
+    if not active_round:
         return
+    round_id = active_round["round_id"]
     
-    round_id = st.session_state.active_round_id
-      # ラウンド情報を取得
-    round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
-    if not round_result.data:
-        st.error("ラウンド情報が見つかりません。")
-        return
-    
-    active_round = round_result.data[0]
-    st.write(f"### {active_round['date_played']} - {active_round['course_name']}")
-    
-    # 入力モード切り替えボタン
-    toggle_input_mode()
-    
-    # has_extraフラグを更新
+    # エキストラ入力を明示的に開始した場合だけ has_extra を更新する
     if not active_round.get('has_extra'):
-        supabase.table('rounds').update({'has_extra': True}).eq('round_id', round_id).execute()
-        st.info("このラウンドにエキストラホールが設定されました。")
+        st.info("エキストラを実施した場合だけ入力を開始してください。")
+        start_extra, skip_extra = st.columns(2)
+        with start_extra:
+            if st.button("エキストラ入力を開始", type="primary", use_container_width=True):
+                supabase.table('rounds').update({'has_extra': True}).eq('round_id', round_id).execute()
+                st.rerun()
+        with skip_extra:
+            if st.button("実施なし・結果確認へ", use_container_width=True):
+                switch_page("05_結果確認")
+        return
     
     # スコア情報を取得
     scores = supabase.table('score').select('*, member:member_id(name)').eq('round_id', round_id).execute()
@@ -142,58 +136,46 @@ def run():
             member_id = score['member_id']
             player_name = score['member']['name'] if score['member'] else f"Player {member_id}"
             
-            st.write(f"#### {player_name}")
-              # 現在のデータベース値を表示
-            current_extra_score = score.get('extra_score', 0)
-            current_extra_putt = score.get('extra_putt', 0)
-            current_extra_game_pt = score.get('extra_game_pt', 0)
-            
-            if current_extra_score != 0 or current_extra_putt != 0 or current_extra_game_pt != 0:
-                st.info(f"現在の値 - スコア: {current_extra_score}, パット: {current_extra_putt}, GP: {current_extra_game_pt}")
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
+            with st.container(border=True):
+                st.write(f"#### {player_name}")
+                current_extra_score = score.get('extra_score', 0)
+                current_extra_putt = score.get('extra_putt', 0)
+                current_extra_game_pt = score.get('extra_game_pt', 0)
+                if current_extra_score != 0 or current_extra_putt != 0 or current_extra_game_pt != 0:
+                    st.caption(f"保存済み：スコア {current_extra_score}／パット {current_extra_putt}／GP {current_extra_game_pt:+}")
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    smart_number_input(
+                        "Extraスコア",
+                        key=f"extra_score_{member_id}",
+                        min_value=0,
+                        max_value=100,
+                        default_value=st.session_state.get(f"extra_score_{member_id}", 0),
+                    )
+                with col2:
+                    smart_number_input(
+                        "Extraパット",
+                        key=f"extra_putt_{member_id}",
+                        min_value=0,
+                        max_value=40,
+                        default_value=st.session_state.get(f"extra_putt_{member_id}", 0),
+                    )
                 smart_number_input(
-                    "エキストラスコア", 
-                    key=f"extra_score_{member_id}",
-                    min_value=0, 
-                    max_value=100,
-                    default_value=st.session_state.get(f"extra_score_{member_id}", 0),
-                    step_buttons=[-5, -1, 1, 5]
-                )
-            
-            with col2:
-                smart_number_input(
-                    "エキストラパット",
-                    key=f"extra_putt_{member_id}",
-                    min_value=0,
-                    max_value=40,
-                    default_value=st.session_state.get(f"extra_putt_{member_id}", 0),
-                    step_buttons=[-2, -1, 1, 2]
-                )
-            
-            with col3:
-                smart_number_input(
-                    "エキストラゲームポイント",
+                    "Extraゲームポイント",
                     key=f"extra_game_pt_{member_id}",
                     min_value=-300,
                     max_value=300,
                     default_value=st.session_state.get(f"extra_game_pt_{member_id}", 0),
-                    step_buttons=[-10, -1, 1, 10]
                 )
-            
-            st.write("---")  # プレイヤー間の区切り線
         
         # 送信ボタン
         submitted = st.form_submit_button("スコアを保存", use_container_width=True)
         
         if submitted:
             st.session_state.extra_form_submitted = True
-      # 入力内容の確認と保存
+    # 入力内容の確認と保存
     if st.session_state.extra_form_submitted:
-        st.success("スコアを保存しました！")
-
         # バッチレコード作成
         records = []
         errors = []
@@ -232,7 +214,7 @@ def run():
             st.error(f"一括保存に失敗しました: {res}")
             return
         else:
-            st.success("一括でスコアを保存しました")
+            st.success("エキストラスコアを保存しました")
         # ▼▼▼ 追加: 計算結果をround_resultsに保存 ▼▼▼
         try:
             # --- 進捗コメント出力をすべて削除 ---
@@ -292,7 +274,7 @@ def run():
         # フォーム送信状態をリセット
         st.session_state.extra_form_submitted = False
         # 結果確認ページへのリンク
-        st.info("結果確認ページへはサイドバーから選択してください。")
+        st.info("エキストラスコアを保存しました。結果を確認してください。")
         # # ↓もし遷移が機能する場合は下記を有効化
         # if st.button("結果確認へ", use_container_width=True, key="to_results"):
         #     st.session_state.active_round_id = round_id

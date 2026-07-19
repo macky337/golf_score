@@ -14,8 +14,9 @@ from modules.page_utils import switch_page
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
 from modules.supabase_client import get_scores_with_fallback  # 追加: バックスコア入力と同様に必要な関数をインポート
-from modules.input_helpers import toggle_input_mode, smart_number_input, close_sidebar_on_mobile
+from modules.input_helpers import smart_number_input, close_sidebar_on_mobile
 from modules.auth import require_login
+from modules.round_context import select_editable_round
 
 def run():
     require_login()
@@ -32,26 +33,10 @@ def run():
     # Supabaseクライアントを取得
     supabase = ensure_supabase()
     
-    # アクティブなラウンドIDをセッション状態から取得
-    if "active_round_id" not in st.session_state:
-        st.error("ラウンドが選択されていません。ホーム画面から選択してください。")
-        if st.button("ホームに戻る"):
-            st.switch_page("main.py")
+    active_round = select_editable_round(supabase, "front_active_round")
+    if not active_round:
         return
-    
-    round_id = st.session_state.active_round_id
-    
-    # ラウンド情報を取得
-    round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
-    if not round_result.data:
-        st.error("ラウンド情報が見つかりません。")
-        return
-    
-    active_round = round_result.data[0]
-    st.write(f"### {active_round['date_played']} - {active_round['course_name']}")
-    
-    # 入力モード切り替えボタン
-    toggle_input_mode()
+    round_id = active_round["round_id"]
     
     # スコア情報を取得
     scores = supabase.table('score').select('*, member:member_id(name)').eq('round_id', round_id).execute()
@@ -105,40 +90,32 @@ def run():
             member_id = score['member_id']
             player_name = score['member']['name'] if score['member'] else f"Player {member_id}"
             
-            st.write(f"#### {player_name}")
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
+            with st.container(border=True):
+                st.write(f"#### {player_name}")
+                col1, col2 = st.columns(2)
+                with col1:
+                    smart_number_input(
+                        "OUTスコア",
+                        key=f"front_score_{member_id}",
+                        min_value=0,
+                        max_value=100,
+                        default_value=st.session_state.get(f"front_score_{member_id}", 0),
+                    )
+                with col2:
+                    smart_number_input(
+                        "OUTパット",
+                        key=f"front_putt_{member_id}",
+                        min_value=0,
+                        max_value=40,
+                        default_value=st.session_state.get(f"front_putt_{member_id}", 0),
+                    )
                 smart_number_input(
-                    "フロントスコア", 
-                    key=f"front_score_{member_id}",
-                    min_value=0, 
-                    max_value=100,
-                    default_value=st.session_state.get(f"front_score_{member_id}", 0),
-                    step_buttons=[-5, -1, 1, 5]
-                )
-            
-            with col2:
-                smart_number_input(
-                    "フロントパット",
-                    key=f"front_putt_{member_id}",
-                    min_value=0,
-                    max_value=40,
-                    default_value=st.session_state.get(f"front_putt_{member_id}", 0),
-                    step_buttons=[-2, -1, 1, 2]
-                )
-            
-            with col3:
-                smart_number_input(
-                    "フロントゲームポイント",
+                    "OUTゲームポイント",
                     key=f"front_game_pt_{member_id}",
                     min_value=-300,
                     max_value=300,
                     default_value=st.session_state.get(f"front_game_pt_{member_id}", 0),
-                    step_buttons=[-10, -1, 1, 10]
                 )
-            
-            st.write("---")  # プレイヤー間の区切り線
         
         # 送信ボタン
         submitted = st.form_submit_button("スコアを保存", use_container_width=True)
@@ -148,8 +125,6 @@ def run():
     
     # 入力内容の確認と保存
     if st.session_state.form_submitted:
-        st.success("スコアを保存しました！")
-
         # スコア情報を更新
         # 変更点: 各プレイヤーの更新データをローカルリストにまとめ、一括 upsert を行う
         records = []
@@ -172,8 +147,10 @@ def run():
         ok, res = upsert_scores_batch(round_id, records)
         if not ok:
             st.error(f"一括保存に失敗しました: {res}")
+            st.session_state.form_submitted = False
+            return
         else:
-            st.success("一括でスコアを保存しました")
+            st.success("フロントスコアを保存しました")
         
         # ▼▼▼ 追加: 計算結果をround_resultsに保存 ▼▼▼
         try:
@@ -239,7 +216,9 @@ def run():
         
         # バックスコア入力ページへのリンク
         st.markdown("### 次のステップ")
-        st.info("フロントスコアの入力が完了しました。サイドバーから『03_バックスコア入力』を選択してください。")
+        st.info("フロントスコアを保存しました。続けてINのスコアを入力してください。")
+        if st.button("IN入力へ", type="primary", use_container_width=True):
+            switch_page("03_バックスコア入力")
 
 if __name__ == "__main__":
     run()
