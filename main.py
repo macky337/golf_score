@@ -64,8 +64,8 @@ def main():
             if st.button("📚 マニュアル", key="manual_button"):
                 switch_page("10_マニュアル")
 
-        st.info("📶 電波が弱いゴルフ場では「オフラインスコア入力」をご利用ください。端末に保存して、通信復帰後にまとめて同期できます。")
-        if st.button("📱 電波が弱い場所用：オフラインスコア入力", key="nav_offline_score_primary", type="primary", use_container_width=True):
+        st.info("📶 電波が弱いゴルフ場へ行く場合は、出発前にラウンド設定を保存し、開始ファイルをスマホへ保存してください。現地では端末内へ入力し、通信復帰後に同期します。")
+        if st.button("📱 出発前・現地・同期：オフライン入力", key="nav_offline_score_primary", type="primary", use_container_width=True):
             switch_page("11_オフライン入力")
         
         # メインメニューの作成
@@ -76,7 +76,7 @@ def main():
         
         with col1:
             st.markdown("### 📝 スコア入力")
-            if st.button("ラウンド設定", key="nav_main_round_settings"):
+            if st.button("① ラウンド設定（最初に行う）", key="nav_main_round_settings"):
                 switch_page("01_ラウンド設定")
             if st.button("フロントスコア入力", key="nav_main_front"):
                 switch_page("02_フロントスコア入力")
@@ -97,13 +97,13 @@ def main():
                 switch_page("07_メンバー登録")
             if st.button("コース管理", key="nav_main_courses"):
                 switch_page("09_コース管理")
-            if st.button("📱 オフラインスコア入力", key="nav_main_offline_score"):
+            if st.button("📱 オフライン入力（出発前・現地・同期）", key="nav_main_offline_score"):
                 switch_page("11_オフライン入力")
         
         # 使い方ガイド
         with st.expander("💡 使い方ガイド"):
             st.markdown("""
-            #### 基本的な使い方
+            #### 通常のスコア入力
             1. **ラウンド設定**: 新規ラウンドの基本情報を設定します
             2. **フロントスコア入力**: フロント9のスコアを入力します
             3. **バックスコア入力**: バック9のスコアを入力します
@@ -112,6 +112,12 @@ def main():
             6. **ポイント集計**: 全期間または期間を指定してポイントを集計します
             7. **管理画面**: データの修正や削除ができます
             8. **メンバー登録**: 新しいプレイヤーを登録します
+
+            #### 電波が弱いゴルフ場での入力
+            1. **ラウンド設定**を保存します
+            2. **オフライン入力**で開始ファイル（JSON）をスマホへ保存します
+            3. 現地で開始ファイルを読み込み、OUT・IN・エキストラを入力します
+            4. 同期ファイル（-sync.json）を保存し、通信復帰後にオフライン入力画面で同期します
             """)
         
         show_changelog()
@@ -120,7 +126,8 @@ def main():
         st.markdown("---")
         st.markdown("""
         #### 📌 注意事項
-        - スコアの入力は、ラウンド設定 → フロント → バック → エキストラの順で行ってください
+        - 通常入力は、ラウンド設定 → フロント → バック → エキストラの順で行ってください
+        - オフライン入力は、ラウンド設定の保存後に「オフライン入力」で開始ファイルを保存してから使います
         - 入力したデータは「結果確認」画面で確認できます
         - データの修正が必要な場合は「管理画面」をご利用ください
         """)

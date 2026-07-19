@@ -160,13 +160,8 @@ def _sync_offline_package(supabase, payload):
 def run():
     require_login()
     close_sidebar_on_mobile()
-    st.title("📱 オフラインスコア入力")
-    st.caption("電波が弱い場所でも、端末内にスコアを保存できます。")
-
-    st.info(
-        "1. 開始用JSONを保存  →  2. 下の入力画面で開始用JSONを読み込む  →  "
-        "3. 終了後に -sync.json を出力  →  4. このページ下部で同期"
-    )
+    st.title("📱 オフライン入力")
+    st.caption("出発前に開始ファイルを保存し、現地で入力、通信復帰後に同期します。")
 
     supabase = ensure_supabase()
     rounds = (
@@ -178,32 +173,43 @@ def run():
         .data
     )
     if not rounds:
-        st.warning("オフライン入力用の未確定ラウンドがありません。")
+        st.warning("開始ファイルを作成できる未確定ラウンドがありません。先にラウンド設定を保存してください。")
+        st.page_link(
+            "pages/01_ラウンド設定.py",
+            label="① ラウンド設定へ",
+            icon="🗓️",
+            use_container_width=True,
+        )
         return
 
+    st.subheader("① 出発前：開始ファイルをスマホへ保存")
+    st.info("最初にラウンド設定を保存してください。ここには、保存済みで未確定のラウンドだけが表示されます。")
     options = _round_options(rounds)
     selected_round_id = st.selectbox(
-        "ラウンドを選択",
+        "開始ファイルを作るラウンドを選択",
         options=list(options),
         format_func=options.get,
     )
     package = _create_offline_package(supabase, selected_round_id)
 
     st.download_button(
-        "1. 開始用JSONを保存",
+        "開始ファイルを保存（JSON）",
         data=json.dumps(package, ensure_ascii=False, indent=2),
         file_name=f"golf-round-{selected_round_id}.json",
         mime="application/json",
         use_container_width=True,
     )
-    st.caption("下の入力画面の「1. ここを押して開始用JSONを選ぶ」から、今保存したファイルを読み込みます。")
+    st.caption("保存した開始ファイルは、次の「② 現地」で読み込みます。通信が弱くなる前に、このファイルがスマホの「ファイル」へ保存されたことを確認してください。")
+    st.divider()
+    st.subheader("② 現地：開始ファイルを読み込んでスコア入力")
+    st.info("下の入力画面で、①で保存した開始ファイルを読み込んでください。入力内容は端末内に保存されます。OUT・IN終了後やラウンド終了後に保存できます。")
     render_offline_score_pwa()
     st.divider()
-    st.subheader("4. -sync.json を読み込んでDBへ同期")
-    st.warning("ここには「入力後：同期用ファイルを出力」から保存した **-sync.json** だけを選びます。開始用の golf-round-72.json は選びません。")
-    uploaded_file = st.file_uploader("入力後に出力した -sync.json", type=["json"])
-    confirmed = st.checkbox("現在のスコアをオフライン入力の内容で更新する")
-    if st.button("一括同期", type="primary", disabled=not (uploaded_file and confirmed)):
+    st.subheader("③ 通信復帰後：同期ファイルを読み込んで反映")
+    st.warning("ここでは、現地入力画面で出力した **-sync.json** だけを選びます。①の開始ファイル（golf-round-XX.json）は選びません。")
+    uploaded_file = st.file_uploader("同期ファイル（-sync.json）を選択", type=["json"])
+    confirmed = st.checkbox("現在のスコアを同期ファイルの内容で更新する")
+    if st.button("同期して結果を更新", type="primary", disabled=not (uploaded_file and confirmed)):
         try:
             payload = json.loads(uploaded_file.getvalue().decode("utf-8"))
             round_id, updated_count, calculated_count = _sync_offline_package(supabase, payload)

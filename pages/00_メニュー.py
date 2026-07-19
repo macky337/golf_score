@@ -40,7 +40,7 @@ def run():
     with right:
         navigation_link(
             "pages/11_オフライン入力.py",
-            "オフライン入力",
+            "オフライン入力（出発前・現地・同期）",
             "📱",
             "menu_offline",
         )
