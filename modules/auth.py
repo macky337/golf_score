@@ -1,13 +1,24 @@
 """Streamlitアプリ全体で使用する共通ログイン処理。"""
 
+import base64
+import binascii
+import datetime as dt
+import hashlib
 import hmac
 import os
 
 import streamlit as st
 
+try:
+    import extra_streamlit_components as stx
+except ImportError:
+    stx = None
+
 
 AUTHENTICATED_KEY = "app_authenticated"
 AUTH_USERNAME_KEY = "app_auth_username"
+SESSION_COOKIE = "golf_score_session"
+SESSION_TTL = dt.timedelta(days=7)
 
 
 def _read_secret(name):
@@ -48,8 +59,78 @@ def credentials_match(input_username, input_password, expected_username, expecte
     )
 
 
+def create_session_token(username, password, expires_at=None):
+    """パスワードを含まない、有効期限付き署名トークンを作成する。"""
+    if not username or not password:
+        return None
+
+    expires_at = expires_at or (dt.datetime.now(dt.timezone.utc) + SESSION_TTL)
+    expires_at = int(expires_at.timestamp())
+    payload = f"{username}:{expires_at}".encode("utf-8")
+    encoded_payload = base64.urlsafe_b64encode(payload).decode("ascii")
+    signature = hmac.new(
+        str(password).encode("utf-8"),
+        encoded_payload.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"{encoded_payload}.{signature}"
+
+
+def verify_session_token(token, expected_username, expected_password, now=None):
+    """Cookieトークンの署名・利用者・有効期限を検証する。"""
+    if not token or not expected_username or not expected_password:
+        return False
+
+    try:
+        encoded_payload, signature = token.rsplit(".", 1)
+        expected_signature = hmac.new(
+            str(expected_password).encode("utf-8"),
+            encoded_payload.encode("ascii"),
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(signature, expected_signature):
+            return False
+
+        payload = base64.urlsafe_b64decode(encoded_payload.encode("ascii")).decode("utf-8")
+        username, expires_at = payload.rsplit(":", 1)
+        current_time = int((now or dt.datetime.now(dt.timezone.utc)).timestamp())
+        return hmac.compare_digest(username, str(expected_username)) and int(expires_at) > current_time
+    except (ValueError, UnicodeDecodeError, binascii.Error):
+        return False
+
+
+def _cookie_manager():
+    return stx.CookieManager() if stx is not None else None
+
+
+def _restore_cookie_session():
+    manager = _cookie_manager()
+    expected_username, expected_password = get_login_credentials()
+    if manager is None or not expected_username or not expected_password:
+        return False
+
+    token = manager.get(SESSION_COOKIE)
+    if verify_session_token(token, expected_username, expected_password):
+        st.session_state[AUTHENTICATED_KEY] = True
+        st.session_state[AUTH_USERNAME_KEY] = expected_username
+        return True
+    return False
+
+
+def _save_cookie_session(username, password):
+    manager = _cookie_manager()
+    if manager is None:
+        return
+
+    manager.set(
+        SESSION_COOKIE,
+        create_session_token(username, password),
+        expires_at=dt.datetime.now() + SESSION_TTL,
+    )
+
+
 def is_authenticated():
-    return st.session_state.get(AUTHENTICATED_KEY, False) is True
+    return st.session_state.get(AUTHENTICATED_KEY, False) is True or _restore_cookie_session()
 
 
 def _render_login():
@@ -100,6 +181,7 @@ def _render_login():
             if credentials_match(username, password, expected_username, expected_password):
                 st.session_state[AUTHENTICATED_KEY] = True
                 st.session_state[AUTH_USERNAME_KEY] = expected_username
+                _save_cookie_session(expected_username, expected_password)
                 st.rerun()
             else:
                 st.error("ユーザー名またはパスワードが正しくありません。")
@@ -115,6 +197,9 @@ def render_logout():
         if username:
             st.caption(f"ログイン中: {username}")
         if st.button("ログアウト", key="app_logout", use_container_width=True):
+            manager = _cookie_manager()
+            if manager is not None:
+                manager.delete(SESSION_COOKIE)
             st.session_state.clear()
             st.rerun()
 
