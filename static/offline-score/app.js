@@ -1,8 +1,8 @@
 const STORAGE_PREFIX = "golf-score-offline:";
 const sections = [
-  { id: "front", label: "アウト", score: "front_score", putt: "front_putt" },
-  { id: "back", label: "イン", score: "back_score", putt: "back_putt" },
-  { id: "extra", label: "エキストラ", score: "extra_score", putt: "extra_putt" },
+  { id: "front", label: "アウト", score: "front_score", putt: "front_putt", game: "front_game_pt" },
+  { id: "back", label: "イン", score: "back_score", putt: "back_putt", game: "back_game_pt" },
+  { id: "extra", label: "エキストラ", score: "extra_score", putt: "extra_putt", game: "extra_game_pt" },
 ];
 let packageData = null;
 let activeSection = "front";
@@ -68,11 +68,18 @@ function render() {
       <div class="score-row">
         <label for="score-${index}">スコア</label>
         <input id="score-${index}" type="number" min="0" max="200" inputmode="numeric" value="${numberValue(player[section.score])}" />
+      </div>
+      <div class="score-row">
         <label for="putt-${index}">パット</label>
         <input id="putt-${index}" type="number" min="0" max="200" inputmode="numeric" value="${numberValue(player[section.putt])}" />
+      </div>
+      <div class="score-row">
+        <label for="game-${index}">ゲームPt</label>
+        <input id="game-${index}" type="number" min="-1000" max="1000" inputmode="numeric" value="${Number.parseInt(player[section.game], 10) || 0}" />
       </div>`;
     card.querySelector(`#score-${index}`).oninput = (event) => { player[section.score] = numberValue(event.target.value); updateTotals(); saveLocal(); };
     card.querySelector(`#putt-${index}`).oninput = (event) => { player[section.putt] = numberValue(event.target.value); updateTotals(); saveLocal(); };
+    card.querySelector(`#game-${index}`).oninput = (event) => { player[section.game] = Number.parseInt(event.target.value, 10) || 0; updateTotals(); saveLocal(); };
     players.appendChild(card);
   });
   updateTotals();
@@ -83,7 +90,8 @@ function updateTotals() {
   const rows = packageData.players.map((player) => {
     const score = sections.reduce((sum, section) => sum + numberValue(player[section.score]), 0);
     const putt = sections.reduce((sum, section) => sum + numberValue(player[section.putt]), 0);
-    return `<div>${escapeHtml(player.name)}：<strong>${score}</strong> 打 / ${putt} パット</div>`;
+    const gamePoint = sections.reduce((sum, section) => sum + (Number.parseInt(player[section.game], 10) || 0), 0);
+    return `<div>${escapeHtml(player.name)}：<strong>${score}</strong> 打 / ${putt} パット / ゲームPt ${gamePoint >= 0 ? "+" : ""}${gamePoint}</div>`;
   });
   totals.innerHTML = `<h2>合計</h2>${rows.join("")}`;
 }
