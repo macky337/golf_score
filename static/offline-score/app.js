@@ -118,6 +118,7 @@ document.querySelector("#save-checkpoint").onclick = () => saveLocal(sections.fi
 document.querySelector("#save-all").onclick = () => saveLocal("round");
 exportButton.onclick = () => {
   if (!packageData) return;
+  packageData.sync_exported_at = new Date().toISOString();
   saveLocal("round");
   const blob = new Blob([JSON.stringify(packageData, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
