@@ -15,8 +15,11 @@ from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
 from modules.supabase_client import get_scores_with_fallback
 from modules.input_helpers import toggle_input_mode, smart_number_input, close_sidebar_on_mobile
+from modules.auth import require_login
 
 def run():
+    require_login()
+
     # スマホでサイドバーを自動的に閉じる
     close_sidebar_on_mobile()
     

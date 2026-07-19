@@ -3,11 +3,14 @@ from modules.input_helpers import close_sidebar_on_mobile
 import sys
 import os
 from modules.page_utils import switch_page
+from modules.auth import require_login
 
 # モジュールのインポートパスを追加
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def run():
+    require_login()
+
     # スマホでサイドバーを自動的に閉じる
     close_sidebar_on_mobile()
     

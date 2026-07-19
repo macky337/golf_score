@@ -18,6 +18,7 @@ import logging
 from dotenv import load_dotenv
 from modules.input_helpers import close_sidebar_on_mobile
 from modules.backup_restore import restore_backup_atomic
+from modules.auth import require_login
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,8 @@ def check_password():
     return True
 
 def run():
+    require_login()
+
     # スマホでサイドバーを自動的に閉じる
     close_sidebar_on_mobile()
     

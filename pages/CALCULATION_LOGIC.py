@@ -1,6 +1,8 @@
 import streamlit as st
 import os
+from modules.auth import require_login
 
+require_login()
 st.title("Calculation Logic")
 # Updated path: look one level up for CALCULATION_LOGIC.md
 md_path = os.path.join(os.path.dirname(__file__), "..", "CALCULATION_LOGIC.md")

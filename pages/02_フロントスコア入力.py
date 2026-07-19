@@ -15,8 +15,11 @@ from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
 from modules.supabase_client import get_scores_with_fallback  # 追加: バックスコア入力と同様に必要な関数をインポート
 from modules.input_helpers import toggle_input_mode, smart_number_input, close_sidebar_on_mobile
+from modules.auth import require_login
 
 def run():
+    require_login()
+
     # スマホでサイドバーを自動的に閉じる
     close_sidebar_on_mobile()
     
@@ -33,8 +36,6 @@ def run():
     if "active_round_id" not in st.session_state:
         st.error("ラウンドが選択されていません。ホーム画面から選択してください。")
         if st.button("ホームに戻る"):
-            # セッション状態をクリアしてホームページに戻る
-            st.session_state.clear()
             st.switch_page("main.py")
         return
     

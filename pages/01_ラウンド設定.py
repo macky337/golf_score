@@ -9,6 +9,7 @@ from modules.db import ensure_supabase
 from modules.page_utils import switch_page
 from modules.models import get_course_list, get_or_create_course, get_course_by_id, get_members_list
 from modules.input_helpers import close_sidebar_on_mobile, inject_numeric_keyboard_css
+from modules.auth import require_login
 
 
 def create_score_records(supabase, round_id, member_ids):
@@ -57,6 +58,8 @@ def create_score_records(supabase, round_id, member_ids):
     return success
 
 def run():
+    require_login()
+
     # スマホでサイドバーを自動的に閉じる
     close_sidebar_on_mobile()
     
