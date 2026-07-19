@@ -17,6 +17,8 @@ except ImportError:
 
 AUTHENTICATED_KEY = "app_authenticated"
 AUTH_USERNAME_KEY = "app_auth_username"
+COOKIE_MANAGER_KEY = "_app_cookie_manager_instance"
+COOKIE_COMPONENT_KEY = "app_cookie_component"
 SESSION_COOKIE = "golf_score_session"
 SESSION_TTL = dt.timedelta(days=7)
 
@@ -100,7 +102,14 @@ def verify_session_token(token, expected_username, expected_password, now=None):
 
 
 def _cookie_manager():
-    return stx.CookieManager() if stx is not None else None
+    if stx is None:
+        return None
+
+    # CookieManagerはコンポーネントを描画するため、同一実行内で複数回生成すると
+    # Streamlitのキーが重複する。セッションごとに1つだけ保持する。
+    if COOKIE_MANAGER_KEY not in st.session_state:
+        st.session_state[COOKIE_MANAGER_KEY] = stx.CookieManager(key=COOKIE_COMPONENT_KEY)
+    return st.session_state[COOKIE_MANAGER_KEY]
 
 
 def _restore_cookie_session():

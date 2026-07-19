@@ -93,6 +93,8 @@ def main():
                 switch_page("07_メンバー登録")
             if st.button("コース管理", key="nav_main_courses"):
                 switch_page("09_コース管理")
+            if st.button("📱 オフラインスコア入力", key="nav_main_offline_score"):
+                switch_page("11_オフライン入力")
         
         # 使い方ガイド
         with st.expander("💡 使い方ガイド"):

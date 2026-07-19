@@ -1,0 +1,23 @@
+:root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #0d1117; color: #f4f6f8; }
+main { max-width: 720px; margin: 0 auto; padding: 18px 14px 40px; }
+h1 { font-size: 1.65rem; margin: 0 0 6px; }
+h2 { font-size: 1.05rem; margin: 18px 0 10px; }
+.muted, #status { color: #9ba6b5; font-size: .9rem; }
+.notice { padding: 12px; border-radius: 10px; background: #12233d; color: #cfe5ff; margin: 16px 0; line-height: 1.5; }
+.toolbar, .checkpoint { display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr); margin: 14px 0; }
+button, .file-label { border: 0; border-radius: 10px; min-height: 48px; padding: 10px; color: #fff; background: #2d6cdf; font-size: 1rem; font-weight: 700; text-align: center; }
+button.secondary, .file-label { background: #293241; }
+button:disabled { opacity: .45; }
+input[type=file] { display: none; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 18px 0 10px; }
+.tabs button { background: #293241; min-height: 42px; font-size: .9rem; }
+.tabs button.active { background: #e3a314; color: #111; }
+.player { background: #171d26; border: 1px solid #2a3442; padding: 12px; border-radius: 12px; margin: 10px 0; }
+.player-name { font-size: 1.1rem; font-weight: 800; margin-bottom: 10px; }
+.score-row { display: grid; grid-template-columns: 1fr 96px 1fr 96px; align-items: center; gap: 8px; }
+.score-row label { color: #c3ccd8; }
+input[type=number] { width: 100%; min-height: 48px; border-radius: 9px; border: 1px solid #445063; background: #0d1117; color: #fff; font-size: 1.4rem; text-align: center; }
+.total { margin-top: 22px; padding: 14px; border-radius: 12px; background: #171d26; font-size: 1.1rem; }
+.total strong { color: #ffd166; }
