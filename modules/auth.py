@@ -198,6 +198,21 @@ def _render_login():
     return False
 
 
+def _logout():
+    """Cookieとセッションを破棄してログアウトする。"""
+    manager = _cookie_manager()
+    if manager is not None:
+        manager.delete(SESSION_COOKIE)
+    st.session_state.clear()
+    st.rerun()
+
+
+def render_logout_button(key="app_logout", use_container_width=True):
+    """任意の画面内に共通ログアウトボタンを表示する。"""
+    if st.button("ログアウト", key=key, use_container_width=use_container_width):
+        _logout()
+
+
 def render_logout():
     """ログイン済み画面のサイドバーへログアウト操作を表示する。"""
     username = st.session_state.get(AUTH_USERNAME_KEY, "")
@@ -205,12 +220,7 @@ def render_logout():
         st.divider()
         if username:
             st.caption(f"ログイン中: {username}")
-        if st.button("ログアウト", key="app_logout", use_container_width=True):
-            manager = _cookie_manager()
-            if manager is not None:
-                manager.delete(SESSION_COOKIE)
-            st.session_state.clear()
-            st.rerun()
+        render_logout_button()
 
 
 def require_login():
