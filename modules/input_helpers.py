@@ -7,60 +7,11 @@ import streamlit.components.v1 as components
 
 def close_sidebar_on_mobile():
     """
-    スマホでページ遷移後にサイドバーを自動的に閉じるJavaScript
+    スマホでサイドバーを閉じ、共通ボトムナビゲーションを表示する。
     """
-    components.html("""
-    <script>
-    (function() {
-        try {
-            // 親ウィンドウが存在するかチェック
-            if (!window.parent || !window.parent.document) {
-                return;
-            }
-            
-            const parentDoc = window.parent.document;
-            
-            // モバイルデバイスかどうかを判定
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
-                            window.parent.innerWidth <= 768;
-            
-            if (isMobile) {
-                // サイドバーを閉じる処理
-                setTimeout(() => {
-                    try {
-                        // Streamlitのサイドバー閉じるボタンを探してクリック
-                        const sidebarCloseBtn = parentDoc.querySelector('[data-testid="collapsedControl"]');
-                        const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
-                        
-                        // サイドバーが開いている場合のみ閉じる
-                        if (sidebar) {
-                            const isExpanded = sidebar.getAttribute('aria-expanded') === 'true' ||
-                                             !sidebar.classList.contains('st-emotion-cache-1gwvy71');
-                            
-                            if (isExpanded) {
-                                // より確実にサイドバーを閉じる方法
-                                const closeButton = parentDoc.querySelector('[kind="header"] button[aria-label*="Close"]') ||
-                                                  parentDoc.querySelector('[data-testid="baseButton-header"] button');
-                                
-                                if (closeButton) {
-                                    closeButton.click();
-                                } else if (sidebarCloseBtn) {
-                                    // フォールバック：collapsedControlボタンをクリック
-                                    sidebarCloseBtn.click();
-                                }
-                            }
-                        }
-                    } catch(e) {
-                        console.log('Error closing sidebar:', e);
-                    }
-                }, 300); // ページ読み込み後に実行
-            }
-        } catch(e) {
-            console.log('Error in sidebar auto-close:', e);
-        }
-    })();
-    </script>
-    """, height=0)
+    from modules.mobile_navigation import render_mobile_navigation
+
+    render_mobile_navigation()
 
 
 def inject_numeric_keyboard_css():
