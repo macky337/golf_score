@@ -18,6 +18,12 @@ SCORE_FIELDS = (
     "extra_score",
     "extra_putt",
 )
+GAME_POINT_FIELDS = (
+    "front_game_pt",
+    "back_game_pt",
+    "extra_game_pt",
+)
+OFFLINE_INPUT_FIELDS = SCORE_FIELDS + GAME_POINT_FIELDS
 
 
 def _round_options(rounds):
@@ -46,7 +52,7 @@ def _create_offline_package(supabase, round_id):
             {
                 "member_id": score["member_id"],
                 "name": (score.get("member") or {}).get("name", "未登録"),
-                **{field: score.get(field) or 0 for field in SCORE_FIELDS},
+                **{field: score.get(field) or 0 for field in OFFLINE_INPUT_FIELDS},
             }
         )
 
@@ -84,9 +90,11 @@ def _sync_offline_package(supabase, payload):
             raise ValueError("パッケージ内に対象外メンバーが含まれています")
 
         values = {}
-        for field in SCORE_FIELDS:
+        for field in OFFLINE_INPUT_FIELDS:
             value = player.get(field, 0)
-            if not isinstance(value, int) or value < 0 or value > 200:
+            is_game_point = field in GAME_POINT_FIELDS
+            minimum, maximum = (-1000, 1000) if is_game_point else (0, 200)
+            if not isinstance(value, int) or value < minimum or value > maximum:
                 raise ValueError(f"スコア値が不正です: {field}")
             values[field] = value
 
