@@ -49,7 +49,7 @@ def main():
     try:
         # スマホでサイドバーを自動的に閉じる
         close_sidebar_on_mobile()
-        
+
         st.title("⛳ Golf Score App")
         
         # アプリの説明とマニュアルリンク
