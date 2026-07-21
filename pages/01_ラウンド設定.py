@@ -10,6 +10,7 @@ from modules.page_utils import switch_page
 from modules.models import get_course_list, get_or_create_course, get_course_by_id, get_members_list
 from modules.input_helpers import close_sidebar_on_mobile, inject_numeric_keyboard_css
 from modules.auth import require_login
+from modules.competition_rules import get_default_rules
 
 
 def create_score_records(supabase, round_id, member_ids):
@@ -253,10 +254,20 @@ def run():
                     'course_id': course_id,      # 新しいリレーション用
                     'num_players': num_players,
                     'has_extra': False,
-                    'finalized': False
+                    'finalized': False,
+                    'rule_settings': get_default_rules(supabase),
                 }
-                
-                round_result = supabase.table('rounds').insert(round_data).execute()
+
+                try:
+                    round_result = supabase.table('rounds').insert(round_data).execute()
+                except Exception:
+                    # DB更新前も従来ルールでラウンド作成を継続できるようにする。
+                    round_data.pop('rule_settings', None)
+                    round_result = supabase.table('rounds').insert(round_data).execute()
+                    st.warning(
+                        "競技ルールの保存列が未導入のため、従来の標準ルールで作成しました。"
+                        "管理者は sql/add_competition_rules.sql をSupabaseで実行してください。"
+                    )
                 round_id = round_result.data[0]['round_id']
 
                 # アクティブなラウンドIDをセッション状態に保存

@@ -32,6 +32,7 @@ from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
 from modules.auth import require_login
 from modules.round_validation import validate_round
+from modules.competition_rules import rules_for_round
 logger = logging.getLogger(__name__)
 
 # ▼▼▼ フォント登録（日本語対応） ▼▼▼
@@ -426,7 +427,9 @@ def run():
             # 変数の初期化（既に定義済みのhandicapsとtotal_only_setを使用）
             color_func = get_color_points_function()
             
-            match_matrix = create_match_matrix(player_data, handicaps, total_only_set)
+            match_matrix = create_match_matrix(
+                player_data, handicaps, total_only_set, rules_for_round(active_round)
+            )
             match_matrix_reset = match_matrix.reset_index()
             match_matrix_reset.rename(columns={'index': 'Player'}, inplace=True)
             m_df = match_matrix_reset.astype(str)
@@ -453,7 +456,9 @@ def run():
             )
             
             # 詳細なマッチ結果の作成と表示
-            match_results = create_detailed_match_results(player_data, handicaps, total_only_set)
+            match_results = create_detailed_match_results(
+                player_data, handicaps, total_only_set, rules_for_round(active_round)
+            )
             df_reset = match_results.reset_index()
             df_reset.rename(columns={'index': 'Player'}, inplace=True)
             r_df = df_reset.astype(str)

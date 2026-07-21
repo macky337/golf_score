@@ -28,7 +28,10 @@ def calc_net_extra(data, handicap, multiplier=1):
     extra = safe_get_score(data, "Extra Score")
     return extra - (handicap * multiplier)
 
-def calc_putt_points(putt_scores, n):
+from modules.competition_rules import normalize_rules
+
+
+def calc_putt_points(putt_scores, n, rules=None):
     """
     パット戦の得点計算（参加人数に応じたルール）
     
@@ -44,6 +47,7 @@ def calc_putt_points(putt_scores, n):
        - 勝者が3名の場合: 勝者に +5pt、残り1名に -15pt
     なお、すべてのプレイヤーが同じスコアの場合は全員0点とする。
     """
+    rules = normalize_rules(rules)
     if not putt_scores:
         return {}
     
@@ -58,38 +62,39 @@ def calc_putt_points(putt_scores, n):
     
     if n == 3:
         if len(winners) == 1:
-            points[winners[0]] = 20
+            points[winners[0]] = rules["putt_3_solo_winner"]
             for m_id in putt_scores:
                 if m_id not in winners:
-                    points[m_id] = -10
+                    points[m_id] = rules["putt_3_solo_loser"]
         elif len(winners) == 2:
             for m_id in putt_scores:
                 if m_id in winners:
-                    points[m_id] = 5
+                    points[m_id] = rules["putt_3_two_winners"]
                 else:
-                    points[m_id] = -10
+                    points[m_id] = rules["putt_3_two_losers"]
     elif n == 4:
         if len(winners) == 1:
-            points[winners[0]] = 30
+            points[winners[0]] = rules["putt_4_solo_winner"]
             for m_id in putt_scores:
                 if m_id not in winners:
-                    points[m_id] = -10
+                    points[m_id] = rules["putt_4_solo_loser"]
         elif len(winners) == 2:
             for m_id in putt_scores:
                 if m_id in winners:
-                    points[m_id] = 10
+                    points[m_id] = rules["putt_4_two_winners"]
                 else:
-                    points[m_id] = -10
+                    points[m_id] = rules["putt_4_two_losers"]
         elif len(winners) == 3:
             for m_id in putt_scores:
                 if m_id in winners:
-                    points[m_id] = 5
+                    points[m_id] = rules["putt_4_three_winners"]
                 else:
-                    points[m_id] = -15
+                    points[m_id] = rules["putt_4_three_losers"]
     
     return points
 
-def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=False):
+def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=False, rules=None):
+    match_value = normalize_rules(rules)["match_win_points"]
     front_pt = back_pt = total_pt = extra_pt = 0
     # バックスコアの入力が不足している場合（フロント９のみ入力）
     if safe_get_score(data_i, "Back Score") <= 0 or safe_get_score(data_j, "Back Score") <= 0:
@@ -100,16 +105,16 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
         front_i = calc_net_score(data_i, "Front Score", handicap_ij, multiplier=1)
         front_j = calc_net_score(data_j, "Front Score", handicap_ji, multiplier=1)
         if front_i < front_j:
-            front_pt = 10  # 5から10に修正
+            front_pt = match_value
         elif front_i > front_j:
-            front_pt = -10  # -5から-10に修正
+            front_pt = -match_value
         if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
             extra_i = calc_net_extra(data_i, handicap_ij, multiplier=1)
             extra_j = calc_net_extra(data_j, handicap_ji, multiplier=1)
             if extra_i < extra_j:
-                extra_pt = 10  # 5から10に修正
+                extra_pt = match_value
             elif extra_i > extra_j:
-                extra_pt = -10  # -5から-10に修正
+                extra_pt = -match_value
         total_points = front_pt + extra_pt
         return {"Match Front": front_pt, "Match Back": 0, "Match Total": front_pt, "Match Extra": extra_pt, "Total": total_points}
     else:
@@ -118,48 +123,48 @@ def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=Fa
             total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
             total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
             if total_i < total_j:
-                total_pt = 10  # 5から10に修正
+                total_pt = match_value
             elif total_i > total_j:
-                total_pt = -10  # -5から-10に修正
+                total_pt = -match_value
             if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
                 extra_i = calc_net_extra(data_i, handicap_ij, multiplier=1)
                 extra_j = calc_net_extra(data_j, handicap_ji, multiplier=1)
                 if extra_i < extra_j:
-                    extra_pt = 10  # 5から10に修正
+                    extra_pt = match_value
                 elif extra_i > extra_j:
-                    extra_pt = -10  # -5から-10に修正
+                    extra_pt = -match_value
             total_points = total_pt + extra_pt
             return {"Match Front": 0, "Match Back": 0, "Match Total": total_pt, "Match Extra": extra_pt, "Total": total_points}
         else:
             front_i = calc_net_score(data_i, "Front Score", handicap_ij, multiplier=1)
             front_j = calc_net_score(data_j, "Front Score", handicap_ji, multiplier=1)
             if front_i < front_j:
-                front_pt = 10  # 5から10に修正
+                front_pt = match_value
             elif front_i > front_j:
-                front_pt = -10  # -5から-10に修正
+                front_pt = -match_value
             back_i = calc_net_score(data_i, "Back Score", handicap_ij, multiplier=1)
             back_j = calc_net_score(data_j, "Back Score", handicap_ji, multiplier=1)
             if back_i < back_j:
-                back_pt = 10  # 5から10に修正
+                back_pt = match_value
             elif back_i > back_j:
-                back_pt = -10  # -5から-10に修正
+                back_pt = -match_value
             total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
             total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
             if total_i < total_j:
-                total_pt = 10  # 5から10に修正
+                total_pt = match_value
             elif total_i > total_j:
-                total_pt = -10  # -5から-10に修正
+                total_pt = -match_value
             if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
                 extra_i = calc_net_extra(data_i, handicap_ij, multiplier=1)
                 extra_j = calc_net_extra(data_j, handicap_ji, multiplier=1)
                 if extra_i < extra_j:
-                    extra_pt = 10  # 5から10に修正
+                    extra_pt = match_value
                 elif extra_i > extra_j:
-                    extra_pt = -10  # -5から-10に修正
+                    extra_pt = -match_value
             total_points = front_pt + back_pt + total_pt + extra_pt
             return {"Match Front": front_pt, "Match Back": back_pt, "Match Total": total_pt, "Match Extra": extra_pt, "Total": total_points}
 
-def calc_match_points_by_section(player_i, player_j, handicap_ij, handicap_ji, section, multiplier=1):
+def calc_match_points_by_section(player_i, player_j, handicap_ij, handicap_ji, section, multiplier=1, rules=None):
     """セクション（Front/Back/Total/Extra）ごとのマッチポイントを計算"""
     if section == "Front":
         score_i = player_i["Front Score"] - handicap_ij
@@ -180,10 +185,11 @@ def calc_match_points_by_section(player_i, player_j, handicap_ij, handicap_ji, s
         score_i = player_i["Extra Score"] - handicap_ij
         score_j = player_j["Extra Score"] - handicap_ji
     
+    match_value = normalize_rules(rules)["match_win_points"]
     score_diff = score_i - score_j
     if score_diff < 0:
-        return 10  # 5から10に修正
+        return match_value
     elif score_diff > 0:
-        return -10  # -5から-10に修正
+        return -match_value
     else:
         return 0

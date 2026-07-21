@@ -9,6 +9,7 @@ BACKUP_LIST_KEYS = (
     "scores",
     "handicap_matches",
     "round_results",
+    "app_settings",
 )
 
 

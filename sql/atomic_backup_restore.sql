@@ -19,7 +19,8 @@ BEGIN
        OR jsonb_typeof(COALESCE(backup_data->'rounds', '[]'::jsonb)) <> 'array'
        OR jsonb_typeof(COALESCE(backup_data->'scores', '[]'::jsonb)) <> 'array'
        OR jsonb_typeof(COALESCE(backup_data->'handicap_matches', '[]'::jsonb)) <> 'array'
-       OR jsonb_typeof(COALESCE(backup_data->'round_results', '[]'::jsonb)) <> 'array' THEN
+       OR jsonb_typeof(COALESCE(backup_data->'round_results', '[]'::jsonb)) <> 'array'
+       OR jsonb_typeof(COALESCE(backup_data->'app_settings', '[]'::jsonb)) <> 'array' THEN
         RAISE EXCEPTION 'backup table values must be JSON arrays';
     END IF;
 
@@ -28,6 +29,13 @@ BEGIN
     DELETE FROM public.score;
     DELETE FROM public.rounds;
     DELETE FROM public.member;
+    DELETE FROM public.app_settings;
+
+    INSERT INTO public.app_settings
+    SELECT * FROM jsonb_populate_recordset(
+        NULL::public.app_settings,
+        COALESCE(backup_data->'app_settings', '[]'::jsonb)
+    );
 
     INSERT INTO public.member
     SELECT * FROM jsonb_populate_recordset(
@@ -90,7 +98,8 @@ BEGIN
         'rounds', (SELECT COUNT(*) FROM public.rounds),
         'scores', (SELECT COUNT(*) FROM public.score),
         'handicap_matches', (SELECT COUNT(*) FROM public.handicap_match),
-        'round_results', (SELECT COUNT(*) FROM public.round_results)
+        'round_results', (SELECT COUNT(*) FROM public.round_results),
+        'app_settings', (SELECT COUNT(*) FROM public.app_settings)
     );
     RETURN restored_counts;
 END;

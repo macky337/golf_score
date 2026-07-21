@@ -1,10 +1,10 @@
 from modules.score_calculator import calc_putt_points, calc_match_points_by_section, calc_match_points
-from modules.round_results import save_round_results
+from modules.competition_rules import rules_for_round
 
 def calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round):
     """プレイヤーのポイントを計算"""
-    result = {pid: player_data[pid].copy() for pid in player_ids}
-    
+    rules = rules_for_round(active_round)
+
     # パットスコアでポイント計算
     # キー名の互換性を確保するために get() を使う
     front_putt = {mid: player_data[mid].get("Front Putt", player_data[mid].get("Putt Front", 0)) for mid in player_data}
@@ -14,9 +14,13 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
     # 実際にExtra Puttのスコアがあるか確認
     has_actual_extra = any(score > 0 for score in extra_putt.values())
 
-    putt_front_points = calc_putt_points(front_putt, len(player_ids))
-    putt_back_points = calc_putt_points(back_putt, len(player_ids))
-    putt_extra_points = calc_putt_points(extra_putt, len(player_ids) if has_actual_extra else {mid: 0 for mid in player_data})
+    putt_front_points = calc_putt_points(front_putt, len(player_ids), rules)
+    putt_back_points = calc_putt_points(back_putt, len(player_ids), rules)
+    putt_extra_points = calc_putt_points(
+        extra_putt,
+        len(player_ids) if has_actual_extra else {mid: 0 for mid in player_data},
+        rules,
+    )
 
     # 計算結果をデバッグ出力
     print("Front Putt:", front_putt)
@@ -50,15 +54,8 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
             player_data[pid]["Front GP"] = player_data[pid]["front_game_pt"]
         else:
             sorted_front = sorted(front_scores.items(), key=lambda x: (x[1], x[0]))
-            if len(player_ids) == 3:
-                player_data[sorted_front[0][0]]["Front GP"] = 30
-                player_data[sorted_front[1][0]]["Front GP"] = 0
-                player_data[sorted_front[2][0]]["Front GP"] = -30
-            else:
-                player_data[sorted_front[0][0]]["Front GP"] = 30
-                player_data[sorted_front[1][0]]["Front GP"] = 10
-                player_data[sorted_front[2][0]]["Front GP"] = -10
-                player_data[sorted_front[3][0]]["Front GP"] = -30
+            rank_points = rules[f"game_points_{len(player_ids)}"]
+            player_data[pid]["Front GP"] = rank_points[[item[0] for item in sorted_front].index(pid)]
 
     # Back GPも同様に処理
     for pid in player_ids:
@@ -72,15 +69,8 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
             player_data[pid]["Back GP"] = player_data[pid]["back_game_pt"]
         else:
             sorted_back = sorted(back_scores.items(), key=lambda x: (x[1], x[0]))
-            if len(player_ids) == 3:
-                player_data[sorted_back[0][0]]["Back GP"] = 30
-                player_data[sorted_back[1][0]]["Back GP"] = 0
-                player_data[sorted_back[2][0]]["Back GP"] = -30
-            else:
-                player_data[sorted_back[0][0]]["Back GP"] = 30
-                player_data[sorted_back[1][0]]["Back GP"] = 10
-                player_data[sorted_back[2][0]]["Back GP"] = -10
-                player_data[sorted_back[3][0]]["Back GP"] = -30
+            rank_points = rules[f"game_points_{len(player_ids)}"]
+            player_data[pid]["Back GP"] = rank_points[[item[0] for item in sorted_back].index(pid)]
 
     # Extra GPも同様に処理
     if active_round.get('has_extra', False):
@@ -95,15 +85,8 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
                 player_data[pid]["Extra GP"] = player_data[pid]["extra_game_pt"]
             else:
                 sorted_extra = sorted(extra_scores.items(), key=lambda x: (x[1], x[0]))
-                if len(player_ids) == 3:
-                    player_data[sorted_extra[0][0]]["Extra GP"] = 30
-                    player_data[sorted_extra[1][0]]["Extra GP"] = 0
-                    player_data[sorted_extra[2][0]]["Extra GP"] = -30
-                else:
-                    player_data[sorted_extra[0][0]]["Extra GP"] = 30
-                    player_data[sorted_extra[1][0]]["Extra GP"] = 10
-                    player_data[sorted_extra[2][0]]["Extra GP"] = -10
-                    player_data[sorted_extra[3][0]]["Extra GP"] = -30
+                rank_points = rules[f"game_points_{len(player_ids)}"]
+                player_data[pid]["Extra GP"] = rank_points[[item[0] for item in sorted_extra].index(pid)]
 
     # temp_game_ptsの計算を行う
     temp_game_pts = {}
@@ -183,9 +166,9 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
             handicap_ji_val = handicaps.get((pid_i, pid_j), 0)
 
             if pair_key in total_only_set:
-                pts = calc_match_points(data_i, data_j, handicap_ij_val, handicap_ji_val, is_total_only=True)
+                pts = calc_match_points(data_i, data_j, handicap_ij_val, handicap_ji_val, is_total_only=True, rules=rules)
             else:
-                pts = calc_match_points(data_i, data_j, handicap_ij_val, handicap_ji_val, is_total_only=False)
+                pts = calc_match_points(data_i, data_j, handicap_ij_val, handicap_ji_val, is_total_only=False, rules=rules)
             data_i["Match Front"] += pts["Match Front"]
             data_i["Match Back"] += pts["Match Back"]
             data_i["Match Total"] += pts["Match Total"]
@@ -201,17 +184,6 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
         d = player_data[mid]
         d["Total Pt"] = d["Game Pt"] + d["Match Pt"] + d["Putt Pt"]
 
-    round_id = active_round.get('round_id')
-    is_test_round = round_id > 900 or active_round.get('is_test', False)  # テストフラグも確認
-    
-    if round_id and not is_test_round:  # テストモードではデータを保存しない
-        if save_round_results(round_id, player_data):
-            print(f"Successfully saved round results and scores for round_id: {round_id}")
-        else:
-            print(f"Failed to save data for round_id: {round_id}")
-    elif is_test_round:
-        print("テストモード: データベースへの保存をスキップします")
-
     return player_data
 
 def calculate_match_points_for_section(data_i, data_j, pid_i, pid_j, handicaps, section, active_round):
@@ -220,7 +192,8 @@ def calculate_match_points_for_section(data_i, data_j, pid_i, pid_j, handicaps, 
         data_i, data_j,
         handicaps.get((pid_j, pid_i), 0),
         handicaps.get((pid_i, pid_j), 0),
-        section
+        section,
+        rules=rules_for_round(active_round),
     )
     if points is not None:
         print(f"Section: {section}, Player {pid_i} vs {pid_j}, Points: {points}")

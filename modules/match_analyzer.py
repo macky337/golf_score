@@ -2,7 +2,7 @@ import copy
 import pandas as pd
 from modules.score_calculator import calc_match_points
 
-def create_match_matrix(player_data, handicaps, total_only_set):
+def create_match_matrix(player_data, handicaps, total_only_set, rules=None):
     # 累積前の元データ（Front, Back, Extra, Total）のみを抽出して使用する
     raw_data = {}
     for pid, data in player_data.items():
@@ -29,14 +29,15 @@ def create_match_matrix(player_data, handicaps, total_only_set):
                         raw_data[pid_i], raw_data[pid_j],
                         handicaps.get((pid_j, pid_i), 0),
                         handicaps.get((pid_i, pid_j), 0),
-                        is_total_only=(pair_key in total_only_set)
+                        is_total_only=(pair_key in total_only_set),
+                        rules=rules,
                     )
                     # ptsは辞書なので、Total を使用
                     matrix[player_data[pid_i]["Player"]][player_data[pid_j]["Player"]] = -pts["Total"]
                     matrix[player_data[pid_j]["Player"]][player_data[pid_i]["Player"]] = pts["Total"]
     return pd.DataFrame(matrix)
 
-def create_detailed_match_results(player_data, handicaps, total_only_set):
+def create_detailed_match_results(player_data, handicaps, total_only_set, rules=None):
     """マッチ戦の詳細結果を作成（横：対戦カード、縦：プレイヤーのポイント）"""
     # member_idの昇順に並べ替え済みのプレイヤーIDリスト
     player_ids = sorted(list(player_data.keys()))
@@ -81,7 +82,8 @@ def create_detailed_match_results(player_data, handicaps, total_only_set):
                 data_j,
                 handicap_ij,
                 handicap_ji,
-                is_total_only
+                is_total_only,
+                rules=rules,
             )
             
             match_results[data_i["Player"]][match_name] = f"{points['Total']:+d}" if points["Total"] != 0 else "0"

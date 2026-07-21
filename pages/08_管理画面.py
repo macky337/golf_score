@@ -21,6 +21,7 @@ from modules.backup_restore import restore_backup_atomic
 from modules.auth import require_login
 from modules.round_calculation import recalculate_round
 from modules.round_validation import validate_round
+from modules.competition_rules import get_default_rules, save_default_rules
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +41,6 @@ if os.path.exists(modules_path) and modules_path not in sys.path:
 try:
     from modules.db import get_supabase, ensure_supabase
     from modules.models import *
-    from modules.game_points import calculate_game_pt
-    from modules.calculation_logic import calculate_player_points
-    from modules.round_results import save_round_results, get_round_results
     import_success = True
     # Supabaseクライアントを取得
     supabase = get_supabase()
@@ -62,19 +60,6 @@ except ImportError as e:
             st.stop()
         return client
     
-    # 代替の関数を定義
-    def calculate_player_points(*args, **kwargs):
-        st.error("calculation_logicモジュールが利用できません")
-        return {}, {}, {}, {}
-    
-    def save_round_results(*args, **kwargs):
-        st.error("round_resultsモジュールが利用できません")
-        return False
-    
-    def get_round_results(*args, **kwargs):
-        st.error("round_resultsモジュールが利用できません")
-        return {}
-
 # from modules.page_utils import switch_page  # 未使用のため削除
 
 # パスワード取得関数を完全にインライン化
@@ -96,16 +81,6 @@ def get_admin_password():
         pass  # secretsがない場合は無視
     
     return None
-
-def calculate_game_pt(player_pt, other_pts):
-    """ゲームポイントを計算する
-    
-    3人プレーの場合：自分のポイント×2 - 他のプレイヤーの合計
-    4人プレーの場合：そのままのポイント
-    """
-    if len(other_pts) == 2:  # 3人プレー
-        return player_pt * 2 - sum(other_pts)
-    return player_pt  # 4人プレー
 
 def check_password():
     """パスワードチェック機能"""
@@ -152,6 +127,7 @@ def run():
         (
             "📝 スコア修正",
             "⚖️ ハンディキャップ修正",
+            "🎯 競技ルール設定",
             "👤 メンバー管理",
             "🛡️ データ保守・危険操作",
         ),
@@ -162,6 +138,8 @@ def run():
         score_edit_tab()
     elif admin_menu == "⚖️ ハンディキャップ修正":
         show_handicap_editor()
+    elif admin_menu == "🎯 競技ルール設定":
+        show_competition_rule_settings()
     elif admin_menu == "👤 メンバー管理":
         show_member_manager()
     else:
@@ -175,123 +153,6 @@ def recalculate_single_round(round_id):
     except Exception as e:
         raise Exception(f"ラウンド{round_id}の再計算に失敗: {str(e)}")
 
-def recalculate_scores(round_id):
-    """後方互換用。通常画面と同じ再計算処理へ委譲する。"""
-    recalculate_round(ensure_supabase(), round_id)
-    return
-
-    """旧方式の再計算処理（互換参照用、実行されない）。"""
-    try:
-        # Supabaseクライアントを取得
-        supabase = ensure_supabase()
-        if not supabase:
-            raise Exception("Supabaseクライアントが初期化できません")
-        
-        # ラウンドのスコアデータを取得
-        scores = supabase.table('score').select('*').eq('round_id', round_id).execute().data
-        
-        # ハンディキャップデータを取得
-        handicaps = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute().data
-        
-        # ハンディキャップをペアごとにマッピング
-        handicap_map = {}
-        total_only_pairs = set()
-        for h in handicaps:
-            handicap_map[(h['player_1_id'], h['player_2_id'])] = h['player_1_to_2']
-            handicap_map[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
-            if h['total_only']:
-                total_only_pairs.add(frozenset([h['player_1_id'], h['player_2_id']]))
-
-        # スコアの計算
-        for score in scores:
-            front_total = score['front_score']
-            back_total = score['back_score']
-            extra_total = score['extra_score'] if score['extra_score'] is not None else 0
-            
-            # マッチポイントの初期化
-            total_match_points = 0
-            
-            # 他のプレイヤーとの対戦結果を計算
-            for opponent in scores:
-                if score['member_id'] == opponent['member_id']:
-                    continue
-                
-                pair = frozenset([score['member_id'], opponent['member_id']])
-                is_total_only = pair in total_only_pairs
-                
-                # ハンディキャップを取得
-                handicap = handicap_map.get((score['member_id'], opponent['member_id']), 0)
-                
-                # ネットスコアの計算
-                net_front = front_total - (0 if is_total_only else handicap//2)
-                net_back = back_total - (0 if is_total_only else (handicap - handicap//2))
-                net_extra = extra_total - handicap if extra_total else 0
-                
-                opp_handicap = handicap_map.get((opponent['member_id'], score['member_id']), 0)
-                opp_net_front = opponent['front_score'] - (0 if is_total_only else opp_handicap//2)
-                opp_net_back = opponent['back_score'] - (0 if is_total_only else (opp_handicap - opp_handicap//2))
-                opp_net_extra = opponent['extra_score'] - opp_handicap if opponent['extra_score'] else 0
-                
-                # マッチポイントの計算
-                if not is_total_only:
-                    # Front 9
-                    if net_front < opp_net_front:
-                        total_match_points += 5
-                    elif net_front > opp_net_front:
-                        total_match_points -= 5
-                    
-                    # Back 9
-                    if net_back < opp_net_back:
-                        total_match_points += 5
-                    elif net_back > opp_net_back:
-                        total_match_points -= 5
-                
-                # Total（必ず計算）
-                net_total = (net_front + net_back) - handicap
-                opp_net_total = (opp_net_front + opp_net_back) - opp_handicap
-                if net_total < opp_net_total:
-                    total_match_points += 10
-                elif net_total > opp_net_total:
-                    total_match_points -= 10
-                
-                # Extra holes（もしあれば）
-                if extra_total is not None and opponent['extra_score'] is not None:
-                    if net_extra < opp_net_extra:
-                        total_match_points += 5
-                    elif net_extra > opp_net_extra:
-                        total_match_points -= 5
-            
-            # マッチポイントの更新
-            supabase.table('score').update({
-                'match_pt': total_match_points
-            }).eq('score_id', score['score_id']).execute()
-
-        # プレイヤー数を確認
-        player_count = len(scores)
-        
-        # Game Ptの計算（手動入力された値を使用）
-        # 3人プレイの場合は再計算が必要
-        if player_count == 3:
-            for score in scores:
-                temp_gp = (score['front_game_pt'] or 0) + (score['back_game_pt'] or 0) + (score['extra_game_pt'] or 0)
-                others_gp = [
-                    (s['front_game_pt'] or 0) + (s['back_game_pt'] or 0) + (s['extra_game_pt'] or 0)
-                    for s in scores if s['member_id'] != score['member_id']
-                ]
-                final_game_pt = calculate_game_pt(temp_gp, others_gp)
-                
-                # total_ptとgame_ptはround_resultsテーブルで管理されるため、ここでは更新しない
-                # scoreテーブルにはfront_game_pt, back_game_pt, extra_game_ptのみ保存
-        else:
-            # 4人の場合は各セクションの合計をそのまま使用
-            # 4人の場合も、game_ptとtotal_ptはround_resultsテーブルで管理されるため、
-            # scoreテーブルには保存しない
-            pass
-
-    except Exception as e:
-        raise Exception(f"スコアの再計算中にエラーが発生しました: {str(e)}")
-
-
 def recalculate_after_handicap_change(supabase, round_id):
     """ハンデ変更後に結果を再計算し、確定済みなら整合性も確認する。"""
     recalculate_round(supabase, round_id)
@@ -302,161 +163,6 @@ def recalculate_after_handicap_change(supabase, round_id):
         errors = validate_round(supabase, round_id, require_results=True)
         if errors:
             raise ValueError("／".join(errors))
-
-def show_score_editor():
-    st.subheader("スコア修正")
-    
-    # Supabaseクライアントを取得
-    supabase = ensure_supabase()
-    
-    # ラウンドデータの取得
-    rounds_result = supabase.table('rounds').select('*').order('date_played', desc=True).execute()
-    rounds = rounds_result.data
-    
-    round_options = [
-        f"{r['date_played']} - {r['course_name']} (ID: {r['round_id']})"
-        for r in rounds
-    ]
-    
-    selected_round = st.selectbox(
-        "修正するラウンドを選択",
-        options=round_options,
-        index=0 if round_options else None
-    )
-    
-    if selected_round:
-        round_id = int(selected_round.split("ID: ")[1].rstrip(")"))
-        selected_round_data = next(r for r in rounds if r['round_id'] == round_id)
-        status = "確定済み（変更後に再計算）" if selected_round_data.get('finalized') else "未確定"
-        st.info(f"**管理対象**：{selected_round}　／　{status}")
-        round_data = next((r for r in rounds if r['round_id'] == round_id), None)
-        
-        # ラウンド削除機能
-        with st.expander("⚠️ ラウンドの削除"):
-            st.warning("このラウンドのデータをすべて削除します。この操作は取り消せません。")
-            
-            # 削除の確認チェックボックス
-            confirm_delete = st.checkbox("このラウンドを削除することを確認しました")
-            
-            if st.button("ラウンドを削除", disabled=not confirm_delete, type="primary"):
-                try:
-                    # 関連データの削除（順序が重要）
-                    # 1. round_resultsテーブルからデータを削除（これが追加部分）
-                    supabase.table('round_results').delete().eq('round_id', round_id).execute()
-                    
-                    # 2. ハンディキャップマッチデータの削除
-                    supabase.table('handicap_match').delete().eq('round_id', round_id).execute()
-                    
-                    # 3. スコアデータの削除
-                    supabase.table('score').delete().eq('round_id', round_id).execute()
-                    
-                    # 4. ラウンドデータの削除
-                    supabase.table('rounds').delete().eq('round_id', round_id).execute()
-                    
-                    st.success(f"ラウンドID: {round_id} を削除しました")
-                    st.rerun()  # 画面を再読み込み
-                    
-                except Exception as e:
-                    logger.exception("ラウンドの削除に失敗しました")
-                    st.error(f"ラウンドの削除中にエラーが発生しました: {str(e)}")
-        
-        if round_data:
-            # スコアデータの取得
-            scores_result = supabase.table('score').select(
-                '*, member(name)'
-            ).eq('round_id', round_id).execute()
-            scores = scores_result.data
-            
-            if scores:
-                # スコア編集フォーム
-                with st.form("score_edit_form"):
-                    updated_scores = {}
-                    
-                    for score in scores:
-                        st.write(f"### {score['member']['name']}")
-                        col1, col2, col3, col4 = st.columns(4)
-                        
-                        with col1:
-                            front_score = st.number_input(
-                                "Front Score",
-                                value=score['front_score'],
-                                key=f"front_{score['score_id']}"
-                            )
-                            front_putt = st.number_input(
-                                "Front Putt",
-                                value=score['front_putt'] or 0,
-                                key=f"front_putt_{score['score_id']}"
-                            )
-                        
-                        with col2:
-                            back_score = st.number_input(
-                                "Back Score",
-                                value=score['back_score'],
-                                key=f"back_{score['score_id']}"
-                            )
-                            back_putt = st.number_input(
-                                "Back Putt",
-                                value=score['back_putt'] or 0,
-                                key=f"back_putt_{score['score_id']}"
-                            )
-                        
-                        with col3:
-                            extra_score = st.number_input(
-                                "Extra Score",
-                                value=score['extra_score'] or 0,
-                                key=f"extra_{score['score_id']}"
-                            )
-                            extra_putt = st.number_input(
-                                "Extra Putt",
-                                value=score['extra_putt'] or 0,
-                                key=f"extra_putt_{score['score_id']}"
-                            )
-                        
-                        with col4:
-                            front_game_pt = st.number_input(
-                                "Front Game Pt",
-                                value=score['front_game_pt'] or 0,
-                                key=f"front_game_{score['score_id']}"
-                            )
-                            back_game_pt = st.number_input(
-                                "Back Game Pt",
-                                value=score['back_game_pt'] or 0,
-                                key=f"back_game_{score['score_id']}"
-                            )
-                            extra_game_pt = st.number_input(
-                                "Extra Game Pt",
-                                value=score['extra_game_pt'] or 0,
-                                key=f"extra_game_{score['score_id']}"
-                            )
-                        
-                        # 更新データの準備
-                        updated_scores[score['score_id']] = {
-                            'front_score': st.session_state[f"front_{score['score_id']}"],
-                            'front_putt': st.session_state[f"front_putt_{score['score_id']}"],
-                            'back_score': st.session_state[f"back_{score['score_id']}"],
-                            'back_putt': st.session_state[f"back_putt_{score['score_id']}"],
-                            'extra_score': st.session_state[f"extra_{score['score_id']}"],
-                            'extra_putt': st.session_state[f"extra_putt_{score['score_id']}"],
-                            'front_game_pt': st.session_state[f"front_game_{score['score_id']}"],
-                            'back_game_pt': st.session_state[f"back_game_{score['score_id']}"],
-                            'extra_game_pt': st.session_state[f"extra_game_{score['score_id']}"]
-                        }
-                    
-                    if st.form_submit_button("スコアを更新"):
-                        try:
-                            for record_id, new_values in updated_scores.items():
-                                supabase.table('score').update(new_values).eq('score_id', record_id).execute()
-                            
-                            if round_data['finalized']:
-                                with st.spinner("スコアを再計算中..."):
-                                    recalculate_scores(round_id)
-                                
-                            st.success("スコアを更新しました")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"更新中にエラーが発生しました: {str(e)}")
-            else:
-                st.warning("スコアデータが見つかりません")
 
 def show_handicap_editor():
     st.subheader("ハンディキャップ修正")
@@ -632,6 +338,82 @@ def show_handicap_editor():
                             st.code(str(e))
                 else:
                     st.error("同じプレーヤーは選択できません")
+
+def show_competition_rule_settings():
+    """新規ラウンドへ適用する標準の競技ルールを編集する。"""
+    st.subheader("競技ルール設定")
+    st.info(
+        "ここで保存したルールは、次に作成する新規ラウンドから適用されます。"
+        "作成済みラウンドの配点は変更されません。"
+    )
+    st.caption("ログイン情報やDB接続情報はこの画面では変更できません。")
+    supabase = ensure_supabase()
+    rules = get_default_rules(supabase)
+
+    with st.form("competition_rule_settings_form"):
+        st.markdown("### マッチ対戦")
+        match_win_points = st.number_input(
+            "1勝あたりのポイント",
+            min_value=1,
+            max_value=100,
+            value=rules["match_win_points"],
+            step=1,
+        )
+
+        st.markdown("### パット戦（3人）")
+        putt_3_solo_winner = st.number_input("単独勝者", value=rules["putt_3_solo_winner"], step=1)
+        putt_3_solo_loser = st.number_input("単独勝者時・その他", value=rules["putt_3_solo_loser"], step=1)
+        putt_3_two_winners = st.number_input("2人同率勝者・各人", value=rules["putt_3_two_winners"], step=1)
+        putt_3_two_losers = st.number_input("2人同率勝者時・その他", value=rules["putt_3_two_losers"], step=1)
+
+        st.markdown("### パット戦（4人）")
+        putt_4_solo_winner = st.number_input("単独勝者（4人）", value=rules["putt_4_solo_winner"], step=1)
+        putt_4_solo_loser = st.number_input("単独勝者時・その他（4人）", value=rules["putt_4_solo_loser"], step=1)
+        putt_4_two_winners = st.number_input("2人同率勝者・各人（4人）", value=rules["putt_4_two_winners"], step=1)
+        putt_4_two_losers = st.number_input("2人同率勝者時・その他（4人）", value=rules["putt_4_two_losers"], step=1)
+        putt_4_three_winners = st.number_input("3人同率勝者・各人", value=rules["putt_4_three_winners"], step=1)
+        putt_4_three_losers = st.number_input("3人同率勝者時・その他", value=rules["putt_4_three_losers"], step=1)
+
+        st.markdown("### ゲームポイント")
+        st.caption(
+            "ゲームポイントは各入力画面で手動入力する値のため、標準配点の変更対象には含めません。"
+        )
+
+        if st.form_submit_button("標準ルールを保存", type="primary", use_container_width=True):
+            updated = {
+                **rules,
+                "match_win_points": match_win_points,
+                "putt_3_solo_winner": putt_3_solo_winner,
+                "putt_3_solo_loser": putt_3_solo_loser,
+                "putt_3_two_winners": putt_3_two_winners,
+                "putt_3_two_losers": putt_3_two_losers,
+                "putt_4_solo_winner": putt_4_solo_winner,
+                "putt_4_solo_loser": putt_4_solo_loser,
+                "putt_4_two_winners": putt_4_two_winners,
+                "putt_4_two_losers": putt_4_two_losers,
+                "putt_4_three_winners": putt_4_three_winners,
+                "putt_4_three_losers": putt_4_three_losers,
+            }
+            balance_checks = (
+                putt_3_solo_winner + 2 * putt_3_solo_loser,
+                2 * putt_3_two_winners + putt_3_two_losers,
+                putt_4_solo_winner + 3 * putt_4_solo_loser,
+                2 * putt_4_two_winners + 2 * putt_4_two_losers,
+                3 * putt_4_three_winners + putt_4_three_losers,
+            )
+            if any(total != 0 for total in balance_checks):
+                st.error("各配点パターンの合計が0になるように設定してください。")
+            else:
+                try:
+                    save_default_rules(supabase, updated)
+                    st.success("標準ルールを保存しました。次の新規ラウンドから適用されます。")
+                except Exception as error:
+                    logger.exception("競技ルール設定の保存に失敗しました")
+                    st.error(
+                        "保存できませんでした。先にSupabaseで "
+                        "sql/add_competition_rules.sql を実行してください。"
+                    )
+
 
 def show_member_manager():
     st.subheader("メンバー管理")
@@ -902,12 +684,17 @@ def save_backup_to_supabase(backup_data):
 
 def create_backup_snapshot(supabase):
     """破壊的操作の直前にも使える、全データのバックアップを作成する。"""
+    try:
+        app_settings = supabase.table('app_settings').select('*').execute().data
+    except Exception:
+        app_settings = []
     backup_data = {
         'rounds': supabase.table('rounds').select('*').execute().data,
         'scores': supabase.table('score').select('*').execute().data,
         'members': supabase.table('member').select('*').execute().data,
         'handicap_matches': supabase.table('handicap_match').select('*').execute().data,
         'round_results': supabase.table('round_results').select('*').execute().data,
+        'app_settings': app_settings,
     }
     return save_backup_to_supabase(backup_data)
 
@@ -1229,56 +1016,6 @@ def show_balance_diagnostics():
     except Exception as e:
         logger.exception("ポイントバランスの診断に失敗しました")
         st.error(f"診断中にエラーが発生しました: {str(e)}")
-
-def recalculate_single_round_v2(round_id):
-    """単一ラウンドのポイントを再計算する（別実装）"""
-    supabase = ensure_supabase()
-    
-    try:
-        # ラウンドのスコアデータを取得
-        scores = supabase.table('score').select('*').eq('round_id', round_id).execute().data
-        
-        if not scores:
-            raise Exception(f"ラウンド{round_id}のスコアデータが見つかりません")
-        
-        # ハンディキャップデータを取得
-        handicaps = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute().data
-        
-        # ハンディキャップをペアごとにマッピング
-        handicap_map = {}
-        for hc in handicaps:
-            key = tuple(sorted([hc['member_id_1'], hc['member_id_2']]))
-            handicap_map[key] = hc['handicap_difference']
-        
-        # 各プレイヤーのポイントを再計算
-        updated_scores = []
-        player_ids = [score['member_id'] for score in scores]
-        
-        for score in scores:
-            member_id = score['member_id']
-            
-            # ゲームポイントを計算
-            front_gp, back_gp, extra_gp, total_pt = calculate_player_points(
-                round_id, member_id, player_ids, handicap_map, active_round={'round_id': round_id}
-            )
-            
-            # スコアを更新（total_ptはround_resultsで管理）
-            update_data = {
-                'front_game_pt': front_gp,
-                'back_game_pt': back_gp,
-                'extra_game_pt': extra_gp
-            }
-            
-            supabase.table('score').update(update_data).eq('score_id', score['score_id']).execute()
-            updated_scores.append({**score, **update_data})
-        
-        # ラウンド結果も更新
-        save_round_results(round_id, updated_scores)
-        
-        return True
-        
-    except Exception as e:
-        raise Exception(f"ラウンド{round_id}の再計算に失敗: {str(e)}")
 
 def show_detailed_balance_report(round_details):
     """詳細なバランスレポートを表示"""

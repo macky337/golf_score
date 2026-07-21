@@ -34,6 +34,7 @@ def test_validate_backup_payload_completes_legacy_backup():
     normalized = validate_backup_payload(payload)
 
     assert normalized["round_results"] == []
+    assert normalized["app_settings"] == []
     assert normalized["members"] == payload["members"]
     assert "round_results" not in payload
 

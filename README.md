@@ -63,6 +63,16 @@ Railway は [railway.toml](railway.toml) を使い、`main.py` を Streamlit で
 
 Railway Variables に、ローカルと同じ認証・Supabase関連の環境変数を設定してください。
 
+### 競技ルール設定の初期化
+
+管理画面からマッチ配点・パット配点を変更するには、Supabase SQL Editorで次を一度実行します。
+
+```text
+sql/add_competition_rules.sql
+```
+
+これにより、新規ラウンド用の標準ルールと、ラウンド作成時のルール保存列が追加されます。作成済みラウンドは従来の配点を維持します。バックアップ復元RPCも最新版にする場合は、続けて `sql/atomic_backup_restore.sql` を実行します。
+
 ## 構成
 
 - `main.py`：ホーム画面
