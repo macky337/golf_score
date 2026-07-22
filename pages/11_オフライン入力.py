@@ -9,7 +9,7 @@ from modules.calculation_logic import calculate_player_points
 from modules.db import ensure_supabase
 from modules.data_formatter import initialize_player_data
 from modules.input_helpers import close_sidebar_on_mobile
-from modules.offline_score_pwa import render_offline_score_pwa
+from modules.offline_score_pwa import offline_instance_id, render_offline_score_pwa
 from modules.round_results import get_round_results, save_round_results
 from modules.supabase_client import get_scores_with_fallback
 
@@ -60,9 +60,11 @@ def _create_offline_package(supabase, round_id):
             }
         )
 
+    round_data = round_result.data[0]
     return {
         "format": "golf-score-offline-v1",
-        "round": round_result.data[0],
+        "instance_id": offline_instance_id(round_data, players),
+        "round": round_data,
         "players": players,
         "checkpoints": {},
     }

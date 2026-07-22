@@ -1,10 +1,11 @@
-const STORAGE_PREFIX = "golf-score-offline:";
+const STORAGE_PREFIX = "golf-score-offline:v2:";
 const sections = [
   { id: "front", label: "アウト", score: "front_score", putt: "front_putt", game: "front_game_pt" },
   { id: "back", label: "イン", score: "back_score", putt: "back_putt", game: "back_game_pt" },
   { id: "extra", label: "エキストラ", score: "extra_score", putt: "extra_putt", game: "extra_game_pt" },
 ];
 let packageData = null;
+let sourcePackage = null;
 let activeSection = "front";
 
 const status = document.querySelector("#status");
@@ -14,7 +15,8 @@ const players = document.querySelector("#players");
 const totals = document.querySelector("#totals");
 const exportButton = document.querySelector("#export-file");
 
-function storageKey() { return `${STORAGE_PREFIX}${packageData?.round?.round_id || "draft"}`; }
+function packageInstanceId(data) { return data?.instance_id || "invalid"; }
+function storageKey(data = packageData) { return `${STORAGE_PREFIX}${packageInstanceId(data)}`; }
 function setStatus(message) { status.textContent = message; }
 function readDraft(key) {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -22,6 +24,10 @@ function readDraft(key) {
 function writeDraft(key, value) {
   try { localStorage.setItem(key, value); return true; } catch { return false; }
 }
+function removeDraft(key) {
+  try { localStorage.removeItem(key); return true; } catch { return false; }
+}
+function clonePackage(value) { return JSON.parse(JSON.stringify(value)); }
 
 function saveLocal(checkpoint) {
   if (!packageData) return;
@@ -100,13 +106,31 @@ function escapeHtml(value) {
   return String(value || "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
 }
 
+function ensureInstanceId(parsed) {
+  if (parsed?.instance_id) return parsed;
+  const round = parsed?.round || {};
+  const memberIds = Array.isArray(parsed?.players)
+    ? parsed.players.map((player) => player.member_id).sort((a, b) => a - b).join(",")
+    : "";
+  parsed.instance_id = encodeURIComponent([
+    "legacy", round.round_id, round.created_at, round.date_played, round.course_name, memberIds,
+  ].join("|"));
+  return parsed;
+}
+
 function loadPackage(parsed) {
   if (parsed?.format !== "golf-score-offline-v1" || !parsed.round?.round_id || !Array.isArray(parsed.players)) {
     throw new Error("format");
   }
-  const saved = readDraft(`${STORAGE_PREFIX}${parsed.round.round_id}`);
-  packageData = saved ? JSON.parse(saved) : parsed;
+  parsed = ensureInstanceId(clonePackage(parsed));
+  sourcePackage = clonePackage(parsed);
+  const saved = readDraft(storageKey(parsed));
+  const savedPackage = saved ? JSON.parse(saved) : null;
+  packageData = savedPackage?.instance_id === parsed.instance_id ? savedPackage : clonePackage(parsed);
   render();
+  if (savedPackage?.instance_id === parsed.instance_id) {
+    setStatus("このラウンドの端末保存データを復元しました。最初から入力する場合は、下の破棄ボタンを押してください。");
+  }
 }
 
 document.querySelector("#import-file").addEventListener("change", async (event) => {
@@ -122,6 +146,13 @@ document.querySelector("#import-file").addEventListener("change", async (event) 
 
 document.querySelector("#save-checkpoint").onclick = () => saveLocal(sections.find((item) => item.id === activeSection).id);
 document.querySelector("#save-all").onclick = () => saveLocal("round");
+document.querySelector("#reset-draft").onclick = () => {
+  if (!sourcePackage) return;
+  removeDraft(storageKey(sourcePackage));
+  packageData = clonePackage(sourcePackage);
+  render();
+  setStatus("端末の保存データを破棄し、読み込み時の値に戻しました。");
+};
 exportButton.onclick = () => {
   if (!packageData) return;
   packageData.sync_exported_at = new Date().toISOString();

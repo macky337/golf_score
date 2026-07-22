@@ -1,6 +1,7 @@
 """オフラインスコア入力UIをStreamlitに埋め込む。"""
 
 import base64
+import hashlib
 import json
 from pathlib import Path
 
@@ -8,6 +9,19 @@ import streamlit.components.v1 as components
 
 
 _PWA_PATH = Path(__file__).resolve().parent.parent / "static" / "offline-score"
+
+
+def offline_instance_id(round_data, players):
+    """ID再利用時にも別ラウンドを区別できる端末保存用識別子を返す。"""
+    identity = {
+        "round_id": round_data.get("round_id"),
+        "created_at": round_data.get("created_at"),
+        "date_played": round_data.get("date_played"),
+        "course_name": round_data.get("course_name"),
+        "member_ids": sorted(player.get("member_id") for player in players),
+    }
+    serialized = json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:24]
 
 
 def _initial_package_script(package):
