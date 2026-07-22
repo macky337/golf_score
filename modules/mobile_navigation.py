@@ -32,7 +32,9 @@ def render_mobile_navigation():
 
         @media (max-width: 768px) {
             [data-testid="stSidebar"],
-            [data-testid="collapsedControl"] {
+            [data-testid="collapsedControl"],
+            [data-testid="stSidebarCollapsedControl"],
+            [data-testid="stSidebarCollapseButton"] {
                 display: none !important;
             }
 
