@@ -1,12 +1,30 @@
 """オフラインスコア入力UIをStreamlitに埋め込む。"""
 
+import base64
+import json
 from pathlib import Path
 
 import streamlit.components.v1 as components
 
 
 _PWA_PATH = Path(__file__).resolve().parent.parent / "static" / "offline-score"
-def render_offline_score_pwa():
+
+
+def _initial_package_script(package):
+    """HTMLを壊さずに開始データを埋め込むスクリプトを返す。"""
+    if package is None:
+        return ""
+    encoded = base64.b64encode(
+        json.dumps(package, ensure_ascii=False).encode("utf-8")
+    ).decode("ascii")
+    return (
+        "<script>window.__GOLF_SCORE_INITIAL_PACKAGE__ = "
+        f"JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('{encoded}'), "
+        "character => character.charCodeAt(0))));</script>"
+    )
+
+
+def render_offline_score_pwa(package=None):
     """端末内で動くスコア入力UIを表示する。
 
     Railwayのプロキシ環境でカスタムコンポーネントの静的ファイルが取得できない場合があるため、
@@ -18,5 +36,8 @@ def render_offline_score_pwa():
 
     body = index_html.split("<body>", 1)[1].split("</body>", 1)[0]
     body = body.replace('<script src="./app.js"></script>', "")
-    embedded_html = f"<style>{styles}</style>{body}<script>{script}</script>"
+    initial_package = _initial_package_script(package)
+    embedded_html = (
+        f"<style>{styles}</style>{body}{initial_package}<script>{script}</script>"
+    )
     components.html(embedded_html, height=800, scrolling=True)

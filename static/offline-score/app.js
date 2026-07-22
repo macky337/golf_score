@@ -100,15 +100,21 @@ function escapeHtml(value) {
   return String(value || "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
 }
 
+function loadPackage(parsed) {
+  if (parsed?.format !== "golf-score-offline-v1" || !parsed.round?.round_id || !Array.isArray(parsed.players)) {
+    throw new Error("format");
+  }
+  const saved = readDraft(`${STORAGE_PREFIX}${parsed.round.round_id}`);
+  packageData = saved ? JSON.parse(saved) : parsed;
+  render();
+}
+
 document.querySelector("#import-file").addEventListener("change", async (event) => {
   const file = event.target.files[0];
   if (!file) return;
   try {
     const parsed = JSON.parse(await file.text());
-    if (parsed.format !== "golf-score-offline-v1" || !parsed.round?.round_id || !Array.isArray(parsed.players)) throw new Error("format");
-    const saved = readDraft(`${STORAGE_PREFIX}${parsed.round.round_id}`);
-    packageData = saved ? JSON.parse(saved) : parsed;
-    render();
+    loadPackage(parsed);
   } catch {
     setStatus("ラウンドデータを読み込めませんでした。Webアプリから出力したJSONを選択してください。");
   }
@@ -127,3 +133,15 @@ exportButton.onclick = () => {
   link.click();
   URL.revokeObjectURL(link.href);
 };
+
+if (window.__GOLF_SCORE_INITIAL_PACKAGE__) {
+  try {
+    loadPackage(window.__GOLF_SCORE_INITIAL_PACKAGE__);
+    document.querySelector("#start-notice").textContent =
+      "選択したラウンドを読み込みました。JSONを選び直さず、そのまま入力できます。";
+  } catch {
+    setStatus("ラウンドデータを読み込めませんでした。予備JSONを選択してください。");
+  }
+} else {
+  setStatus("予備JSONを選択してください。");
+}

@@ -182,28 +182,29 @@ def run():
         )
         return
 
-    st.subheader("① 出発前：開始ファイルをスマホへ保存")
+    st.subheader("① 出発前：入力するラウンドを選択")
     st.info("最初にラウンド設定を保存してください。ここには、保存済みで未確定のラウンドだけが表示されます。")
     options = _round_options(rounds)
     selected_round_id = st.selectbox(
-        "開始ファイルを作るラウンドを選択",
+        "オフライン入力するラウンドを選択",
         options=list(options),
         format_func=options.get,
     )
     package = _create_offline_package(supabase, selected_round_id)
 
+    st.success("選択したラウンドは、下の入力画面へ自動で読み込まれます。")
     st.download_button(
-        "開始ファイルを保存（JSON）",
+        "予備の開始ファイルを保存（JSON）",
         data=json.dumps(package, ensure_ascii=False, indent=2),
         file_name=f"golf-round-{selected_round_id}.json",
         mime="application/json",
         use_container_width=True,
     )
-    st.caption("保存した開始ファイルは、次の「② 現地」で読み込みます。通信が弱くなる前に、このファイルがスマホの「ファイル」へ保存されたことを確認してください。")
+    st.caption("通常は保存不要です。別の端末で入力する場合や、入力画面へ自動読込できない場合だけ使用します。")
     st.divider()
-    st.subheader("② 現地：開始ファイルを読み込んでスコア入力")
-    st.info("下の入力画面で、①で保存した開始ファイルを読み込んでください。入力内容は端末内に保存されます。OUT・IN終了後やラウンド終了後に保存できます。")
-    render_offline_score_pwa()
+    st.subheader("② 現地：スコアを入力")
+    st.info("選択したラウンドは自動で読み込まれます。そのまま入力してください。OUT・IN終了後やラウンド終了後に端末へ保存できます。")
+    render_offline_score_pwa(package)
     st.divider()
     st.subheader("③ 通信復帰後：同期ファイルを読み込んで反映")
     st.warning("ここでは、現地入力画面で出力した **-sync.json** だけを選びます。①の開始ファイル（golf-round-XX.json）は選びません。")
