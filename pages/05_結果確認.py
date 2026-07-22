@@ -26,6 +26,7 @@ from modules.supabase_client import (
 )
 from modules.input_helpers import close_sidebar_on_mobile
 from modules.pdf_generator import generate_pdf, set_font, get_pdf_filename
+from modules.pdf_share import render_pdf_share_button
 from modules.match_analyzer import create_match_matrix, create_detailed_match_results
 from modules.data_formatter import highlight_total_only, color_points, get_color_points_function, get_color_function_for_column, apply_ranking_colors_to_dataframe
 from modules.calculation_logic import calculate_player_points
@@ -504,30 +505,30 @@ def run():
                 
                 # PDFファイル名を生成
                 pdf_filename = get_pdf_filename(active_round)
+                pdf_data = pdf_buffer.getvalue()
                 
                 # ダウンロードボタンを提供
                 st.download_button(
                     label="📥 PDFをダウンロード",
-                    data=pdf_buffer,
+                    data=pdf_data,
                     file_name=pdf_filename,
                     mime="application/pdf",
                     use_container_width=True,
                     type="primary"
                 )
+                render_pdf_share_button(pdf_data, pdf_filename)
                 
-                st.success("✅ PDFが正常に生成されました。ダウンロードボタンをクリックしてPDFをダウンロードしてください。")
+                st.success("✅ PDFを生成しました。LINEへ送る場合は共有ボタンをタップしてください。")
                 
                 # SNS シェア用の情報を表示
                 with st.expander("📱 SNS での共有について"):
                     st.info("""
-                    **現在のシェア方法:**
-                    1. 上記のダウンロードボタンでPDFファイルをダウンロード
-                    2. ダウンロードしたPDFファイルをSNSに直接添付して投稿
-                    
-                    **将来実装予定の機能:**
-                    - クラウドストレージによるシェア用URL生成
-                    - SNS投稿時のプレビュー表示対応
-                    - ワンクリック共有機能
+                    **iPhoneでLINEへ送る方法:**
+                    1. 「LINEなどへPDFを共有」をタップ
+                    2. iPhoneの共有先からLINEを選択
+                    3. 送信する相手またはグループを選択
+
+                    共有ボタンが利用できないブラウザでは、PDFをダウンロードしてLINEへ添付してください。
                     """)
                     
             except Exception as e:
