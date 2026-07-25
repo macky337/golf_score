@@ -15,10 +15,6 @@ def render_scorecard_reader(scores_data: list[dict[str, Any]], prefix: str, labe
         if not is_available():
             st.warning("このサーバーでは画像読み取りを利用できません。OPENAI_API_KEY を設定してください。")
             return
-        if prefix == "extra":
-            st.info("Golf Networkのスコア表にはエキストラホールの合計欄がないため、エキストラスコアは手入力してください。")
-            return
-
         upload = st.file_uploader(
             "スコアカード画像を選択",
             type=["jpg", "jpeg", "png", "webp"],

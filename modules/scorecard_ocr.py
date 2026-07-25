@@ -63,7 +63,8 @@ def extract_scores(
 ) -> dict[int, dict[str, int]]:
     """Read OUT or IN totals from a Golf Network scorecard image.
 
-    ``segment`` must be ``front`` (holes 1-9) or ``back`` (holes 10-18).
+    ``segment`` is ``front`` (holes 1-9), ``back`` (holes 10-18), or
+    ``extra`` (holes 19-27).
     The table is normalised to landscape before being sent to the model.
     """
     api_key = os.environ.get("OPENAI_API_KEY")
@@ -71,13 +72,18 @@ def extract_scores(
         raise ScorecardOcrError("OPENAI_API_KEY が設定されていません。")
     if not image_bytes:
         raise ScorecardOcrError("画像ファイルが空です。")
-    if segment not in {"front", "back"}:
-        raise ScorecardOcrError("この画像形式からエキストラスコアは読み取れません。")
+    if segment not in {"front", "back", "extra"}:
+        raise ScorecardOcrError("読み取り対象の区分が不正です。")
 
     known_members = [member for member in members if member.get("member_id") is not None and member.get("name")]
     if not known_members:
         raise ScorecardOcrError("照合する参加者名がありません。")
-    target = "OUT（1〜9番）" if segment == "front" else "IN（10〜18番）"
+    targets = {
+        "front": "OUT（1〜9番）",
+        "back": "IN（10〜18番）",
+        "extra": "エキストラ（19〜27番）",
+    }
+    target = targets[segment]
     names = "、".join(str(member["name"]) for member in known_members)
     schema = {
         "type": "object",
@@ -104,7 +110,7 @@ def extract_scores(
 対象は {target} の合計欄です。各プレイヤーについて、合計スコア・合計パット数・ゲームポイント合計を抽出してください。
 照合対象の参加者は次の名前だけです: {names}。
 プレイヤー名は表の左側に縦書きであり、各名前に対応する横一行の色付きセルを読みます。別の行の値を対応づけないでください。
-色付きセルは左が打数、右がパット数です。対象9ホールを合計し、9番または18番の直後の集計値と照合してください。右端のGROSS/NETは使いません。
+色付きセルは左が打数、右がパット数です。対象9ホールを合計し、9番・18番・27番のいずれか対象区分の直後にある集計値と照合してください。右端のGROSS/NETは使いません。
 ゲームポイントは各プレイヤー行の直下にある細い数値行の、対象9ホール最後の合計値です。確信できない参加者は返さないでください。"""
     prepared_image, prepared_mime_type = _prepare_scorecard_image(image_bytes, mime_type)
     encoded = base64.b64encode(prepared_image).decode("ascii")

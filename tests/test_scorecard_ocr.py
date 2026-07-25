@@ -16,10 +16,10 @@ def test_response_text_rejects_empty_response():
         _response_text({"output": []})
 
 
-def test_extract_scores_rejects_extra_before_calling_api(monkeypatch):
+def test_extract_scores_rejects_unknown_segment_before_calling_api(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test")
-    with pytest.raises(ScorecardOcrError, match="エキストラ"):
-        extract_scores(b"image", "image/jpeg", [{"member_id": 1, "name": "山田"}], "extra")
+    with pytest.raises(ScorecardOcrError, match="区分"):
+        extract_scores(b"image", "image/jpeg", [{"member_id": 1, "name": "山田"}], "other")
 
 
 def test_prepare_scorecard_image_rotates_portrait_image_to_landscape():
