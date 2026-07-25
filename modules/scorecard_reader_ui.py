@@ -1,0 +1,70 @@
+"""Streamlit UI shared by OUT/IN scorecard image readers."""
+from __future__ import annotations
+
+from typing import Any
+
+import streamlit as st
+
+from modules.scorecard_ocr import ScorecardOcrError, extract_text, is_available, suggest_scores
+
+
+def render_scorecard_reader(scores_data: list[dict[str, Any]], prefix: str, label: str) -> None:
+    """Render an OCR review UI and copy accepted suggestions into session state."""
+    with st.expander(f"📷 画像から{label}を読み取る", expanded=False):
+        st.caption("スコアカードを撮影または選択し、候補を確認してから入力欄へ反映します。手書きは誤認識することがあるため、保存前に必ず確認してください。")
+        if not is_available():
+            st.warning("このサーバーでは画像読み取りを利用できません。Tesseract をインストールすると有効になります。")
+            return
+
+        photo = st.camera_input("スコアカードを撮影", key=f"{prefix}_scorecard_camera")
+        upload = st.file_uploader(
+            "または画像を選択",
+            type=["jpg", "jpeg", "png", "webp"],
+            key=f"{prefix}_scorecard_upload",
+        )
+        image = photo or upload
+        if image is None:
+            return
+
+        if st.button("画像を読み取る", key=f"{prefix}_scorecard_read", use_container_width=True):
+            suffix = "." + (image.name.rsplit(".", 1)[-1] if "." in image.name else "jpg")
+            try:
+                text = extract_text(image.getvalue(), suffix)
+            except ScorecardOcrError as exc:
+                st.error(str(exc))
+                return
+            members = [
+                {"member_id": score["member_id"], "name": (score.get("member") or {}).get("name")}
+                for score in scores_data
+            ]
+            st.session_state[f"{prefix}_scorecard_text"] = text
+            st.session_state[f"{prefix}_scorecard_suggestions"] = suggest_scores(text, members)
+
+        suggestions = st.session_state.get(f"{prefix}_scorecard_suggestions")
+        if suggestions is None:
+            return
+        if not suggestions:
+            st.warning("名前と数値を同じ行で読み取れませんでした。画像を明るく真上から撮影して、手入力してください。")
+        else:
+            rows = []
+            for score in scores_data:
+                member_id = score["member_id"]
+                value = suggestions.get(member_id)
+                if value:
+                    rows.append({"プレイヤー": (score.get("member") or {}).get("name", f"Player {member_id}"), "スコア": value["score"], "パット": value["putt"], "ゲームポイント": value.get("game_pt", "")})
+            st.dataframe(rows, use_container_width=True, hide_index=True)
+            if st.button("候補を入力欄へ反映", key=f"{prefix}_scorecard_apply", type="primary", use_container_width=True):
+                for member_id, value in suggestions.items():
+                    st.session_state[f"{prefix}_score_{member_id}"] = value["score"]
+                    st.session_state[f"{prefix}_putt_{member_id}"] = value["putt"]
+                    if "game_pt" in value:
+                        st.session_state[f"{prefix}_game_pt_{member_id}"] = value["game_pt"]
+                    # smart_number_input has a device-specific widget key.  Drop
+                    # its old value so the suggestion becomes the next default.
+                    for field in ("score", "putt", "game_pt"):
+                        st.session_state.pop(f"{prefix}_{field}_{member_id}_pc", None)
+                        st.session_state.pop(f"{prefix}_{field}_{member_id}_mobile", None)
+                st.rerun()
+
+        with st.expander("読み取りテキストを確認"):
+            st.code(st.session_state.get(f"{prefix}_scorecard_text", "（まだ読み取っていません）"), language=None)

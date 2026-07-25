@@ -31,8 +31,8 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Railway設定（問題防止）
-nixpacks.toml
+# Railway設定
+# OCRの本番依存を固定するため、このプロジェクトでは管理対象にする。
 # Local runtime artifacts
 *.pid
 *.log

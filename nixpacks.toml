@@ -1,0 +1,4 @@
+# Keep the Python provider auto-detected by Nixpacks and add the OCR runtime.
+# Japanese scorecards need both the engine and its trained language data.
+[phases.setup]
+aptPkgs = ["...", "tesseract-ocr", "tesseract-ocr-jpn"]

@@ -1,4 +1,4 @@
-# 超高速デプロイ用Railway設定 - SQLAlchemy Fix - No Custom Nixpacks
+# Railway設定。nixpacks.toml でOCR用のTesseractを追加する。
 [build]
 builder = "NIXPACKS"
 

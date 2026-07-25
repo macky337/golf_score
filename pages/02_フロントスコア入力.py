@@ -15,6 +15,7 @@ from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
 from modules.supabase_client import get_scores_with_fallback  # 追加: バックスコア入力と同様に必要な関数をインポート
 from modules.input_helpers import smart_number_input, close_sidebar_on_mobile
+from modules.scorecard_reader_ui import render_scorecard_reader
 from modules.auth import require_login
 from modules.round_context import select_editable_round
 
@@ -79,6 +80,7 @@ def run():
     
     # プレイヤーごとのスコア入力フォーム
     st.write("### スコア入力")
+    render_scorecard_reader(scores_data, "front", "OUTスコア")
     
     # フォーム送信状態を追跡
     if "form_submitted" not in st.session_state:
