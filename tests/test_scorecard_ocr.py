@@ -1,15 +1,20 @@
-from modules.scorecard_ocr import suggest_scores
+import json
+
+import pytest
+
+from modules.scorecard_ocr import ScorecardOcrError, _response_text, extract_scores
 
 
-def test_suggest_scores_matches_member_row_and_normalises_full_width_digits():
-    text = "山田太郎 ４２ １６ -５\n佐藤花子 45 18 +10"
-    members = [{"member_id": 1, "name": "山田 太郎"}, {"member_id": 2, "name": "佐藤花子"}]
-
-    assert suggest_scores(text, members) == {
-        1: {"score": 42, "putt": 16, "game_pt": -5},
-        2: {"score": 45, "putt": 18, "game_pt": 10},
-    }
+def test_response_text_reads_output_message():
+    assert _response_text({"output": [{"type": "message", "content": [{"type": "output_text", "text": '{"players": []}'}]}]}) == '{"players": []}'
 
 
-def test_suggest_scores_ignores_rows_without_enough_values():
-    assert suggest_scores("山田太郎 42", [{"member_id": 1, "name": "山田太郎"}]) == {}
+def test_response_text_rejects_empty_response():
+    with pytest.raises(ScorecardOcrError):
+        _response_text({"output": []})
+
+
+def test_extract_scores_rejects_extra_before_calling_api(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    with pytest.raises(ScorecardOcrError, match="エキストラ"):
+        extract_scores(b"image", "image/jpeg", [{"member_id": 1, "name": "山田"}], "extra")

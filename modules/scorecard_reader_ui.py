@@ -5,15 +5,18 @@ from typing import Any
 
 import streamlit as st
 
-from modules.scorecard_ocr import ScorecardOcrError, extract_text, is_available, suggest_scores
+from modules.scorecard_ocr import ScorecardOcrError, extract_scores, is_available
 
 
 def render_scorecard_reader(scores_data: list[dict[str, Any]], prefix: str, label: str) -> None:
     """Render an OCR review UI and copy accepted suggestions into session state."""
     with st.expander(f"📷 画像から{label}を読み取る", expanded=False):
-        st.caption("スコアカード画像を選択し、候補を確認してから入力欄へ反映します。手書きは誤認識することがあるため、保存前に必ず確認してください。")
+        st.caption("スコアカード画像を選択し、候補を確認してから入力欄へ反映します。OUT／INの合計スコアとパット数を読み取ります。ゲームポイントは手入力のままです。")
         if not is_available():
-            st.warning("このサーバーでは画像読み取りを利用できません。Tesseract をインストールすると有効になります。")
+            st.warning("このサーバーでは画像読み取りを利用できません。OPENAI_API_KEY を設定してください。")
+            return
+        if prefix == "extra":
+            st.info("Golf Networkのスコア表にはエキストラホールの合計欄がないため、エキストラスコアは手入力してください。")
             return
 
         upload = st.file_uploader(
@@ -27,22 +30,22 @@ def render_scorecard_reader(scores_data: list[dict[str, Any]], prefix: str, labe
         if st.button("画像を読み取る", key=f"{prefix}_scorecard_read", use_container_width=True):
             suffix = "." + (upload.name.rsplit(".", 1)[-1] if "." in upload.name else "jpg")
             try:
-                text = extract_text(upload.getvalue(), suffix)
+                mime_type = upload.type or {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(suffix[1:].lower(), "image/jpeg")
+                members = [
+                    {"member_id": score["member_id"], "name": (score.get("member") or {}).get("name")}
+                    for score in scores_data
+                ]
+                suggestions = extract_scores(upload.getvalue(), mime_type, members, prefix)
             except ScorecardOcrError as exc:
                 st.error(str(exc))
                 return
-            members = [
-                {"member_id": score["member_id"], "name": (score.get("member") or {}).get("name")}
-                for score in scores_data
-            ]
-            st.session_state[f"{prefix}_scorecard_text"] = text
-            st.session_state[f"{prefix}_scorecard_suggestions"] = suggest_scores(text, members)
+            st.session_state[f"{prefix}_scorecard_suggestions"] = suggestions
 
         suggestions = st.session_state.get(f"{prefix}_scorecard_suggestions")
         if suggestions is None:
             return
         if not suggestions:
-            st.warning("名前と数値を同じ行で読み取れませんでした。画像を明るく真上から撮影して、手入力してください。")
+            st.warning("参加者名または集計値を確実に読み取れませんでした。画像全体が入る高解像度のファイルを選択するか、手入力してください。")
         else:
             rows = []
             for score in scores_data:
@@ -63,6 +66,3 @@ def render_scorecard_reader(scores_data: list[dict[str, Any]], prefix: str, labe
                         st.session_state.pop(f"{prefix}_{field}_{member_id}_pc", None)
                         st.session_state.pop(f"{prefix}_{field}_{member_id}_mobile", None)
                 st.rerun()
-
-        st.caption("読み取りテキスト")
-        st.code(st.session_state.get(f"{prefix}_scorecard_text", "（まだ読み取っていません）"), language=None)
