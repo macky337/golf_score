@@ -11,7 +11,7 @@ from modules.scorecard_ocr import ScorecardOcrError, extract_scores, is_availabl
 def render_scorecard_reader(scores_data: list[dict[str, Any]], prefix: str, label: str) -> None:
     """Render an OCR review UI and copy accepted suggestions into session state."""
     with st.expander(f"📷 画像から{label}を読み取る", expanded=False):
-        st.caption("スコアカード画像を選択し、候補を確認してから入力欄へ反映します。OUT／INの合計スコアとパット数を読み取ります。ゲームポイントは手入力のままです。")
+        st.caption("スコアカード画像を選択し、候補を確認してから入力欄へ反映します。OUT／INの合計スコア・パット・ゲームポイントを読み取ります。")
         if not is_available():
             st.warning("このサーバーでは画像読み取りを利用できません。OPENAI_API_KEY を設定してください。")
             return

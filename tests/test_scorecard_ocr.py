@@ -1,8 +1,10 @@
 import json
+from io import BytesIO
 
 import pytest
+from PIL import Image
 
-from modules.scorecard_ocr import ScorecardOcrError, _response_text, extract_scores
+from modules.scorecard_ocr import ScorecardOcrError, _prepare_scorecard_image, _response_text, extract_scores
 
 
 def test_response_text_reads_output_message():
@@ -18,3 +20,14 @@ def test_extract_scores_rejects_extra_before_calling_api(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test")
     with pytest.raises(ScorecardOcrError, match="エキストラ"):
         extract_scores(b"image", "image/jpeg", [{"member_id": 1, "name": "山田"}], "extra")
+
+
+def test_prepare_scorecard_image_rotates_portrait_image_to_landscape():
+    raw = BytesIO()
+    Image.new("RGB", (20, 40), "white").save(raw, format="PNG")
+
+    result, mime_type = _prepare_scorecard_image(raw.getvalue(), "image/png")
+
+    with Image.open(BytesIO(result)) as image:
+        assert image.size == (40, 20)
+    assert mime_type == "image/jpeg"
