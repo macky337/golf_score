@@ -11,25 +11,23 @@ from modules.scorecard_ocr import ScorecardOcrError, extract_text, is_available,
 def render_scorecard_reader(scores_data: list[dict[str, Any]], prefix: str, label: str) -> None:
     """Render an OCR review UI and copy accepted suggestions into session state."""
     with st.expander(f"📷 画像から{label}を読み取る", expanded=False):
-        st.caption("スコアカードを撮影または選択し、候補を確認してから入力欄へ反映します。手書きは誤認識することがあるため、保存前に必ず確認してください。")
+        st.caption("スコアカード画像を選択し、候補を確認してから入力欄へ反映します。手書きは誤認識することがあるため、保存前に必ず確認してください。")
         if not is_available():
             st.warning("このサーバーでは画像読み取りを利用できません。Tesseract をインストールすると有効になります。")
             return
 
-        photo = st.camera_input("スコアカードを撮影", key=f"{prefix}_scorecard_camera")
         upload = st.file_uploader(
-            "または画像を選択",
+            "スコアカード画像を選択",
             type=["jpg", "jpeg", "png", "webp"],
             key=f"{prefix}_scorecard_upload",
         )
-        image = photo or upload
-        if image is None:
+        if upload is None:
             return
 
         if st.button("画像を読み取る", key=f"{prefix}_scorecard_read", use_container_width=True):
-            suffix = "." + (image.name.rsplit(".", 1)[-1] if "." in image.name else "jpg")
+            suffix = "." + (upload.name.rsplit(".", 1)[-1] if "." in upload.name else "jpg")
             try:
-                text = extract_text(image.getvalue(), suffix)
+                text = extract_text(upload.getvalue(), suffix)
             except ScorecardOcrError as exc:
                 st.error(str(exc))
                 return
@@ -66,5 +64,5 @@ def render_scorecard_reader(scores_data: list[dict[str, Any]], prefix: str, labe
                         st.session_state.pop(f"{prefix}_{field}_{member_id}_mobile", None)
                 st.rerun()
 
-        with st.expander("読み取りテキストを確認"):
-            st.code(st.session_state.get(f"{prefix}_scorecard_text", "（まだ読み取っていません）"), language=None)
+        st.caption("読み取りテキスト")
+        st.code(st.session_state.get(f"{prefix}_scorecard_text", "（まだ読み取っていません）"), language=None)
