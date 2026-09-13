@@ -1,8 +1,9 @@
 import json
 import os
 import datetime
-import pytz
 from pathlib import Path
+
+JST = datetime.timezone(datetime.timedelta(hours=9), name='JST')
 
 def get_version_file_path():
     """バージョンファイルのパスを取得"""
@@ -31,7 +32,7 @@ def get_default_version():
         'major': 1,
         'minor': 0,
         'patch': 248,
-        'last_updated': datetime.datetime.now(pytz.timezone('Asia/Tokyo')).strftime('%Y-%m-%d')
+        'last_updated': datetime.datetime.now(JST).strftime('%Y-%m-%d')
     }
 
 def save_version(version_info):
@@ -54,7 +55,7 @@ def update_version(level='patch'):
     else:
         version_info['patch'] += 1
     
-    version_info['last_updated'] = datetime.datetime.now(pytz.timezone('Asia/Tokyo')).strftime('%Y-%m-%d')
+    version_info['last_updated'] = datetime.datetime.now(JST).strftime('%Y-%m-%d')
     save_version(version_info)
     print(f"バージョンを更新しました: v{version_info['major']}.{version_info['minor']}.{version_info['patch']}")
 
