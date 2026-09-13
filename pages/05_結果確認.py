@@ -91,7 +91,7 @@ def initialize_player_data(scores, round_results):
             "Front GP": sc.get('front_game_pt', 0) or 0,
             "Back GP": sc.get('back_game_pt', 0) or 0,
             "Extra GP": sc.get('extra_game_pt', 0) or 0,
-            "Game Pt": round_result_data.get("Game Pt", sc.get('total_game_pt', 0) or 0),  # round_resultsからゲームポイントを優先取得
+            "Game Pt": round_result_data.get("Game Pt", round_result_data.get("total_game_pt", sc.get('total_game_pt', 0) or 0)),
             # キー名を DB のテーブル構造に合わせる（両方のケースを試す）
             "Match Front": round_result_data.get("Match Front", round_result_data.get("match_front", 0)),
             "Match Back":  round_result_data.get("Match Back", round_result_data.get("match_back", 0)),
@@ -488,6 +488,42 @@ def run():
         else:
             st.info("ハンディキャップが設定されていないため、マッチ対戦表は表示されません。")
             
+        st.subheader("プレイヤー別ポイント内訳")
+        st.caption("総合得点 ＝ マッチ得点 ＋ ゲーム得点 ＋ パット得点。ゲーム得点は人数に応じた計算後の値です。")
+        points_table = pd.DataFrame(score_data_list).set_index("Player")
+        points_table.index.name = "プレイヤー"
+        points_table = points_table[["Match Pt", "Game Pt", "Putt Pt", "Total Pt"]].rename(columns={
+            "Match Pt": "マッチ得点", "Game Pt": "ゲーム得点",
+            "Putt Pt": "パット得点", "Total Pt": "総合得点",
+        })
+
+        def point_color(value):
+            return "color: " + ("#3399ff" if value > 0 else "#ff6666" if value < 0 else "#888888")
+
+        def signed_points(value):
+            return f"{value:+g}" if value else "0"
+
+        st.dataframe(
+            points_table.style.format(signed_points).map(point_color)
+            .set_properties(subset=["総合得点"], **{"font-weight": "bold"}),
+            use_container_width=True,
+        )
+        with st.expander("パット数・ゲーム入力値の内訳を表示"):
+            st.caption("パット数は打った回数、パット得点は獲得ポイントです。3人プレイではゲーム入力値の合計と計算後のゲーム得点は異なります。")
+            detail_columns = {
+                "Front Putt": "OUTパット数", "Back Putt": "INパット数",
+                "Front GP": "OUTゲーム入力値", "Back GP": "INゲーム入力値",
+            }
+            if active_round.get("has_extra", False):
+                detail_columns = {
+                    "Front Putt": "OUTパット数", "Back Putt": "INパット数",
+                    "Extra Putt": "Extraパット数", "Front GP": "OUTゲーム入力値",
+                    "Back GP": "INゲーム入力値", "Extra GP": "Extraゲーム入力値",
+                }
+            details = pd.DataFrame(score_data_list).set_index("Player")
+            details.index.name = "プレイヤー"
+            st.dataframe(details[list(detail_columns)].rename(columns=detail_columns), use_container_width=True)
+
         # PDF出力機能
         st.subheader("PDF出力")
         if not active_round['finalized']:
