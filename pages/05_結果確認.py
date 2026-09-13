@@ -22,6 +22,7 @@ from modules.db import ensure_supabase
 from modules.supabase_client import (
     get_supabase_client,
     get_scores_with_fallback,
+    execute_read_with_retry,
     update_scores_batch,
 )
 from modules.input_helpers import close_sidebar_on_mobile
@@ -217,9 +218,9 @@ def run():
         )
 
         # 未確定ラウンドと全ラウンドの取得
-        rounds_result = supabase.table('rounds').select('*').eq('finalized', False).order('date_played', desc=True).execute()
+        rounds_result = execute_read_with_retry(lambda client: client.table('rounds').select('*').eq('finalized', False).order('date_played', desc=True).execute())
         unfinalized_rounds = rounds_result.data
-        all_rounds_result = supabase.table('rounds').select('*').order('date_played', desc=True).execute()
+        all_rounds_result = execute_read_with_retry(lambda client: client.table('rounds').select('*').order('date_played', desc=True).execute())
         all_rounds = all_rounds_result.data
 
         if unfinalized_rounds:
@@ -246,7 +247,7 @@ def run():
         st.session_state.active_round_id = round_id
 
         # ラウンド情報を取得
-        round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
+        round_result = execute_read_with_retry(lambda client: client.table('rounds').select('*').eq('round_id', round_id).execute())
         
         # 変数の初期化（広いスコープで定義）
         handicaps = {}

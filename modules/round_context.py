@@ -1,19 +1,20 @@
 """入力画面で共通利用する操作中ラウンド管理。"""
 
 import streamlit as st
+from modules.supabase_client import execute_read_with_retry
 
 
 def select_editable_round(supabase, key):
     """未確定ラウンドを選択し、現在の操作対象として返す。"""
-    rounds = (
-        supabase.table("rounds")
+    rounds = execute_read_with_retry(lambda client: (
+        client.table("rounds")
         .select("*")
         .eq("finalized", False)
         .order("date_played", desc=True)
         .execute()
         .data
         or []
-    )
+    ))
     if not rounds:
         st.warning("入力できる未確定ラウンドがありません。")
         st.page_link(

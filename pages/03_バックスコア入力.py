@@ -13,7 +13,7 @@ from modules.db import ensure_supabase
 from modules.page_utils import switch_page
 from modules.calculation_logic import calculate_player_points
 from modules.round_results import save_round_results, get_round_results
-from modules.supabase_client import get_scores_with_fallback
+from modules.supabase_client import execute_read_with_retry, get_scores_with_fallback
 from modules.input_helpers import smart_number_input, close_sidebar_on_mobile
 from modules.scorecard_reader_ui import render_scorecard_reader
 from modules.auth import require_login
@@ -36,7 +36,7 @@ def run():
     round_id = active_round["round_id"]
     
     # スコア情報を取得
-    scores = supabase.table('score').select('*, member:member_id(name)').eq('round_id', round_id).execute()
+    scores = execute_read_with_retry(lambda client: client.table('score').select('*, member:member_id(name)').eq('round_id', round_id).execute())
     if not scores.data:
         st.error("スコアデータが見つかりません。")
         return    # 並び替え: member_idでソート

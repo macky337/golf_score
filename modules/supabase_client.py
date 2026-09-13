@@ -1,6 +1,7 @@
 import os
 import time
-from typing import Optional
+from typing import Callable, Optional, TypeVar
+import httpx
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import streamlit as st
@@ -10,6 +11,7 @@ load_dotenv()
 
 # グローバルクライアント変数
 _supabase_client: Optional[Client] = None
+T = TypeVar("T")
 
 def get_supabase_client() -> Optional[Client]:
     """Supabaseクライアントを取得する"""
@@ -43,6 +45,28 @@ def get_supabase_client() -> Optional[Client]:
         return _supabase_client
     except Exception as e:
         return None
+
+
+def execute_read_with_retry(operation: Callable[[Client], T], attempts: int = 3) -> T:
+    """再試行で一時的なSupabase接続断を吸収して読み取りを実行する。"""
+    global _supabase_client
+
+    last_error: Optional[Exception] = None
+    for attempt in range(attempts):
+        client = get_supabase_client()
+        if client is None:
+            raise RuntimeError("Supabaseクライアントが利用できません。")
+        try:
+            return operation(client)
+        except (httpx.RequestError, OSError) as exc:
+            last_error = exc
+            # 上流で閉じられたHTTP/2接続を破棄し、次回は新しい接続を使う。
+            _supabase_client = None
+            if attempt < attempts - 1:
+                time.sleep(0.5 * (attempt + 1))
+
+    assert last_error is not None
+    raise last_error
 
 # スコア関連の操作
 def save_score(round_id, member_id, score_data):

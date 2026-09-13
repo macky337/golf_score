@@ -105,20 +105,19 @@ def _cookie_manager():
     if stx is None:
         return None
 
-    # CookieManagerはコンポーネントを描画するため、同一実行内で複数回生成すると
-    # Streamlitのキーが重複する。セッションごとに1つだけ保持する。
-    if COOKIE_MANAGER_KEY not in st.session_state:
-        st.session_state[COOKIE_MANAGER_KEY] = stx.CookieManager(key=COOKIE_COMPONENT_KEY)
-    return st.session_state[COOKIE_MANAGER_KEY]
+    # コンポーネントの初期値をセッションに保持するとCookie取得結果が古い
+    # ままになる。保存・削除時に、その実行のコンポーネントを描画する。
+    return stx.CookieManager(key=COOKIE_COMPONENT_KEY)
 
 
 def _restore_cookie_session():
-    manager = _cookie_manager()
     expected_username, expected_password = get_login_credentials()
-    if manager is None or not expected_username or not expected_password:
+    if not expected_username or not expected_password:
         return False
 
-    token = manager.get(SESSION_COOKIE)
+    # 再読み込み時の接続リクエストに含まれるCookieを同期的に読む。
+    # ブラウザコンポーネントの非同期読み込みを待つ必要がない。
+    token = st.context.cookies.get(SESSION_COOKIE)
     if verify_session_token(token, expected_username, expected_password):
         st.session_state[AUTHENTICATED_KEY] = True
         st.session_state[AUTH_USERNAME_KEY] = expected_username
@@ -190,8 +189,9 @@ def _render_login():
             if credentials_match(username, password, expected_username, expected_password):
                 st.session_state[AUTHENTICATED_KEY] = True
                 st.session_state[AUTH_USERNAME_KEY] = expected_username
-                _save_cookie_session(expected_username, expected_password)
-                st.rerun()
+                # 即時rerunするとCookie保存用コンポーネントの実行前に
+                # 画面が破棄されるため、この実行でログイン済み画面へ進む。
+                return True
             else:
                 st.error("ユーザー名またはパスワードが正しくありません。")
 
@@ -202,9 +202,12 @@ def _logout():
     """Cookieとセッションを破棄してログアウトする。"""
     manager = _cookie_manager()
     if manager is not None:
+        manager.cookies.setdefault(SESSION_COOKIE, "")
         manager.delete(SESSION_COOKIE)
     st.session_state.clear()
-    st.rerun()
+    st.success("ログアウトしました。")
+    _render_login()
+    st.stop()
 
 
 def render_logout_button(key="app_logout", use_container_width=True):
@@ -226,8 +229,14 @@ def render_logout():
 def require_login():
     """未ログインならログイン画面だけを表示し、ページ処理を停止する。"""
     if not is_authenticated():
-        _render_login()
-        st.stop()
+        login_placeholder = st.empty()
+        with login_placeholder.container():
+            logged_in = _render_login()
+        if not logged_in:
+            st.stop()
+        login_placeholder.empty()
+        username, password = get_login_credentials()
+        _save_cookie_session(username, password)
 
     render_logout()
     return True
