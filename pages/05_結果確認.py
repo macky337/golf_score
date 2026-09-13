@@ -490,8 +490,8 @@ def run():
         # PDF出力機能
         st.subheader("PDF出力")
         if not active_round['finalized']:
-            st.info("PDFはラウンド確定後の結果から生成できます。先に内容を確認してラウンドを確定してください。")
-        elif st.button("確定結果のPDFを生成", use_container_width=True):
+            st.info("確定前でも、現在表示されている結果からPDFを生成できます。スコアを修正・保存した場合は、PDFを再生成してください。PDFの生成ではラウンドは確定されません。")
+        if st.button("PDFを生成", use_container_width=True):
             try:
                 pdf_df = df.copy()
                 # PDF用に数値に戻す必要がある場合、各列ごとに変換してください
