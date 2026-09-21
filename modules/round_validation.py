@@ -25,6 +25,11 @@ def validate_round_data(round_data, scores, results=None, require_results=False)
             errors.append(f"{player_name}のINスコアが未入力です。")
         if round_data.get("has_extra") and (score.get("extra_score") or 0) <= 0:
             errors.append(f"{player_name}のエキストラスコアが未入力です。")
+        for section, label in (("front", "OUT"), ("back", "IN"), ("extra", "エキストラ")):
+            if section == "extra" and not round_data.get("has_extra"):
+                continue
+            if (score.get(f"{section}_putt") or 0) <= 0:
+                errors.append(f"{player_name}の{label}パット数が未入力です。")
 
     if require_results:
         result_member_ids = {item.get("member_id") for item in results}

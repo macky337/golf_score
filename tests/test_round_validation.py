@@ -7,8 +7,8 @@ def _round(has_extra=False):
 
 def _scores(extra_score=0):
     return [
-        {"member_id": 1, "front_score": 45, "back_score": 44, "extra_score": extra_score},
-        {"member_id": 2, "front_score": 46, "back_score": 43, "extra_score": extra_score},
+        {"member_id": 1, "front_score": 45, "back_score": 44, "extra_score": extra_score, "front_putt": 16, "back_putt": 17, "extra_putt": 15},
+        {"member_id": 2, "front_score": 46, "back_score": 43, "extra_score": extra_score, "front_putt": 16, "back_putt": 17, "extra_putt": 15},
     ]
 
 

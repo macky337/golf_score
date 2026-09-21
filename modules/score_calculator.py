@@ -51,6 +51,9 @@ def calc_putt_points(putt_scores, n, rules=None):
     if not putt_scores:
         return {}
     
+    # 0/Noneは未入力。全員分が揃うまで、この区分の配点は保留する。
+    if len(putt_scores) != n or any(value is None or value <= 0 for value in putt_scores.values()):
+        return {member_id: 0 for member_id in putt_scores}
     scores = list(putt_scores.values())
     min_score = min(scores)
     winners = [m_id for m_id, score in putt_scores.items() if score == min_score]
@@ -94,102 +97,26 @@ def calc_putt_points(putt_scores, n, rules=None):
     return points
 
 def calc_match_points(data_i, data_j, handicap_ij, handicap_ji, is_total_only=False, rules=None):
-    match_value = normalize_rules(rules)["match_win_points"]
-    front_pt = back_pt = total_pt = extra_pt = 0
-    # バックスコアの入力が不足している場合（フロント９のみ入力）
-    if safe_get_score(data_i, "Back Score") <= 0 or safe_get_score(data_j, "Back Score") <= 0:
-        # Total Onlyモードの場合、判定すべきではないので全て0を返す
-        if is_total_only:
-            return {"Match Front": 0, "Match Back": 0, "Match Total": 0, "Match Extra": 0, "Total": 0}
-        # 通常モード：フロントのみ・エキストラのみで判定
-        front_i = calc_net_score(data_i, "Front Score", handicap_ij, multiplier=1)
-        front_j = calc_net_score(data_j, "Front Score", handicap_ji, multiplier=1)
-        if front_i < front_j:
-            front_pt = match_value
-        elif front_i > front_j:
-            front_pt = -match_value
-        if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
-            extra_i = calc_net_extra(data_i, handicap_ij, multiplier=1)
-            extra_j = calc_net_extra(data_j, handicap_ji, multiplier=1)
-            if extra_i < extra_j:
-                extra_pt = match_value
-            elif extra_i > extra_j:
-                extra_pt = -match_value
-        total_points = front_pt + extra_pt
-        return {"Match Front": front_pt, "Match Back": 0, "Match Total": front_pt, "Match Extra": extra_pt, "Total": total_points}
-    else:
-        # バックスコア入力がある場合
-        if is_total_only:
-            total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
-            total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
-            if total_i < total_j:
-                total_pt = match_value
-            elif total_i > total_j:
-                total_pt = -match_value
-            if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
-                extra_i = calc_net_extra(data_i, handicap_ij, multiplier=1)
-                extra_j = calc_net_extra(data_j, handicap_ji, multiplier=1)
-                if extra_i < extra_j:
-                    extra_pt = match_value
-                elif extra_i > extra_j:
-                    extra_pt = -match_value
-            total_points = total_pt + extra_pt
-            return {"Match Front": 0, "Match Back": 0, "Match Total": total_pt, "Match Extra": extra_pt, "Total": total_points}
-        else:
-            front_i = calc_net_score(data_i, "Front Score", handicap_ij, multiplier=1)
-            front_j = calc_net_score(data_j, "Front Score", handicap_ji, multiplier=1)
-            if front_i < front_j:
-                front_pt = match_value
-            elif front_i > front_j:
-                front_pt = -match_value
-            back_i = calc_net_score(data_i, "Back Score", handicap_ij, multiplier=1)
-            back_j = calc_net_score(data_j, "Back Score", handicap_ji, multiplier=1)
-            if back_i < back_j:
-                back_pt = match_value
-            elif back_i > back_j:
-                back_pt = -match_value
-            total_i = calc_net_total(data_i, handicap_ij, multiplier=2)
-            total_j = calc_net_total(data_j, handicap_ji, multiplier=2)
-            if total_i < total_j:
-                total_pt = match_value
-            elif total_i > total_j:
-                total_pt = -match_value
-            if safe_get_score(data_i, "Extra Score") > 0 or safe_get_score(data_j, "Extra Score") > 0:
-                extra_i = calc_net_extra(data_i, handicap_ij, multiplier=1)
-                extra_j = calc_net_extra(data_j, handicap_ji, multiplier=1)
-                if extra_i < extra_j:
-                    extra_pt = match_value
-                elif extra_i > extra_j:
-                    extra_pt = -match_value
-            total_points = front_pt + back_pt + total_pt + extra_pt
-            return {"Match Front": front_pt, "Match Back": back_pt, "Match Total": total_pt, "Match Extra": extra_pt, "Total": total_points}
+    """双方が入力済みの区分だけを判定する。合計戦にはOUT/IN両方が必要。"""
+    points = {f"Match {section}": 0 for section in ("Front", "Back", "Total", "Extra")}
+    for section in ("Front", "Back", "Total", "Extra"):
+        if is_total_only and section in {"Front", "Back"}:
+            continue
+        value = calc_match_points_by_section(
+            data_i, data_j, handicap_ij, handicap_ji, section, rules=rules
+        )
+        points[f"Match {section}"] = value if value is not None else 0
+    points["Total"] = sum(points.values())
+    return points
+
 
 def calc_match_points_by_section(player_i, player_j, handicap_ij, handicap_ji, section, multiplier=1, rules=None):
-    """セクション（Front/Back/Total/Extra）ごとのマッチポイントを計算"""
-    if section == "Front":
-        score_i = player_i["Front Score"] - handicap_ij
-        score_j = player_j["Front Score"] - handicap_ji
-    elif section == "Back":
-        if player_i["Back Score"] == 0 or player_j["Back Score"] == 0:
-            return None
-        score_i = player_i["Back Score"] - handicap_ij
-        score_j = player_j["Back Score"] - handicap_ji
-    elif section == "Total":
-        if player_i["Back Score"] == 0 or player_j["Back Score"] == 0:
-            return None
-        score_i = player_i["Total Score"] - handicap_ij * 2
-        score_j = player_j["Total Score"] - handicap_ji * 2
-    else:  # Extra
-        if player_i["Extra Score"] == 0 or player_j["Extra Score"] == 0:
-            return None
-        score_i = player_i["Extra Score"] - handicap_ij
-        score_j = player_j["Extra Score"] - handicap_ji
-    
+    """入力されていない区分はNoneを返し、0打として勝敗判定しない。"""
+    fields = ("Front Score", "Back Score") if section == "Total" else (f"{section} Score",)
+    if any(safe_get_score(player, field) <= 0 for player in (player_i, player_j) for field in fields):
+        return None
+    handicap_multiplier = 2 if section == "Total" else 1
+    score_i = sum(safe_get_score(player_i, field) for field in fields) - handicap_ij * handicap_multiplier
+    score_j = sum(safe_get_score(player_j, field) for field in fields) - handicap_ji * handicap_multiplier
     match_value = normalize_rules(rules)["match_win_points"]
-    score_diff = score_i - score_j
-    if score_diff < 0:
-        return match_value
-    elif score_diff > 0:
-        return -match_value
-    else:
-        return 0
+    return match_value if score_i < score_j else -match_value if score_i > score_j else 0

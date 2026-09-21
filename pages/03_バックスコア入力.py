@@ -18,6 +18,7 @@ from modules.input_helpers import smart_number_input, close_sidebar_on_mobile
 from modules.scorecard_reader_ui import render_scorecard_reader
 from modules.auth import require_login
 from modules.round_context import select_editable_round
+from modules.round_calculation import recalculate_round
 
 def run():
     require_login()
@@ -148,34 +149,10 @@ def run():
 
         # 計算処理は既存ロジックを再利用
         try:
-            current_scores = get_scores_with_fallback(round_id)
-            if current_scores:
-                handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
-                handicaps_data = handicaps_result.data
-                round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
-                active_round = round_result.data[0] if round_result.data else None
-                round_results = get_round_results(round_id)
-                from modules.data_formatter import initialize_player_data
-                player_data = initialize_player_data(current_scores, round_results)
-                player_ids = sorted(list(player_data.keys()))
-                handicaps = {}
-                total_only_set = set()
-                if handicaps_data:
-                    for h in handicaps_data:
-                        handicaps[(h['player_1_id'], h['player_2_id'])] = h['player_1_to_2']
-                        handicaps[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
-                        if 'total_only' in h and h['total_only']:
-                            total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
-                updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
-                save_result = save_round_results(round_id, updated_player_data)
-                if save_result:
-                    st.info("計算結果をround_resultsテーブルに保存しました")
-                else:
-                    st.warning("計算結果の保存に失敗しました")
-            else:
-                st.warning("スコアデータの取得に失敗しました")
-        except Exception as e:
-            st.warning(f"計算処理中にエラーが発生しました: {e}")
+            recalculate_round(supabase, round_id)
+            st.info("計算結果を保存しました")
+        except Exception as error:
+            st.warning(f"スコアは保存しましたが、結果を再計算できませんでした。結果確認画面で再試行してください: {error}")
 
         # 確認表示
         st.write("### 入力内容の確認")

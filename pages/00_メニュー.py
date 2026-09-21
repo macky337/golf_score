@@ -39,12 +39,6 @@ def run():
         )
     with right:
         navigation_link(
-            "pages/11_オフライン入力.py",
-            "オフライン入力（出発前・現地・同期）",
-            "📱",
-            "menu_offline",
-        )
-        navigation_link(
             "pages/06_ポイント集計.py",
             "ポイント集計",
             "🏆",

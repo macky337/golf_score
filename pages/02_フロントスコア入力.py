@@ -18,6 +18,7 @@ from modules.input_helpers import smart_number_input, close_sidebar_on_mobile
 from modules.scorecard_reader_ui import render_scorecard_reader
 from modules.auth import require_login
 from modules.round_context import select_editable_round
+from modules.round_calculation import recalculate_round
 
 def run():
     require_login()
@@ -156,44 +157,10 @@ def run():
         
         # ▼▼▼ 追加: 計算結果をround_resultsに保存 ▼▼▼
         try:
-            # 現在のround_idのすべてのスコアを取得
-            scores = get_scores_with_fallback(round_id)  # 変更: より堅牢な関数を使用
-            if scores:
-                # ハンディキャップ情報を取得
-                handicaps_result = supabase.table('handicap_match').select('*').eq('round_id', round_id).execute()
-                handicaps_data = handicaps_result.data
-                
-                # ラウンド情報を取得
-                round_result = supabase.table('rounds').select('*').eq('round_id', round_id).execute()
-                active_round = round_result.data[0] if round_result.data else None
-                
-                # round_resultsを取得（存在する場合）
-                round_results = get_round_results(round_id)
-                
-                # プレイヤーデータ初期化
-                from modules.data_formatter import initialize_player_data
-                player_data = initialize_player_data(scores, round_results)
-                player_ids = sorted(list(player_data.keys()))
-                
-                # ハンディキャップ辞書作成
-                handicaps = {}
-                total_only_set = set()
-                if handicaps_data:
-                    for h in handicaps_data:
-                        handicaps[(h['player_1_id'], h['player_2_id'])] = h['player_1_to_2']
-                        handicaps[(h['player_2_id'], h['player_1_id'])] = h['player_2_to_1']
-                        if 'total_only' in h and h['total_only']:
-                            total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
-                
-                # ポイント計算と保存
-                updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
-                save_result = save_round_results(round_id, updated_player_data)
-                if save_result:
-                    st.info("計算結果をround_resultsテーブルに保存しました")
-                else:
-                    st.warning("計算結果の保存に失敗しました")
-        except Exception as e:
-            st.warning(f"計算処理中にエラーが発生しました: {e}")
+            recalculate_round(supabase, round_id)
+            st.info("計算結果を保存しました")
+        except Exception as error:
+            st.warning(f"スコアは保存しましたが、結果を再計算できませんでした。結果確認画面で再試行してください: {error}")
           # フォーム送信状態をリセット
         st.session_state.form_submitted = False
         

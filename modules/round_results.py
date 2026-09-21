@@ -32,100 +32,16 @@ def get_table_columns(table_name):
         return set()
 
 def save_round_results(round_id, player_data):
-    """ラウンド結果をround_resultsテーブルとscoreテーブルに保存"""
+    """入力スコアを変更せず、計算結果だけを原子的に置き換える。"""
+    from modules.round_persistence import save_calculation_atomic
     try:
         client = get_supabase_client()
-        all_success = True
-         # テーブルカラムの確認
-        round_results_columns = get_table_columns('round_results')
-        score_columns = get_table_columns('score')
-        
-        print(f"round_results カラム: {round_results_columns}")
-        print(f"score カラム: {score_columns}")
-        
-        # まずround_resultsテーブルの既存データを削除（上書き）
-        try:
-            client.table('round_results').delete().eq('round_id', round_id).execute()
-            print(f"既存のround_resultsデータを削除しました (round_id: {round_id})")
-        except Exception as e:
-            print(f"既存データの削除エラー: {e}")
+        if client is None:
             return False
-        
-        # プレイヤーごとにデータを保存
-        for player_id, data in player_data.items():
-            try:                # round_resultsテーブルに保存するデータ
-                # スキーマに合わせて正しいカラム名のみ使用
-                match_pt = data.get('Match Pt', 0)
-                putt_pt = data.get('Putt Pt', 0)
-                game_pt = data.get('total_game_pt', data.get('Game Pt', 0))
-                # total_ptは成分の合計として計算（データベーススキーマに依存しない）
-                
-                result_data = {
-                    'round_id': round_id,
-                    'member_id': player_id,  # メンバーIDを使用
-                    'match_front': data.get('Match Front', 0),
-                    'match_back': data.get('Match Back', 0),
-                    'match_total': data.get('Match Total', 0),
-                    'match_extra': data.get('Match Extra', 0),
-                    'match_pt': match_pt,
-                    'putt_pt': putt_pt,
-                    'temp_game_pt': data.get('temp_game_pt', 0),
-                    'total_game_pt': game_pt
-                    # total_ptはround_resultsテーブルのスキーマに依存するため、存在する場合のみ追加
-                }
-                
-                # total_ptカラムが存在するかは実際のスキーマ次第なので、
-                # エラーが発生しないよう条件的に追加することも検討可能
-                
-                # データ挿入を試みる
-                response = client.table('round_results').insert(result_data).execute()
-                print(f"Round results saved for player {player_id}")
-                
-            except Exception as e:
-                print(f"Error saving round results for player {player_id}: {e}")
-                all_success = False
-            
-            # scoreテーブルのデータを保存するために既存データを確認
-            try:
-                # 既存のスコアレコードを確認（score_idカラムを使用）
-                existing_score = client.table('score').select('score_id').eq('round_id', round_id).eq('member_id', player_id).execute()
-                
-                # スコアデータを作成（score_idカラムは挿入時に指定しない - 自動生成させる）
-                score_data = {
-                    'round_id': round_id,
-                    'member_id': player_id,
-                    'front_score': data.get('Front Score', 0),
-                    'back_score': data.get('Back Score', 0),
-                    'extra_score': data.get('Extra Score', 0),
-                    'front_game_pt': data.get('Front GP', 0),
-                    'back_game_pt': data.get('Back GP', 0),
-                    'extra_game_pt': data.get('Extra GP', 0),
-                    'front_putt': data.get('Front Putt', data.get('Putt Front', 0)), 
-                    'back_putt': data.get('Back Putt', data.get('Putt Back', 0)),
-                    'extra_putt': data.get('Extra Putt', data.get('Putt Extra', 0)),
-                    'total_score': data.get('Front Score', 0) + data.get('Back Score', 0)
-                }
-                
-                # スコアの挿入または更新
-                if existing_score.data:
-                    # 既存のレコードを更新（score_idで検索）
-                    record_id = existing_score.data[0]['score_id']
-                    score_response = client.table('score').update(score_data).eq('score_id', record_id).execute()
-                    print(f"既存のスコアレコードを更新しました (ID: {record_id})")
-                else:
-                    # 新しいレコードを挿入（score_idは自動生成される）
-                    score_response = client.table('score').insert(score_data).execute()
-                    print(f"新しいスコアレコードを作成しました")
-                
-                print(f"Score data saved for player {player_id}")
-                
-            except Exception as score_e:
-                print(f"Score data save error for player {player_id}: {score_e}")
-                all_success = False
-
-        return all_success
-    except Exception as e:
-        print(f"Error saving round results: {e}")
+        save_calculation_atomic(client, round_id, player_data)
+        return True
+    except Exception as error:
+        print(f"計算結果を保存できませんでした: {error}")
         return False
 
 def get_round_results(round_id: int) -> dict:

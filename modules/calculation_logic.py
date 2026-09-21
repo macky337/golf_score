@@ -18,7 +18,7 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
     putt_back_points = calc_putt_points(back_putt, len(player_ids), rules)
     putt_extra_points = calc_putt_points(
         extra_putt,
-        len(player_ids) if has_actual_extra else {mid: 0 for mid in player_data},
+        len(player_ids),
         rules,
     )
 

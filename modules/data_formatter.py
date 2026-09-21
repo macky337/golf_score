@@ -378,9 +378,7 @@ def initialize_player_data(scores, round_results):
             "Front GP": sc.get('front_game_pt', 0) or 0,
             "Back GP": sc.get('back_game_pt', 0) or 0,
             "Extra GP": sc.get('extra_game_pt', 0) or 0,
-            "Game Pt": ((sc.get('front_game_pt', 0) or 0)
-                       + (sc.get('back_game_pt', 0) or 0)
-                       + (sc.get('extra_game_pt', 0) or 0)),
+            "Game Pt": round_result_data.get("Game Pt", round_result_data.get("total_game_pt", 0)) or 0,
             # キー名を DB のテーブル構造に合わせる（両方のケースを試す）
             "Match Front": round_result_data.get("Match Front", round_result_data.get("match_front", 0)),
             "Match Back":  round_result_data.get("Match Back", round_result_data.get("match_back", 0)),
@@ -395,6 +393,8 @@ def initialize_player_data(scores, round_results):
             "Putt Extra": sc.get('extra_putt', 0) or 0,
             "Extra Putt": sc.get('extra_putt', 0) or 0,  # 追加: 別形式のキー名でも対応
             "Putt Pt": round_result_data.get("Putt Pt", round_result_data.get("putt_pt", 0)),
-            "Total Pt": sc.get('total_pt', 0) or 0
+            "Total Pt": 0
         }
+        data = player_data[member_id]
+        data["Total Pt"] = sum(data.get(key, 0) or 0 for key in ("Match Pt", "Putt Pt", "Game Pt"))
     return player_data

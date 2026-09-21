@@ -35,6 +35,7 @@ from modules.round_results import save_round_results, get_round_results
 from modules.auth import require_login
 from modules.round_validation import validate_round
 from modules.competition_rules import rules_for_round
+from modules.round_calculation import recalculate_round
 logger = logging.getLogger(__name__)
 
 # ▼▼▼ フォント登録（日本語対応） ▼▼▼
@@ -331,6 +332,11 @@ def run():
                 if 'total_only' in h and h['total_only']:
                     total_only_set.add(frozenset([h['player_1_id'], h['player_2_id']]))
 
+        player_data = calculate_player_points(
+            player_data, player_ids, handicaps if handicaps_data else {},
+            total_only_set if handicaps_data else set(), active_round,
+        )
+
         # データフレーム作成とスタイリング
         df_columns = [
             "Player",
@@ -594,46 +600,11 @@ def run():
                 use_container_width=True,
             ):
                 try:
-                    if handicaps_data and 'handicaps' in locals() and 'total_only_set' in locals():
-                        updated_player_data = calculate_player_points(player_data, player_ids, handicaps, total_only_set, active_round)
-                    else:
-                        updated_player_data = player_data
-                    
-                    if save_round_results(round_id, updated_player_data):
-                        update_data = {}
-                        for mid in player_ids:
-                            data = updated_player_data[mid]
-                            update_data[mid] = {
-                                'front_game_pt': data.get('Front GP', 0),
-                                'back_game_pt':  data.get('Back GP', 0),
-                                'extra_game_pt': data.get('Extra GP', 0)
-                                # total_ptはround_resultsテーブルで管理するため、scoreテーブルの更新からは除外
-                            }
-                        
-                        success, updates, failures = update_scores_batch(round_id, update_data)
-                        if success:
-                            result_errors = validate_round(
-                                supabase, round_id, require_results=True
-                            )
-                            if result_errors:
-                                st.error("計算結果の整合性を確認できないため、確定を中止しました。")
-                                for result_error in result_errors:
-                                    st.markdown(f"- {result_error}")
-                            else:
-                                # Finalizedフラグを更新
-                                supabase.table('rounds').update({'finalized': True}).eq('round_id', round_id).execute()
-                                st.success("🎉 ラウンドを確定しました！")
-                                st.info("今後スコアの修正が必要な場合は、管理画面のスコア修正タブから行ってください。")
-                                # 画面を再読み込み
-                                st.rerun()
-                        else:
-                            st.warning(f"一部のスコア更新に成功しましたが、{len(failures)}件の失敗がありました。")
-                            for failure in failures:
-                                st.error(f"プレイヤーID {failure['member_id']}: {failure['error']}")
-                    else:
-                        st.error("計算結果の保存に失敗しました。")
-                except Exception as e:
-                    st.error(f"ラウンドの確定中にエラーが発生しました: {str(e)}")
+                    recalculate_round(supabase, round_id, finalize=True)
+                    st.success("🎉 ラウンドを確定しました！")
+                    st.rerun()
+                except Exception as error:
+                    st.error(f"確定を完了できませんでした。最新の状態を再確認してください: {error}")
         else:    
             # 確定済みのラウンドの場合、管理画面へのリンクを表示
             st.markdown("---")
