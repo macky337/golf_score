@@ -8,6 +8,7 @@ import pandas as pd
 from modules.db import ensure_supabase
 from modules.page_utils import switch_page
 from modules.models import get_course_list, create_course, is_course_in_use, update_rounds_course_references, get_unused_courses, delete_unused_courses
+from modules.input_helpers import close_sidebar_on_mobile
 from modules.auth import require_login
 
 st.set_page_config(
