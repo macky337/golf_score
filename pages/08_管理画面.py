@@ -126,6 +126,7 @@ def run():
         "管理メニュー",
         (
             "📝 スコア修正",
+            "⛳ 過去ラウンドのコース修正",
             "⚖️ ハンディキャップ修正",
             "🎯 競技ルール設定",
             "👤 メンバー管理",
@@ -136,6 +137,8 @@ def run():
 
     if admin_menu == "📝 スコア修正":
         score_edit_tab()
+    elif admin_menu == "⛳ 過去ラウンドのコース修正":
+        show_round_course_editor()
     elif admin_menu == "⚖️ ハンディキャップ修正":
         show_handicap_editor()
     elif admin_menu == "🎯 競技ルール設定":
@@ -144,6 +147,83 @@ def run():
         show_member_manager()
     else:
         show_data_maintenance()
+
+def show_round_course_editor():
+    """過去ラウンドに保存されたコースを修正する。"""
+    st.header("過去ラウンドのコース修正")
+    st.caption("選択したラウンドのコース名とコース参照を更新します。スコアや集計結果は変更しません。")
+
+    supabase = ensure_supabase()
+    rounds = (
+        supabase.table("rounds")
+        .select("round_id, date_played, course_name, course_id")
+        .order("date_played", desc=True)
+        .execute()
+        .data
+        or []
+    )
+    if not rounds:
+        st.info("ラウンドデータがありません。")
+        return
+
+    courses = (
+        supabase.table("courses").select("id, name").order("name").execute().data
+        or []
+    )
+    if not courses:
+        st.warning("修正先のコースが登録されていません。先にコースを追加してください。")
+        return
+
+    selected_round = st.selectbox(
+        "修正するラウンド",
+        rounds,
+        format_func=lambda row: (
+            f"{row.get('date_played', '日付不明')} - "
+            f"{row.get('course_name', 'コース未設定')} (ID: {row['round_id']})"
+        ),
+        key="round_course_editor_round",
+    )
+    course_options = [(course["id"], course["name"]) for course in courses]
+    selected_course_id = selected_round.get("course_id")
+    current_index = next(
+        (
+            index
+            for index, (course_id, course_name) in enumerate(course_options)
+            if (selected_course_id is not None and str(course_id) == str(selected_course_id))
+            or course_name == selected_round.get("course_name")
+        ),
+        -1,
+    )
+    if current_index == -1:
+        course_options.insert(0, (None, "修正先を選択してください"))
+        current_index = 0
+
+    with st.form("round_course_editor_form"):
+        new_course = st.selectbox(
+            "正しいコース",
+            course_options,
+            index=current_index,
+            format_func=lambda course: course[1],
+            key=f"round_course_editor_course_{selected_round['round_id']}",
+        )
+        submitted = st.form_submit_button("過去ラウンドのコースを更新", type="primary")
+
+    if submitted:
+        if new_course[0] is None:
+            st.warning("更新先のコースを選択してください。")
+            return
+        try:
+            supabase.table("rounds").update(
+                {"course_id": new_course[0], "course_name": new_course[1]}
+            ).eq("round_id", selected_round["round_id"]).execute()
+            st.success(
+                f"ラウンドID {selected_round['round_id']} のコースを「{new_course[1]}」に更新しました。"
+            )
+            st.rerun()
+        except Exception as e:
+            logger.exception("過去ラウンドのコース修正に失敗しました")
+            st.error(f"コースの更新に失敗しました: {e}")
+
 
 def recalculate_single_round(round_id):
     """通常画面と同じロジックで単一ラウンドを再計算する。"""
