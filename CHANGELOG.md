@@ -1,5 +1,11 @@
 # 変更履歴
 
+## [2026-11-01] v1.0.318
+
+### 更新
+
+- Improve input validation and data safety
+
 ## [2026-11-01] v1.0.317
 
 ### 更新
