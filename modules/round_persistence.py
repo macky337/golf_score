@@ -67,3 +67,11 @@ def save_score_updates_atomic(client, round_id, segment, records, *, allow_final
         "p_allow_finalized": allow_finalized,
     }).execute()
     return response.data
+
+
+def delete_round_atomic(client, round_id):
+    """ラウンドと関連データを単一RPCで削除する。"""
+    response = client.rpc("delete_golf_round_atomic", {
+        "p_round_id": int(round_id),
+    }).execute()
+    return response.data

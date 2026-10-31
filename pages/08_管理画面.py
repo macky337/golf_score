@@ -20,7 +20,7 @@ from modules.input_helpers import close_sidebar_on_mobile
 from modules.backup_restore import restore_backup_atomic
 from modules.auth import require_login
 from modules.round_calculation import recalculate_round
-from modules.round_persistence import save_score_updates_atomic
+from modules.round_persistence import delete_round_atomic, save_score_updates_atomic
 from modules.round_validation import validate_round
 from modules.competition_rules import get_default_rules, save_default_rules
 
@@ -620,10 +620,7 @@ def show_round_delete():
         try:
             with st.spinner("削除前バックアップを作成中..."):
                 backup_id = create_backup_snapshot(supabase)
-            supabase.table('round_results').delete().eq('round_id', round_id).execute()
-            supabase.table('handicap_match').delete().eq('round_id', round_id).execute()
-            supabase.table('score').delete().eq('round_id', round_id).execute()
-            supabase.table('rounds').delete().eq('round_id', round_id).execute()
+            delete_round_atomic(supabase, round_id)
             st.success(f"ラウンドID: {round_id} を削除しました。削除前バックアップ: {backup_id}")
             st.rerun()
         except Exception as e:

@@ -47,9 +47,6 @@ CREATE OR REPLACE FUNCTION public.create_golf_round_atomic(
     p_handicaps jsonb
 )
 RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY INVOKER
-SET search_path = public
 AS $$
 DECLARE
     created_round_id bigint;
@@ -111,7 +108,10 @@ BEGIN
 
     RETURN jsonb_build_object('round_id', created_round_id, 'players', participant_count);
 END;
-$$;
+$$
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public;
 
 CREATE OR REPLACE FUNCTION public.save_golf_score_segment_atomic(
     p_round_id bigint,
@@ -120,9 +120,6 @@ CREATE OR REPLACE FUNCTION public.save_golf_score_segment_atomic(
     p_allow_finalized boolean DEFAULT false
 )
 RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY INVOKER
-SET search_path = public
 AS $$
 DECLARE
     round_is_finalized boolean;
@@ -206,9 +203,47 @@ BEGIN
     END IF;
     RETURN jsonb_build_object('round_id', p_round_id, 'updated_players', updated_count);
 END;
-$$;
+$$
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public;
+
+CREATE OR REPLACE FUNCTION public.delete_golf_round_atomic(p_round_id bigint)
+RETURNS jsonb
+AS $$
+DECLARE
+    deleted_scores integer;
+    deleted_handicaps integer;
+    deleted_results integer;
+BEGIN
+    PERFORM 1 FROM public.rounds WHERE round_id = p_round_id FOR UPDATE;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Round not found';
+    END IF;
+
+    DELETE FROM public.round_results WHERE round_id = p_round_id;
+    GET DIAGNOSTICS deleted_results = ROW_COUNT;
+    DELETE FROM public.handicap_match WHERE round_id = p_round_id;
+    GET DIAGNOSTICS deleted_handicaps = ROW_COUNT;
+    DELETE FROM public.score WHERE round_id = p_round_id;
+    GET DIAGNOSTICS deleted_scores = ROW_COUNT;
+    DELETE FROM public.rounds WHERE round_id = p_round_id;
+
+    RETURN jsonb_build_object(
+        'round_id', p_round_id,
+        'deleted_scores', deleted_scores,
+        'deleted_handicaps', deleted_handicaps,
+        'deleted_results', deleted_results
+    );
+END;
+$$
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public;
 
 REVOKE ALL ON FUNCTION public.create_golf_round_atomic(jsonb, bigint[], jsonb) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.save_golf_score_segment_atomic(bigint, text, jsonb, boolean) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.delete_golf_round_atomic(bigint) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.create_golf_round_atomic(jsonb, bigint[], jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.save_golf_score_segment_atomic(bigint, text, jsonb, boolean) TO service_role;
+GRANT EXECUTE ON FUNCTION public.delete_golf_round_atomic(bigint) TO service_role;

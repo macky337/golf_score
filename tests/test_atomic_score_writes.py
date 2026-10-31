@@ -1,6 +1,10 @@
 from types import SimpleNamespace
 
-from modules.round_persistence import create_round_setup_atomic, save_score_updates_atomic
+from modules.round_persistence import (
+    create_round_setup_atomic,
+    delete_round_atomic,
+    save_score_updates_atomic,
+)
 from modules import supabase_client
 
 
@@ -63,3 +67,15 @@ def test_admin_score_batch_can_explicitly_allow_finalized_round():
 
     assert result == {"ok": True}
     assert client.calls[0][1]["p_allow_finalized"] is True
+
+
+def test_round_delete_uses_one_atomic_rpc():
+    client = FakeRpcClient()
+
+    result = delete_round_atomic(client, "12")
+
+    assert result == {"ok": True}
+    assert client.calls == [(
+        "delete_golf_round_atomic",
+        {"p_round_id": 12},
+    )]
