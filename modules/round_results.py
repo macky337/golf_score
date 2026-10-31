@@ -1,10 +1,13 @@
 from typing import Dict, List, Any, Optional
+import logging
 from modules.supabase_client import get_supabase_client
 import streamlit as st
 import time
 import traceback
 import os
 from supabase import Client  # 型ヒント用のみ
+
+logger = logging.getLogger(__name__)
 
 # Supabase接続は get_supabase_client() を使用
 
@@ -57,9 +60,6 @@ def get_round_results(round_id: int) -> dict:
         response = client.table('round_results').select('*').eq('round_id', round_id).order('member_id').execute()
         results = OrderedDict()
         
-        # レスポンスデータの確認
-        print(f"Round results response data: {response}")
-        
         if response.data:
             # データはすでにmember_id昇順でソートされている
             for record in response.data:
@@ -89,8 +89,7 @@ def get_round_results(round_id: int) -> dict:
         return results
     except Exception as e:
         error_message = f"Error getting round results: {e}"
-        print(error_message)
-        print(f"Exception details: {traceback.format_exc()}")
+        logger.exception("round_resultsの取得に失敗しました")
         try:
             st.error(error_message)
         except:

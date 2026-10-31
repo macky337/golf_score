@@ -343,9 +343,16 @@ def show_handicap_editor():
                                         'player_2_to_1': new_p2_to_1,
                                         'total_only': new_total_only
                                     }).eq('id', h['id']).execute()
-                                    recalculate_after_handicap_change(supabase, round_id)
-                                    st.success("ハンディキャップを更新し、結果を再計算しました")
-                                    st.rerun()
+                                    try:
+                                        recalculate_after_handicap_change(supabase, round_id)
+                                        st.success("ハンディキャップを更新し、結果を再計算しました")
+                                        st.rerun()
+                                    except Exception as recalculation_error:
+                                        logger.exception("ハンディキャップ更新後の再計算に失敗しました")
+                                        st.warning(
+                                            "ハンディキャップは更新しましたが、結果を再計算できませんでした。"
+                                            f"結果確認画面で再試行してください: {recalculation_error}"
+                                        )
                                 except Exception as e:
                                     st.error(f"更新エラー: {str(e)}")
                         
@@ -353,9 +360,16 @@ def show_handicap_editor():
                             if st.form_submit_button("削除", use_container_width=True):
                                 try:
                                     supabase.table('handicap_match').delete().eq('id', h['id']).execute()
-                                    recalculate_after_handicap_change(supabase, round_id)
-                                    st.success("ハンディキャップを削除し、結果を再計算しました")
-                                    st.rerun()
+                                    try:
+                                        recalculate_after_handicap_change(supabase, round_id)
+                                        st.success("ハンディキャップを削除し、結果を再計算しました")
+                                        st.rerun()
+                                    except Exception as recalculation_error:
+                                        logger.exception("ハンディキャップ削除後の再計算に失敗しました")
+                                        st.warning(
+                                            "ハンディキャップは削除しましたが、結果を再計算できませんでした。"
+                                            f"結果確認画面で再試行してください: {recalculation_error}"
+                                        )
                                 except Exception as e:
                                     st.error(f"削除エラー: {str(e)}")
         else:
@@ -400,9 +414,16 @@ def show_handicap_editor():
                                 'total_only': total_only
                             }
                             result = supabase.table('handicap_match').insert(insert_data).execute()
-                            recalculate_after_handicap_change(supabase, round_id)
-                            st.success("ハンディキャップ設定を追加し、結果を再計算しました")
-                            st.rerun()
+                            try:
+                                recalculate_after_handicap_change(supabase, round_id)
+                                st.success("ハンディキャップ設定を追加し、結果を再計算しました")
+                                st.rerun()
+                            except Exception as recalculation_error:
+                                logger.exception("ハンディキャップ追加後の再計算に失敗しました")
+                                st.warning(
+                                    "ハンディキャップは追加しましたが、結果を再計算できませんでした。"
+                                    f"結果確認画面で再試行してください: {recalculation_error}"
+                                )
                     except Exception as e:
                         st.error(f"追加中にエラーが発生しました: {str(e)}")
                         # デバッグ情報を表示
@@ -521,6 +542,7 @@ def show_member_manager():
                 try:
                     # メンバーの更新と削除
                     for member_id, new_name in updated_members.items():
+                        new_name = new_name.strip()
                         if st.session_state.get(f"delete_{member_id}_confirmed"):
                             # メンバーの削除前に関連データをチェック
                             scores = supabase.table('score').select('*').eq('member_id', member_id).execute()
@@ -539,6 +561,9 @@ def show_member_manager():
                             supabase.table('member').delete().eq('member_id', member_id).execute()
                             st.success(f"メンバー '{new_name}' を削除しました")
                         else:
+                            if not new_name:
+                                st.error("メンバー名を空白にはできません")
+                                continue
                             # 名前が変更されている場合のみ更新
                             if new_name != next((m['name'] for m in members if m['member_id'] == member_id), None):
                                 supabase.table('member').update({'name': new_name}).eq('member_id', member_id).execute()
@@ -556,6 +581,7 @@ def show_member_manager():
         # フォーム送信ボタン
         submit = st.form_submit_button("追加")
         if submit:
+            new_name = new_name.strip()
             if new_name:
                 try:
                     # 同じ名前のメンバーが既に存在するかチェック

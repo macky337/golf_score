@@ -65,6 +65,15 @@ BEGIN
     IF COALESCE((p_round->>'num_players')::integer, -1) <> participant_count THEN
         RAISE EXCEPTION 'Participant count does not match round';
     END IF;
+    IF NULLIF(trim(p_round->>'course_name'), '') IS NULL
+       OR NULLIF(p_round->>'course_id', '') IS NULL
+       OR NOT EXISTS (
+           SELECT 1 FROM public.courses c
+           WHERE c.id = (p_round->>'course_id')::bigint
+             AND c.name = p_round->>'course_name'
+       ) THEN
+        RAISE EXCEPTION 'Course not found or does not match course ID';
+    END IF;
     IF EXISTS (
         SELECT 1 FROM unnest(p_member_ids) AS ids(member_id)
         WHERE NOT EXISTS (SELECT 1 FROM public.member m WHERE m.member_id = ids.member_id)

@@ -53,6 +53,7 @@ def run():
         st.write("### 新規メンバー追加")
         new_name = st.text_input("名前")
         if st.form_submit_button("追加"):
+            new_name = new_name.strip()
             if new_name:
                 try:
                     # 同じ名前のメンバーが既に存在するかチェック
@@ -75,7 +76,6 @@ def run():
         try:
             # すべてのメンバーIDを取得
             all_members = supabase.table('member').select('member_id', 'name').execute().data
-            all_member_ids = [m['member_id'] for m in all_members]
             # スコアテーブルに一度も出現しないmember_idを抽出
             played_member_ids = set()
             scores = supabase.table('score').select('member_id').execute().data
@@ -85,9 +85,12 @@ def run():
             if not unplayed_members:
                 st.info("すべてのメンバーがラウンドに参加しています。削除対象はありません。")
             else:
-                for m in unplayed_members:
-                    supabase.table('member').delete().eq('member_id', m['member_id']).execute()
-                st.success(f"{len(unplayed_members)}名の未参加メンバーを削除しました。")
+                member_ids = [member['member_id'] for member in unplayed_members]
+                result = supabase.table('member').delete().in_('member_id', member_ids).execute()
+                deleted_count = len(result.data or [])
+                if deleted_count != len(member_ids):
+                    raise RuntimeError("削除対象の一部を削除できませんでした")
+                st.success(f"{deleted_count}名の未参加メンバーを削除しました。")
                 st.rerun()
         except Exception as e:
             st.error(f"未参加メンバーの削除に失敗しました: {str(e)}")

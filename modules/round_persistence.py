@@ -53,6 +53,8 @@ def create_round_setup_atomic(client, round_data, member_ids, handicaps):
         raise ValueError("参加者は2名から4名で選択してください。")
     if len(set(member_ids)) != len(member_ids):
         raise ValueError("参加者が重複しています。")
+    if not round_data.get("course_id") or not str(round_data.get("course_name") or "").strip():
+        raise ValueError("登録済みのゴルフ場を選択してください。")
 
     pairs = set()
     for handicap in handicaps:

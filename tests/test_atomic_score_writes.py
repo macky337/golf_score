@@ -8,6 +8,8 @@ from modules.round_persistence import (
 from modules import supabase_client
 import pytest
 
+ROUND_DATA = {"date_played": "2026-10-31", "num_players": 2, "course_id": 1, "course_name": "Test"}
+
 
 class FakeRpcClient:
     def __init__(self):
@@ -23,7 +25,7 @@ def test_round_setup_is_one_rpc_and_normalizes_member_ids():
 
     result = create_round_setup_atomic(
         client,
-        {"date_played": "2026-10-31", "num_players": 2},
+        ROUND_DATA,
         ["3", 5],
         [],
     )
@@ -32,7 +34,7 @@ def test_round_setup_is_one_rpc_and_normalizes_member_ids():
     assert client.calls == [(
         "create_golf_round_atomic",
         {
-            "p_round": {"date_played": "2026-10-31", "num_players": 2},
+            "p_round": ROUND_DATA,
             "p_member_ids": [3, 5],
             "p_handicaps": [],
         },
@@ -43,7 +45,16 @@ def test_round_setup_rejects_more_than_four_participants():
     client = FakeRpcClient()
 
     with pytest.raises(ValueError, match="2名から4名"):
-        create_round_setup_atomic(client, {"num_players": 5}, [1, 2, 3, 4, 5], [])
+        create_round_setup_atomic(client, {**ROUND_DATA, "num_players": 5}, [1, 2, 3, 4, 5], [])
+
+    assert client.calls == []
+
+
+def test_round_setup_requires_registered_course():
+    client = FakeRpcClient()
+
+    with pytest.raises(ValueError, match="ゴルフ場"):
+        create_round_setup_atomic(client, {"num_players": 2}, [1, 2], [])
 
     assert client.calls == []
 
@@ -56,7 +67,7 @@ def test_round_setup_rejects_reversed_duplicate_handicap_pair():
     ]
 
     with pytest.raises(ValueError, match="重複"):
-        create_round_setup_atomic(client, {"num_players": 2}, [1, 2], handicaps)
+        create_round_setup_atomic(client, ROUND_DATA, [1, 2], handicaps)
 
     assert client.calls == []
 
@@ -66,7 +77,7 @@ def test_round_setup_rejects_handicap_player_outside_participants():
 
     with pytest.raises(ValueError, match="参加者"):
         create_round_setup_atomic(
-            client, {"num_players": 2}, [1, 2], [{"player_1_id": 1, "player_2_id": 3}]
+            client, ROUND_DATA, [1, 2], [{"player_1_id": 1, "player_2_id": 3}]
         )
 
     assert client.calls == []
