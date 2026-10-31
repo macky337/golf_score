@@ -386,10 +386,9 @@ def show_handicap_editor():
             if st.form_submit_button("ハンディキャップ設定を追加"):
                 if player1[0] != player2[0]:
                     try:
-                        # 既存のハンディキャップ設定を確認
-                        existing = supabase.table('handicap_match').select('*').eq('round_id', round_id).eq('player_1_id', player1[0]).eq('player_2_id', player2[0]).execute()
-                        
-                        if existing.data:
+                        # 選択順が逆でも同一組み合わせとして重複を防ぐ。
+                        pair = frozenset((player1[0], player2[0]))
+                        if any(frozenset((h['player_1_id'], h['player_2_id'])) == pair for h in handicaps):
                             st.warning("この組み合わせのハンディキャップ設定は既に存在します。既存の設定を編集してください。")
                         else:
                             insert_data = {

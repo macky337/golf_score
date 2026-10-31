@@ -48,6 +48,30 @@ def test_round_setup_rejects_more_than_four_participants():
     assert client.calls == []
 
 
+def test_round_setup_rejects_reversed_duplicate_handicap_pair():
+    client = FakeRpcClient()
+    handicaps = [
+        {"player_1_id": 1, "player_2_id": 2},
+        {"player_1_id": 2, "player_2_id": 1},
+    ]
+
+    with pytest.raises(ValueError, match="重複"):
+        create_round_setup_atomic(client, {"num_players": 2}, [1, 2], handicaps)
+
+    assert client.calls == []
+
+
+def test_round_setup_rejects_handicap_player_outside_participants():
+    client = FakeRpcClient()
+
+    with pytest.raises(ValueError, match="参加者"):
+        create_round_setup_atomic(
+            client, {"num_players": 2}, [1, 2], [{"player_1_id": 1, "player_2_id": 3}]
+        )
+
+    assert client.calls == []
+
+
 def test_score_batch_uses_one_atomic_rpc(monkeypatch):
     client = FakeRpcClient()
     monkeypatch.setattr(supabase_client, "get_supabase_client", lambda: client)

@@ -51,6 +51,22 @@ def create_round_setup_atomic(client, round_data, member_ids, handicaps):
     member_ids = [int(member_id) for member_id in member_ids]
     if not 2 <= len(member_ids) <= 4:
         raise ValueError("参加者は2名から4名で選択してください。")
+    if len(set(member_ids)) != len(member_ids):
+        raise ValueError("参加者が重複しています。")
+
+    pairs = set()
+    for handicap in handicaps:
+        try:
+            player_1_id = int(handicap["player_1_id"])
+            player_2_id = int(handicap["player_2_id"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("ハンディキャップ設定が正しくありません。") from exc
+        if player_1_id == player_2_id or player_1_id not in member_ids or player_2_id not in member_ids:
+            raise ValueError("ハンディキャップの参加者が正しくありません。")
+        pair = tuple(sorted((player_1_id, player_2_id)))
+        if pair in pairs:
+            raise ValueError("同じ組み合わせのハンディキャップが重複しています。")
+        pairs.add(pair)
     response = client.rpc("create_golf_round_atomic", {
         "p_round": round_data,
         "p_member_ids": member_ids,

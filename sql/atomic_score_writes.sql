@@ -71,6 +71,24 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'Participant not found';
     END IF;
+    IF EXISTS (
+        SELECT 1
+        FROM jsonb_to_recordset(p_handicaps) AS h(player_1_id bigint, player_2_id bigint)
+        WHERE h.player_1_id IS NULL OR h.player_2_id IS NULL
+           OR h.player_1_id = h.player_2_id
+           OR NOT (h.player_1_id = ANY(p_member_ids))
+           OR NOT (h.player_2_id = ANY(p_member_ids))
+    ) THEN
+        RAISE EXCEPTION 'Invalid handicap participants';
+    END IF;
+    IF EXISTS (
+        SELECT 1
+        FROM jsonb_to_recordset(p_handicaps) AS h(player_1_id bigint, player_2_id bigint)
+        GROUP BY LEAST(h.player_1_id, h.player_2_id), GREATEST(h.player_1_id, h.player_2_id)
+        HAVING count(*) > 1
+    ) THEN
+        RAISE EXCEPTION 'Duplicate handicap pair';
+    END IF;
 
     INSERT INTO public.rounds
         (date_played, date, course_name, course_id, num_players, has_extra, finalized, rule_settings)
