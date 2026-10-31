@@ -54,7 +54,7 @@ DECLARE
 BEGIN
     IF jsonb_typeof(p_round) IS DISTINCT FROM 'object'
        OR jsonb_typeof(COALESCE(p_handicaps, '[]'::jsonb)) IS DISTINCT FROM 'array'
-       OR COALESCE(array_length(p_member_ids, 1), 0) < 2 THEN
+       OR COALESCE(array_length(p_member_ids, 1), 0) NOT BETWEEN 2 AND 4 THEN
         RAISE EXCEPTION 'Invalid round setup';
     END IF;
     IF (SELECT count(DISTINCT ids.member_id) FROM unnest(p_member_ids) AS ids(member_id))

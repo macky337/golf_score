@@ -6,6 +6,7 @@ from modules.round_persistence import (
     save_score_updates_atomic,
 )
 from modules import supabase_client
+import pytest
 
 
 class FakeRpcClient:
@@ -36,6 +37,15 @@ def test_round_setup_is_one_rpc_and_normalizes_member_ids():
             "p_handicaps": [],
         },
     )]
+
+
+def test_round_setup_rejects_more_than_four_participants():
+    client = FakeRpcClient()
+
+    with pytest.raises(ValueError, match="2名から4名"):
+        create_round_setup_atomic(client, {"num_players": 5}, [1, 2, 3, 4, 5], [])
+
+    assert client.calls == []
 
 
 def test_score_batch_uses_one_atomic_rpc(monkeypatch):

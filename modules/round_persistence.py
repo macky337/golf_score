@@ -48,9 +48,12 @@ def save_calculation_atomic(client, round_id, player_data, *, expected_scores=No
 
 def create_round_setup_atomic(client, round_data, member_ids, handicaps):
     """ラウンド、参加者スコア、ハンディキャップを単一RPCで作成する。"""
+    member_ids = [int(member_id) for member_id in member_ids]
+    if not 2 <= len(member_ids) <= 4:
+        raise ValueError("参加者は2名から4名で選択してください。")
     response = client.rpc("create_golf_round_atomic", {
         "p_round": round_data,
-        "p_member_ids": [int(member_id) for member_id in member_ids],
+        "p_member_ids": member_ids,
         "p_handicaps": handicaps,
     }).execute()
     return response.data
