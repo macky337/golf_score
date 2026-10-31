@@ -109,3 +109,42 @@ REVOKE ALL ON FUNCTION public.restore_golf_score_backup(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.restore_golf_score_backup(jsonb) FROM anon;
 REVOKE ALL ON FUNCTION public.restore_golf_score_backup(jsonb) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.restore_golf_score_backup(jsonb) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.create_golf_score_backup(
+    p_backup_id text,
+    p_data jsonb,
+    p_created_at timestamptz,
+    p_description text
+)
+RETURNS jsonb
+AS $$
+DECLARE
+    deleted_count integer;
+BEGIN
+    IF p_backup_id IS NULL OR p_backup_id = ''
+       OR p_data IS NULL OR jsonb_typeof(p_data) <> 'object'
+       OR p_created_at IS NULL THEN
+        RAISE EXCEPTION 'Invalid backup data';
+    END IF;
+
+    LOCK TABLE public.backups IN SHARE ROW EXCLUSIVE MODE;
+    INSERT INTO public.backups (backup_id, data, created_at, description)
+    VALUES (p_backup_id, p_data, p_created_at, p_description);
+
+    DELETE FROM public.backups
+    WHERE backup_id IN (
+        SELECT backup_id FROM public.backups
+        ORDER BY created_at DESC, backup_id DESC
+        OFFSET 5
+    );
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+
+    RETURN jsonb_build_object('backup_id', p_backup_id, 'deleted_old_backups', deleted_count);
+END;
+$$
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public;
+
+REVOKE ALL ON FUNCTION public.create_golf_score_backup(text, jsonb, timestamptz, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.create_golf_score_backup(text, jsonb, timestamptz, text) TO service_role;

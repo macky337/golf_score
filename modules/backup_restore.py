@@ -35,3 +35,17 @@ def restore_backup_atomic(supabase, payload):
         "restore_golf_score_backup",
         {"backup_data": backup_data},
     ).execute()
+
+
+def save_backup_atomic(supabase, backup_id, backup_data, created_at, description):
+    """バックアップの保存と世代整理を単一トランザクションで行う。"""
+    response = supabase.rpc(
+        "create_golf_score_backup",
+        {
+            "p_backup_id": backup_id,
+            "p_data": backup_data,
+            "p_created_at": created_at,
+            "p_description": description,
+        },
+    ).execute()
+    return getattr(response, "data", response)

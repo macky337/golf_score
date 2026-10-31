@@ -1,6 +1,10 @@
 import pytest
 
-from modules.backup_restore import restore_backup_atomic, validate_backup_payload
+from modules.backup_restore import (
+    restore_backup_atomic,
+    save_backup_atomic,
+    validate_backup_payload,
+)
 
 
 class FakeRpcRequest:
@@ -64,3 +68,16 @@ def test_restore_backup_uses_one_atomic_rpc_call():
     function_name, params = client.calls[0]
     assert function_name == "restore_golf_score_backup"
     assert params["backup_data"]["round_results"] == []
+
+
+def test_backup_save_uses_one_atomic_rpc_call():
+    client = FakeSupabase()
+
+    result = save_backup_atomic(
+        client, "20261101_120000", {"rounds": []}, "2026-11-01T12:00:00+09:00", "Backup"
+    )
+
+    assert result == {"restored": True}
+    function_name, params = client.calls[0]
+    assert function_name == "create_golf_score_backup"
+    assert params["p_backup_id"] == "20261101_120000"

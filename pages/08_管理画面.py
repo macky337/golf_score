@@ -17,7 +17,7 @@ import time
 import logging
 from dotenv import load_dotenv
 from modules.input_helpers import close_sidebar_on_mobile
-from modules.backup_restore import restore_backup_atomic
+from modules.backup_restore import restore_backup_atomic, save_backup_atomic
 from modules.auth import require_login
 from modules.round_calculation import recalculate_round
 from modules.round_persistence import delete_round_atomic, save_score_updates_atomic
@@ -709,33 +709,18 @@ def show_backup_restore():
         except Exception as e:
             st.error(f"バックアップ一覧の取得に失敗しました: {str(e)}")
 
-def save_backup_to_supabase(backup_data):
+def save_backup_to_supabase(backup_data, supabase=None):
     """バックアップデータをSupabaseに保存（最新5件まで）"""
-    supabase = ensure_supabase()
+    supabase = supabase or ensure_supabase()
     
     try:
-        # 既存のバックアップを取得
-        existing_backups = supabase.table('backups').select('*').order('created_at', desc=True).execute()
-        
-        # 5件以上ある場合、古いものを削除
-        if len(existing_backups.data) >= 5:
-            # 古い順にソート
-            sorted_backups = sorted(existing_backups.data, key=lambda x: x['created_at'])
-            # 超過分を削除
-            for old_backup in sorted_backups[:(len(existing_backups.data) - 4)]:
-                supabase.table('backups').delete().eq('backup_id', old_backup['backup_id']).execute()
-
-        # 新しいバックアップを保存
+        # 新しいバックアップの保存と世代整理はDB側で原子的に行う。
         jst = pytz.timezone('Asia/Tokyo')
         now = datetime.datetime.now(jst)
         timestamp = now.strftime("%Y%m%d_%H%M%S")
-        
-        supabase.table('backups').insert({
-            'backup_id': timestamp,
-            'data': backup_data,
-            'created_at': now.isoformat(),
-            'description': f"Backup {timestamp}"
-        }).execute()
+        save_backup_atomic(
+            supabase, timestamp, backup_data, now.isoformat(), f"Backup {timestamp}"
+        )
         
         return timestamp
     except Exception as e:
@@ -754,7 +739,7 @@ def create_backup_snapshot(supabase):
         'round_results': supabase.table('round_results').select('*').execute().data,
         'app_settings': app_settings,
     }
-    return save_backup_to_supabase(backup_data)
+    return save_backup_to_supabase(backup_data, supabase)
 
 def get_backups_from_supabase():
     """Supabaseからバックアップ一覧を取得"""
