@@ -12,6 +12,11 @@ from modules.input_helpers import close_sidebar_on_mobile, inject_numeric_keyboa
 from modules.auth import require_login
 from modules.competition_rules import get_default_rules
 from modules.round_persistence import create_round_setup_atomic
+from modules.handicap_defaults import (
+    MAX_ROUND_PLAYERS,
+    default_for_pair,
+    load_previous_handicap_defaults,
+)
 
 
 def run():
@@ -113,7 +118,8 @@ def run():
     st.write("### 参加者選択")
     selected_members = st.multiselect(
         "参加者を選択してください",
-        options=member_names
+        options=member_names,
+        max_selections=MAX_ROUND_PLAYERS,
     )
     
     num_players = len(selected_members)
@@ -121,6 +127,17 @@ def run():
     # ハンディキャップ設定セクション
     st.write("### ハンディキャップ設定")
     
+    selected_member_ids = [member_dict[name] for name in selected_members]
+    participant_signature = tuple(sorted(selected_member_ids))
+
+    # 参加者が変わったら、前回ラウンドの値を初期値として読み直す。
+    if st.session_state.get("handicap_participants") != participant_signature:
+        for key in list(st.session_state):
+            if isinstance(key, str) and key.startswith(("h1to2_", "h2to1_", "total_only_")):
+                del st.session_state[key]
+        st.session_state.handicaps = {}
+        st.session_state.handicap_participants = participant_signature
+
     # ハンディキャップ設定の初期化
     if "handicaps" not in st.session_state:
         st.session_state.handicaps = {}
@@ -128,6 +145,7 @@ def run():
     # 参加者が2名以上いる場合に表示
     match_handicaps = []
     if num_players >= 2:
+        previous_defaults = load_previous_handicap_defaults(supabase, selected_member_ids)
         # すべての可能なペアを生成
         pairs = []
         for i in range(len(selected_members)):
@@ -136,15 +154,14 @@ def run():
         
         # 各ペアのハンディキャップを設定
         for i, (player1, player2) in enumerate(pairs):
-            pair_key = f"{player1}_vs_{player2}"
+            player1_id, player2_id = member_dict[player1], member_dict[player2]
+            pair_key = f"{player1_id}_vs_{player2_id}"
             
             # セッションステートに保存されていなければ初期化
             if pair_key not in st.session_state.handicaps:
-                st.session_state.handicaps[pair_key] = {
-                    "h1to2": 0,
-                    "h2to1": 0,
-                    "total_only": False
-                }
+                st.session_state.handicaps[pair_key] = default_for_pair(
+                    previous_defaults, player1_id, player2_id
+                )
                 
             st.write(f"#### {player1} vs {player2}")
             
@@ -154,7 +171,7 @@ def run():
                     f"{player1} → {player2} ハンディキャップ",
                     min_value=-50, max_value=50, step=1, 
                     value=st.session_state.handicaps[pair_key]["h1to2"],
-                    key=f"h1to2_{player1}_{player2}"
+                    key=f"h1to2_{player1_id}_{player2_id}"
                 )
                 st.session_state.handicaps[pair_key]["h1to2"] = h1to2
                 
@@ -163,14 +180,14 @@ def run():
                     f"{player2} → {player1} ハンディキャップ",
                     min_value=-50, max_value=50, step=1,
                     value=st.session_state.handicaps[pair_key]["h2to1"],
-                    key=f"h2to1_{player1}_{player2}"
+                    key=f"h2to1_{player1_id}_{player2_id}"
                 )
                 st.session_state.handicaps[pair_key]["h2to1"] = h2to1
                 
             total_only = st.checkbox(
                 "この組み合わせはトータルスコアのみで対戦",
                 value=st.session_state.handicaps[pair_key]["total_only"],
-                key=f"total_only_{player1}_{player2}"
+                key=f"total_only_{player1_id}_{player2_id}"
             )
             st.session_state.handicaps[pair_key]["total_only"] = total_only
             
@@ -191,6 +208,8 @@ def run():
             st.error("ゴルフ場を選択してください。")
         elif len(selected_members) < 2:
             st.error("少なくとも2人の参加者を選択してください。")
+        elif len(selected_members) > MAX_ROUND_PLAYERS:
+            st.error(f"参加者は最大{MAX_ROUND_PLAYERS}名までです。")
         else:
             try:
                 # コースを取得（すでに選択済み）
@@ -223,6 +242,8 @@ def run():
 
                 # アクティブなラウンドIDをセッション状態に保存
                 st.session_state.active_round_id = round_id
+                st.session_state.pop("handicaps", None)
+                st.session_state.pop("handicap_participants", None)
                 
                 # 新規ラウンドのため、古いスコアデータのセッション状態をクリア
                 # 前回のラウンドのスコアが残っている場合があるため削除
