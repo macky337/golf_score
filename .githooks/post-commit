@@ -1,0 +1,31 @@
+#!/bin/sh
+# 通常のコミット後にバージョンと変更履歴を専用コミットとして追加する。
+
+if [ "${GOLF_SCORE_RELEASE_HOOK:-}" = "1" ]; then
+    exit 0
+fi
+
+changed_files="$(git diff-tree --no-commit-id --name-only -r HEAD)"
+if [ -z "$changed_files" ]; then
+    exit 0
+fi
+
+only_metadata=true
+for changed_file in $changed_files; do
+    case "$changed_file" in
+        version.json|CHANGELOG.md|.githooks/*|scripts/update_release_metadata.py)
+            ;;
+        *)
+            only_metadata=false
+            break
+            ;;
+    esac
+done
+
+if [ "$only_metadata" = true ]; then
+    exit 0
+fi
+
+python3 scripts/update_release_metadata.py || exit $?
+git add version.json CHANGELOG.md
+GOLF_SCORE_RELEASE_HOOK=1 git commit --no-verify -m "chore: update release metadata" || exit $?
