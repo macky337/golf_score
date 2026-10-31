@@ -139,7 +139,7 @@ def run():
             records.append(rec)
 
         from modules.supabase_client import upsert_scores_batch
-        ok, res = upsert_scores_batch(round_id, records)
+        ok, res = upsert_scores_batch(round_id, records, "back")
         if not ok:
             st.error(f"一括保存に失敗しました: {res}")
             st.session_state.back_form_submitted = False

@@ -60,19 +60,9 @@ def run():
                     if existing.data:
                         st.error(f"メンバー「{new_name}」は既に登録されています")
                     else:
-                        # 最大のmember_idを取得して、新しいIDを作成
-                        max_id_result = supabase.table('member').select('member_id').order('member_id', desc=True).limit(1).execute()
-                        next_id = 1
-                        if max_id_result.data:
-                            next_id = max_id_result.data[0]['member_id'] + 1
-                        
-                        # member_idを明示的に指定して挿入
-                        supabase.table('member').insert({
-                            'member_id': next_id,
-                            'name': new_name
-                        }).execute()
-                        
-                        st.success(f"メンバー「{new_name}」を追加しました (ID: {next_id})")
+                        result = supabase.table('member').insert({'name': new_name}).execute()
+                        member_id = result.data[0]['member_id'] if result.data else None
+                        st.success(f"メンバー「{new_name}」を追加しました (ID: {member_id})")
                         st.rerun()
                 except Exception as e:
                     st.error(f"メンバーの追加に失敗しました: {str(e)}")

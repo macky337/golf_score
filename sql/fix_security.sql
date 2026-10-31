@@ -12,30 +12,16 @@ DROP POLICY IF EXISTS "allow_insert_for_authenticated" ON "public"."round_result
 -- 既存のポリシーを明示的にドロップ
 DROP POLICY IF EXISTS "authenticated_full_access" ON "public"."round_results";
 DROP POLICY IF EXISTS "anon_read_only" ON "public"."round_results";
+DROP POLICY IF EXISTS "Allow read access for anonymous users" ON "public"."round_results";
 
 -- RLSを有効化
 ALTER TABLE "public"."round_results" ENABLE ROW LEVEL SECURITY;
 
--- 適切なポリシーを作成
--- 認証されたユーザーに全ての操作を許可
-CREATE POLICY "authenticated_full_access" 
-ON "public"."round_results"
-FOR ALL
-TO authenticated
-USING (true)
-WITH CHECK (true);
-
--- 匿名ユーザーには読み取りのみを許可
-CREATE POLICY "anon_read_only" 
-ON "public"."round_results"
-FOR SELECT
-TO anon
-USING (true);
+-- アプリ外から匿名・認証済みAPIユーザーが集計結果を読めないようにする
+REVOKE ALL ON "public"."round_results" FROM anon, authenticated;
 
 -- テーブルへの権限を設定
-GRANT ALL ON "public"."round_results" TO authenticated;
-GRANT SELECT ON "public"."round_results" TO anon;
-
+GRANT ALL ON "public"."round_results" TO service_role;
 -- 確認用
 SELECT tablename, policyname 
 FROM pg_policies 

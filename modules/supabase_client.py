@@ -219,52 +219,17 @@ def update_scores_batch(round_id, update_data):
         return (False, success_count, failed_updates + [{'error': str(e)}])
 
 
-def upsert_scores_batch(round_id, records):
-    """
-    一括でスコアを更新する。records は各要素が
-    {'member_id': ..., 'front_score': ..., ...} のような辞書のリストとする。
-    既存のスコアレコードを更新するため、upsertではなくupdateを使用。
-    戻り値: (success: bool, result_or_error)
-    """
+def upsert_scores_batch(round_id, records, segment):
+    """参加者全員の指定スコア区分を単一RPCで保存する。"""
     client = get_supabase_client()
     if client is None:
         return (False, "Supabase client not available")
-
-    # 個別に更新を実行（バッチ更新）
-    failures = []
-    success_count = 0
-    
     try:
-        for r in records:
-            member_id = r.get('member_id')
-            if not member_id:
-                failures.append({'error': 'member_id is required', 'record': r})
-                continue
-            
-            # 更新データを作成（round_idとmember_idは除外）
-            update_data = dict(r)
-            update_data.pop('member_id', None)
-            update_data.pop('round_id', None)
-            
-            try:
-                # 既存レコードを更新
-                res = client.table('score').update(update_data).eq('round_id', round_id).eq('member_id', member_id).execute()
-                
-                if res.data:
-                    success_count += 1
-                else:
-                    failures.append({'member_id': member_id, 'error': 'No data returned from update'})
-                    
-            except Exception as e2:
-                failures.append({'member_id': member_id, 'error': str(e2)})
-        
-        if failures:
-            return (False, {'error': f'{len(failures)} updates failed', 'failures': failures, 'success_count': success_count})
-        else:
-            return (True, {'success_count': success_count})
-            
+        from modules.round_persistence import save_score_updates_atomic
+        result = save_score_updates_atomic(client, round_id, segment, records)
+        return (True, result)
     except Exception as e:
-        return (False, {'error': str(e), 'failures': failures})
+        return (False, str(e))
 
 def update_score_total_pts():
     """

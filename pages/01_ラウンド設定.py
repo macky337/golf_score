@@ -7,56 +7,12 @@ import streamlit as st
 import datetime
 from modules.db import ensure_supabase
 from modules.page_utils import switch_page
-from modules.models import get_course_list, get_or_create_course, get_course_by_id, get_members_list
+from modules.models import get_course_list, get_members_list
 from modules.input_helpers import close_sidebar_on_mobile, inject_numeric_keyboard_css
 from modules.auth import require_login
 from modules.competition_rules import get_default_rules
+from modules.round_persistence import create_round_setup_atomic
 
-
-def create_score_records(supabase, round_id, member_ids):
-    """選択されたメンバーのスコアレコードを作成"""
-    success = True
-    
-    # 最大のscore_idを取得
-    max_score_id_result = supabase.table('score').select('score_id').order('score_id', desc=True).limit(1).execute()
-    next_score_id = 1
-    if max_score_id_result.data:
-        next_score_id = max_score_id_result.data[0]['score_id'] + 1
-    
-    for member_id in member_ids:
-        player_name = f"Player {member_id}"  # デフォルト値を設定
-        try:
-            # メンバー情報を取得してプレイヤー名をログに表示
-            member_info = supabase.table('member').select('name').eq('member_id', member_id).execute()
-            player_name = member_info.data[0]['name'] if member_info.data else f"Player {member_id}"
-            
-            # スコアレコード作成 - score_idを明示的に指定
-            score_data = {
-                'score_id': next_score_id,
-                'round_id': round_id,
-                'member_id': member_id,
-                'front_score': 0,
-                'back_score': 0,
-                'extra_score': 0,
-                'front_putt': 0,
-                'back_putt': 0,
-                'extra_putt': 0,
-                'front_game_pt': 0,
-                'back_game_pt': 0,
-                'extra_game_pt': 0,
-                'total_score': 0  # total_scoreも初期化
-            }
-            
-            # スコア追加
-            supabase.table('score').insert(score_data).execute()
-            print(f"{player_name} のスコアレコードを作成しました (score_id: {next_score_id})")
-            next_score_id += 1
-            
-        except Exception as e:
-            print(f"{player_name} のスコア作成エラー: {e}")
-            success = False
-    
-    return success
 
 def run():
     require_login()
@@ -239,15 +195,7 @@ def run():
             try:
                 # コースを取得（すでに選択済み）
                 
-                # 最大のround_idを取得して、新しいIDを作成
-                max_id_result = supabase.table('rounds').select('round_id').order('round_id', desc=True).limit(1).execute()
-                next_round_id = 1
-                if max_id_result.data:
-                    next_round_id = max_id_result.data[0]['round_id'] + 1
-                
-                # roundsテーブルへ新規ラウンドをINSERT（round_idを明示的に指定）
                 round_data = {
-                    'round_id': next_round_id,
                     'date_played': date_played.isoformat(),
                     'date': date_played.isoformat(),
                     'course_name': course_name,  # 後方互換性のために残す
@@ -257,18 +205,21 @@ def run():
                     'finalized': False,
                     'rule_settings': get_default_rules(supabase),
                 }
-
-                try:
-                    round_result = supabase.table('rounds').insert(round_data).execute()
-                except Exception:
-                    # DB更新前も従来ルールでラウンド作成を継続できるようにする。
-                    round_data.pop('rule_settings', None)
-                    round_result = supabase.table('rounds').insert(round_data).execute()
-                    st.warning(
-                        "競技ルールの保存列が未導入のため、従来の標準ルールで作成しました。"
-                        "管理者は sql/add_competition_rules.sql をSupabaseで実行してください。"
-                    )
-                round_id = round_result.data[0]['round_id']
+                member_ids = [member_dict[name] for name in selected_members]
+                handicap_records = [
+                    {
+                        'player_1_id': member_dict[match['player1']],
+                        'player_2_id': member_dict[match['player2']],
+                        'player_1_to_2': match['handicap_1_to_2'],
+                        'player_2_to_1': match['handicap_2_to_1'],
+                        'total_only': match['total_only'],
+                    }
+                    for match in match_handicaps
+                ]
+                result = create_round_setup_atomic(
+                    supabase, round_data, member_ids, handicap_records
+                )
+                round_id = result['round_id']
 
                 # アクティブなラウンドIDをセッション状態に保存
                 st.session_state.active_round_id = round_id
@@ -289,35 +240,8 @@ def run():
                 for key in keys_to_remove:
                     del st.session_state[key]
 
-                # スコアの作成（新しい実装に置き換え）
-                member_ids = [member_dict[name] for name in selected_members]
-                success = create_score_records(supabase, round_id, member_ids)
-                
-                if not success:
-                    st.warning("スコアデータ作成に失敗したメンバーがいます。")
-                
-                # ハンディキャップ設定の保存
-                max_handicap_id_result = supabase.table('handicap_match').select('id').order('id', desc=True).limit(1).execute()
-                next_handicap_id = 1
-                if max_handicap_id_result.data:
-                    next_handicap_id = max_handicap_id_result.data[0]['id'] + 1
-
-                for match in match_handicaps:
-                    handicap_data = {
-                        'id': next_handicap_id,
-                        'round_id': round_id,
-                        'player_1_id': member_dict[match['player1']],
-                        'player_2_id': member_dict[match['player2']],
-                        'player_1_to_2': match['handicap_1_to_2'],
-                        'player_2_to_1': match['handicap_2_to_1'],
-                        'total_only': match['total_only']
-                    }
-                    supabase.table('handicap_match').insert(handicap_data).execute()
-                    next_handicap_id += 1
-
-                if success:
-                    st.success("ラウンド設定が完了しました。")
-                    switch_page("02_フロントスコア入力")
+                st.success("ラウンド設定が完了しました。")
+                switch_page("02_フロントスコア入力")
 
             except Exception as e:
                 st.error(f"ラウンド設定の保存中にエラーが発生しました: {str(e)}")

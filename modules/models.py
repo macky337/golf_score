@@ -129,11 +129,27 @@ def get_or_create_course(course_name):
 def is_course_in_use(course_id):
     """コースがラウンドで使用されているか確認する"""
     try:
-        result = supabase.table('rounds').select('round_id').eq('course_id', course_id).execute()
-        return len(result.data) > 0
+        course_result = supabase.table('courses').select('name').eq('id', course_id).execute()
+        if not course_result.data:
+            raise ValueError(f"コースID {course_id} が見つかりません")
+        course_name = course_result.data[0]['name']
+
+        linked_rounds = (
+            supabase.table('rounds').select('round_id').eq('course_id', course_id).limit(1).execute()
+        )
+        if linked_rounds.data:
+            return True
+
+        # course_id導入前のラウンドは名前だけでコースを参照している。
+        legacy_rounds = (
+            supabase.table('rounds').select('round_id')
+            .is_('course_id', None).eq('course_name', course_name).limit(1).execute()
+        )
+        return bool(legacy_rounds.data)
     except Exception as e:
         print(f"コース使用確認エラー: {str(e)}")
-        return False
+        # DB確認に失敗したときは削除可能として扱わない。
+        return True
 
 def get_unused_courses():
     """使用されていないゴルフ場の一覧を取得する"""
@@ -142,17 +158,10 @@ def get_unused_courses():
         courses_result = supabase.table('courses').select('*').order('name').execute()
         courses = courses_result.data
         
-        # 使用されているコースIDを取得
-        used_courses_result = supabase.table('rounds').select('course_id').execute()
-        used_course_ids = set()
-        for round_data in used_courses_result.data:
-            if round_data.get('course_id'):
-                used_course_ids.add(round_data['course_id'])
-        
-        # 未使用のコースをフィルタリング
+        # コースID導入前のラウンドも含め、実際に参照されているか確認する。
         unused_courses = []
         for course in courses:
-            if course['id'] not in used_course_ids:
+            if not is_course_in_use(course['id']):
                 unused_courses.append(course)
         
         return unused_courses
@@ -172,6 +181,9 @@ def delete_unused_courses():
         
         for course in unused_courses:
             try:
+                # 一覧取得後にラウンドが作られていないか、削除直前に再確認する。
+                if is_course_in_use(course['id']):
+                    continue
                 result = supabase.table('courses').delete().eq('id', course['id']).execute()
                 if result.data:
                     deleted_count += 1

@@ -20,6 +20,7 @@ from modules.input_helpers import close_sidebar_on_mobile
 from modules.backup_restore import restore_backup_atomic
 from modules.auth import require_login
 from modules.round_calculation import recalculate_round
+from modules.round_persistence import save_score_updates_atomic
 from modules.round_validation import validate_round
 from modules.competition_rules import get_default_rules, save_default_rules
 
@@ -391,15 +392,7 @@ def show_handicap_editor():
                         if existing.data:
                             st.warning("この組み合わせのハンディキャップ設定は既に存在します。既存の設定を編集してください。")
                         else:
-                            # 最大のIDを取得して次のIDを決定
-                            max_id_result = supabase.table('handicap_match').select('id').order('id', desc=True).limit(1).execute()
-                            next_id = 1
-                            if max_id_result.data:
-                                next_id = max_id_result.data[0]['id'] + 1
-                            
-                            # 新規追加（idを明示的に指定）
                             insert_data = {
-                                'id': next_id,
                                 'round_id': round_id,
                                 'player_1_id': player1[0],
                                 'player_2_id': player2[0],
@@ -571,19 +564,9 @@ def show_member_manager():
                     if existing.data:
                         st.error(f"メンバー「{new_name}」は既に登録されています")
                     else:
-                        # 最大のmember_idを取得して、新しいIDを作成
-                        max_id_result = supabase.table('member').select('member_id').order('member_id', desc=True).limit(1).execute()
-                        next_id = 1
-                        if max_id_result.data:
-                            next_id = max_id_result.data[0]['member_id'] + 1
-                        
-                        # member_idを明示的に指定して挿入
-                        supabase.table('member').insert({
-                            'member_id': next_id,
-                            'name': new_name
-                        }).execute()
-                        
-                        st.success(f"メンバー「{new_name}」を追加しました (ID: {next_id})")
+                        result = supabase.table('member').insert({'name': new_name}).execute()
+                        member_id = result.data[0]['member_id'] if result.data else None
+                        st.success(f"メンバー「{new_name}」を追加しました (ID: {member_id})")
                         st.rerun()
                 except Exception as e:
                     st.error(f"メンバーの追加に失敗しました: {str(e)}")
@@ -764,10 +747,8 @@ def save_backup_to_supabase(backup_data):
 
 def create_backup_snapshot(supabase):
     """破壊的操作の直前にも使える、全データのバックアップを作成する。"""
-    try:
-        app_settings = supabase.table('app_settings').select('*').execute().data
-    except Exception:
-        app_settings = []
+    # 設定の取得に失敗した状態で不完全なバックアップを作らない。
+    app_settings = supabase.table('app_settings').select('*').execute().data
     backup_data = {
         'rounds': supabase.table('rounds').select('*').execute().data,
         'scores': supabase.table('score').select('*').execute().data,
@@ -932,46 +913,31 @@ def score_edit_tab():
         submit = st.form_submit_button("スコアを保存して再計算する", use_container_width=True, type="primary")
         
         if submit:
-            success_count = 0
-            failure_count = 0            # 各プレイヤーのスコアを更新
+            update_records = []
             for member_id, data in edited_scores.items():
-                try:
-                    # 明示的に更新するフィールドのみを指定
-                    update_data = {
-                        'front_score': data.get("front_score", 0),
-                        'front_putt': data.get("front_putt", 0),
-                        'front_game_pt': data.get("front_game_pt", 0),
-                        'back_score': data.get("back_score", 0),
-                        'back_putt': data.get("back_putt", 0),
-                        'back_game_pt': data.get("back_game_pt", 0),
-                        'total_score': data.get("front_score", 0) + data.get("back_score", 0)
-                    }
-                    
-                    # エキストラデータがある場合のみ追加
-                    if has_extra:
-                        update_data.update({
-                            'extra_score': data.get("extra_score", 0),
-                            'extra_putt': data.get("extra_putt", 0),
-                            'extra_game_pt': data.get("extra_game_pt", 0)
-                        })
-                    
-                    # score IDを取得するためのクエリ
-                    record_result = supabase.table('score').select('score_id').eq('round_id', round_id).eq('member_id', member_id).execute()
-                    if record_result.data:
-                        record_id = record_result.data[0]['score_id']
-                        
-                        # スコアを更新
-                        supabase.table('score').update(update_data).eq('score_id', record_id).execute()
-                        success_count += 1
-                    else:
-                        st.error(f"プレイヤーID {member_id} のスコアレコードが見つかりません。")
-                        failure_count += 1
-                except Exception as e:
-                    st.error(f"プレイヤーID {member_id} のスコア更新エラー: {str(e)}")
-                    failure_count += 1
-            
-            if failure_count == 0 and success_count == len(edited_scores):
-                st.success(f"{success_count}人のプレイヤーのスコアを更新しました。")
+                update_data = {
+                    'member_id': member_id,
+                    'front_score': data.get("front_score", 0),
+                    'front_putt': data.get("front_putt", 0),
+                    'front_game_pt': data.get("front_game_pt", 0),
+                    'back_score': data.get("back_score", 0),
+                    'back_putt': data.get("back_putt", 0),
+                    'back_game_pt': data.get("back_game_pt", 0),
+                    'total_score': data.get("front_score", 0) + data.get("back_score", 0),
+                }
+                if has_extra:
+                    update_data.update({
+                        'extra_score': data.get("extra_score", 0),
+                        'extra_putt': data.get("extra_putt", 0),
+                        'extra_game_pt': data.get("extra_game_pt", 0),
+                    })
+                update_records.append(update_data)
+
+            try:
+                save_score_updates_atomic(
+                    supabase, round_id, "all", update_records, allow_finalized=True
+                )
+                st.success(f"{len(update_records)}人のプレイヤーのスコアを更新しました。")
                 # 全員分の保存成功後だけ、共通ロジックで再計算する
                 try:
                     recalculate_round(supabase, round_id)
@@ -985,8 +951,9 @@ def score_edit_tab():
                 except Exception as e:
                     logger.exception("ラウンド結果の再計算に失敗しました")
                     st.error(f"ラウンド結果の再計算中にエラーが発生しました: {str(e)}")
-            else:
-                st.warning(f"{failure_count}人のプレイヤーのスコア更新に失敗しました。")
+            except Exception as e:
+                logger.exception("スコアの一括更新に失敗しました")
+                st.error(f"スコアを更新できませんでした。変更は反映されていません: {str(e)}")
     
     # フォーム外に配置する結果確認画面への遷移ボタン
     st.markdown("---")

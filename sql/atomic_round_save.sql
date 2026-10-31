@@ -116,5 +116,5 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.save_golf_round_atomic(bigint, jsonb, jsonb, jsonb, jsonb, boolean) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.save_golf_round_atomic(bigint, jsonb, jsonb, jsonb, jsonb, boolean) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.save_golf_round_atomic(bigint, jsonb, jsonb, jsonb, jsonb, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.save_golf_round_atomic(bigint, jsonb, jsonb, jsonb, jsonb, boolean) TO service_role;

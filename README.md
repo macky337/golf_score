@@ -68,7 +68,7 @@ Railway は [railway.toml](railway.toml) を使い、`main.py` を Streamlit で
 
 Railway Variables に、ローカルと同じ認証・Supabase関連の環境変数を設定してください。
 
-計算結果の保存とラウンド確定を一括処理するため、アプリをデプロイする前にSupabase SQL Editorで `sql/atomic_round_save.sql` を一度実行してください。
+計算結果の保存・ラウンド確定・ラウンド作成・スコア一括更新をDBトランザクションで処理し、公開API権限を閉じるため、アプリをデプロイする前にSupabase SQL Editorで `sql/atomic_round_save.sql`、`sql/atomic_score_writes.sql`、`sql/fix_security.sql` を実行してください。`atomic_score_writes.sql` は既存の採番シーケンスも現在の最大IDに合わせて初期化します。
 
 ### 競技ルール設定の初期化
 

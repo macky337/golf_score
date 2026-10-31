@@ -13,8 +13,7 @@ DROP POLICY IF EXISTS "Enable delete for users based on id" ON "public"."round_r
 ALTER TABLE "public"."round_results" DISABLE ROW LEVEL SECURITY;
 
 -- すべてのユーザーに権限を与える
-GRANT ALL ON "public"."round_results" TO authenticated;
-GRANT ALL ON "public"."round_results" TO anon;
+REVOKE ALL ON "public"."round_results" FROM anon, authenticated;
 GRANT ALL ON "public"."round_results" TO service_role;
 
 -- テスト用データ挿入を修正（外部キー制約のため）

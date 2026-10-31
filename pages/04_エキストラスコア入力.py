@@ -212,7 +212,7 @@ def run():
             return
 
         from modules.supabase_client import upsert_scores_batch
-        ok, res = upsert_scores_batch(round_id, records)
+        ok, res = upsert_scores_batch(round_id, records, "extra")
         if not ok:
             st.error(f"一括保存に失敗しました: {res}")
             return

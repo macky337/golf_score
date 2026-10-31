@@ -44,3 +44,26 @@ def save_calculation_atomic(client, round_id, player_data, *, expected_scores=No
         "p_expected_round": expected_round, "p_expected_handicaps": expected_handicaps,
         "p_finalize": finalize,
     }).execute()
+
+
+def create_round_setup_atomic(client, round_data, member_ids, handicaps):
+    """ラウンド、参加者スコア、ハンディキャップを単一RPCで作成する。"""
+    response = client.rpc("create_golf_round_atomic", {
+        "p_round": round_data,
+        "p_member_ids": [int(member_id) for member_id in member_ids],
+        "p_handicaps": handicaps,
+    }).execute()
+    return response.data
+
+
+def save_score_updates_atomic(client, round_id, segment, records, *, allow_finalized=False):
+    """対象ラウンドの参加者全員分を1トランザクションで更新する。"""
+    if not records:
+        raise ValueError("保存するスコアがありません")
+    response = client.rpc("save_golf_score_segment_atomic", {
+        "p_round_id": int(round_id),
+        "p_segment": segment,
+        "p_records": records,
+        "p_allow_finalized": allow_finalized,
+    }).execute()
+    return response.data
