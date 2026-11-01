@@ -1,5 +1,11 @@
 # 変更履歴
 
+## [2026-11-01] v1.0.325
+
+### 更新
+
+- fix: add pytest.ini so tests can import project modules in CI
+
 ## [2026-11-01] v1.0.324
 
 ### 更新
