@@ -166,6 +166,11 @@ BEGIN
         RAISE EXCEPTION 'Finalized rounds cannot be edited here';
     END IF;
 
+    -- エキストラスコアの入力開始は、スコア行の保存と同一トランザクションで記録する。
+    IF p_segment = 'extra' THEN
+        UPDATE public.rounds SET has_extra = true WHERE round_id = p_round_id;
+    END IF;
+
     PERFORM 1 FROM public.score WHERE round_id = p_round_id ORDER BY member_id FOR UPDATE;
     SELECT count(*) INTO score_count FROM public.score WHERE round_id = p_round_id;
     SELECT count(*), count(DISTINCT (rows.value->>'member_id')::bigint)

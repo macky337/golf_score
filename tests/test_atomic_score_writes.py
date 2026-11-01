@@ -103,6 +103,79 @@ def test_score_batch_uses_one_atomic_rpc(monkeypatch):
     )]
 
 
+def test_legacy_batch_update_delegates_to_atomic_rpc(monkeypatch):
+    class ClientWithScores(FakeRpcClient):
+        def table(self, name):
+            assert name == "score"
+
+            class Query:
+                def select(self, *_args): return self
+                def eq(self, *_args): return self
+                def execute(self):
+                    return SimpleNamespace(data=[
+                        {"member_id": 1, "front_score": 40, "front_putt": 15,
+                         "front_game_pt": 0, "back_score": 42, "back_putt": 16,
+                         "back_game_pt": 0, "extra_score": 0, "extra_putt": 0,
+                         "extra_game_pt": 0, "total_score": 82},
+                        {"member_id": 2, "front_score": 41, "front_putt": 16,
+                         "front_game_pt": 0, "back_score": 43, "back_putt": 17,
+                         "back_game_pt": 0, "extra_score": 0, "extra_putt": 0,
+                         "extra_game_pt": 0, "total_score": 84},
+                    ])
+            return Query()
+
+    client = ClientWithScores()
+    monkeypatch.setattr(supabase_client, "get_supabase_client", lambda: client)
+
+    success, count, errors = supabase_client.update_scores_batch(7, {1: {"front_score": 44}})
+
+    assert (success, count, errors) == (True, 1, [])
+    assert len(client.calls) == 1
+    name, params = client.calls[0]
+    assert name == "save_golf_score_segment_atomic"
+    assert params["p_segment"] == "all"
+    assert params["p_records"] == [
+        {"member_id": 1, "front_score": 44, "front_putt": 15, "front_game_pt": 0,
+         "back_score": 42, "back_putt": 16, "back_game_pt": 0,
+         "extra_score": 0, "extra_putt": 0, "extra_game_pt": 0, "total_score": 86},
+        {"member_id": 2, "front_score": 41, "front_putt": 16, "front_game_pt": 0,
+         "back_score": 43, "back_putt": 17, "back_game_pt": 0,
+         "extra_score": 0, "extra_putt": 0, "extra_game_pt": 0, "total_score": 84},
+    ]
+
+
+def test_legacy_single_score_save_delegates_to_atomic_rpc(monkeypatch):
+    class ClientWithScores(FakeRpcClient):
+        def table(self, name):
+            assert name == "score"
+
+            class Query:
+                def select(self, *_args): return self
+                def eq(self, *_args): return self
+                def execute(self):
+                    return SimpleNamespace(data=[
+                        {"member_id": 1, "front_score": 40, "front_putt": 15,
+                         "front_game_pt": 0, "back_score": 42, "back_putt": 16,
+                         "back_game_pt": 0, "extra_score": 0, "extra_putt": 0,
+                         "extra_game_pt": 0, "total_score": 82},
+                        {"member_id": 2, "front_score": 41, "front_putt": 16,
+                         "front_game_pt": 0, "back_score": 43, "back_putt": 17,
+                         "back_game_pt": 0, "extra_score": 0, "extra_putt": 0,
+                         "extra_game_pt": 0, "total_score": 84},
+                    ])
+            return Query()
+
+    client = ClientWithScores()
+    monkeypatch.setattr(supabase_client, "get_supabase_client", lambda: client)
+
+    supabase_client.save_score(7, 2, {"back_putt": 14})
+
+    assert len(client.calls) == 1
+    name, params = client.calls[0]
+    assert name == "save_golf_score_segment_atomic"
+    assert params["p_records"][1]["back_putt"] == 14
+
+
 def test_admin_score_batch_can_explicitly_allow_finalized_round():
     client = FakeRpcClient()
 

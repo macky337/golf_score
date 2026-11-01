@@ -18,7 +18,7 @@ from modules.input_helpers import smart_number_input, close_sidebar_on_mobile
 from modules.scorecard_reader_ui import render_scorecard_reader
 from modules.auth import require_login
 from modules.round_context import select_editable_round
-from modules.round_calculation import recalculate_round
+from modules.round_calculation import save_score_changes_and_recalculate
 
 def run():
     require_login()
@@ -138,21 +138,13 @@ def run():
             }
             records.append(rec)
 
-        from modules.supabase_client import upsert_scores_batch
-        ok, res = upsert_scores_batch(round_id, records, "back")
-        if not ok:
-            st.error(f"一括保存に失敗しました: {res}")
+        try:
+            save_score_changes_and_recalculate(supabase, round_id, records, scores_data)
+            st.success("バックスコアと計算結果を保存しました")
+        except Exception as error:
+            st.error(f"スコアを保存できませんでした。変更は反映されていません: {error}")
             st.session_state.back_form_submitted = False
             return
-        else:
-            st.success("バックスコアを保存しました")
-
-        # 計算処理は既存ロジックを再利用
-        try:
-            recalculate_round(supabase, round_id)
-            st.info("計算結果を保存しました")
-        except Exception as error:
-            st.warning(f"スコアは保存しましたが、結果を再計算できませんでした。結果確認画面で再試行してください: {error}")
 
         # 確認表示
         st.write("### 入力内容の確認")

@@ -20,7 +20,8 @@ from modules.input_helpers import smart_number_input, close_sidebar_on_mobile
 from modules.scorecard_reader_ui import render_scorecard_reader
 from modules.auth import require_login
 from modules.round_context import select_editable_round
-from modules.round_calculation import recalculate_round
+from modules.round_calculation import save_score_changes_and_recalculate
+from modules.round_persistence import save_score_updates_atomic
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +49,23 @@ def run():
         start_extra, skip_extra = st.columns(2)
         with start_extra:
             if st.button("エキストラ入力を開始", type="primary", use_container_width=True):
-                supabase.table('rounds').update({'has_extra': True}).eq('round_id', round_id).execute()
-                st.rerun()
+                try:
+                    scores = (
+                        supabase.table('score').select(
+                            'member_id, extra_score, extra_putt, extra_game_pt'
+                        ).eq('round_id', round_id).execute().data or []
+                    )
+                    records = [{
+                        'member_id': score['member_id'],
+                        'extra_score': score.get('extra_score', 0) or 0,
+                        'extra_putt': score.get('extra_putt', 0) or 0,
+                        'extra_game_pt': score.get('extra_game_pt', 0) or 0,
+                    } for score in scores]
+                    save_score_updates_atomic(supabase, round_id, 'extra', records)
+                    st.rerun()
+                except Exception as error:
+                    logger.exception("エキストラ入力の開始に失敗しました")
+                    st.error(f"エキストラ入力を開始できませんでした: {error}")
         with skip_extra:
             if st.button("実施なし・結果確認へ", use_container_width=True):
                 switch_page("05_結果確認")
@@ -211,19 +227,12 @@ def run():
                 st.error(e)
             return
 
-        from modules.supabase_client import upsert_scores_batch
-        ok, res = upsert_scores_batch(round_id, records, "extra")
-        if not ok:
-            st.error(f"一括保存に失敗しました: {res}")
-            return
-        else:
-            st.success("エキストラスコアを保存しました")
-        # ▼▼▼ 追加: 計算結果をround_resultsに保存 ▼▼▼
         try:
-            recalculate_round(supabase, round_id)
-            st.info("計算結果を保存しました")
+            save_score_changes_and_recalculate(supabase, round_id, records, scores_data)
+            st.success("エキストラスコアと計算結果を保存しました")
         except Exception as error:
-            st.warning(f"スコアは保存しましたが、結果を再計算できませんでした。結果確認画面で再試行してください: {error}")
+            st.error(f"スコアを保存できませんでした。変更は反映されていません: {error}")
+            return
           
         # 初期化フラグをリセットして、次回アクセス時にデータベースから最新値を取得
         initialization_key = f"extra_initialized_{round_id}"

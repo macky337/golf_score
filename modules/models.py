@@ -1,7 +1,6 @@
 import datetime
 from sqlalchemy import Column, Integer, Float, String, ForeignKey, Date, Boolean, func
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import declarative_base, relationship
 from supabase import create_client
 import os
 from dotenv import load_dotenv
@@ -261,28 +260,3 @@ def get_members_list():
     except Exception as e:
         print(f"メンバー一覧取得エラー: {str(e)}")
         return []
-
-# 例: 新規ラウンド登録時（デバッグ用のサンプルコード）
-if __name__ == "__main__":
-    import datetime
-    from sqlalchemy.orm import sessionmaker
-    from modules.db import engine  # engineの定義がある前提
-
-    # サンプル用のセッションを作成
-    SessionLocal = sessionmaker(bind=engine)
-    session = SessionLocal()
-
-    # サンプルデータ用の値を定義
-    provided_date = None
-    provided_date_played = datetime.date.today()  # Define provided_date_played with today's date or any specific date
-
-    new_round = Round(
-        date = provided_date or provided_date_played,  # provided_dateがNoneの場合はdate_playedを利用
-        date_played = provided_date_played,
-        course_name = "千葉よみうり",
-        num_players = 4,
-        has_extra = False,
-        finalized = False
-    )
-    session.add(new_round)
-    session.commit()

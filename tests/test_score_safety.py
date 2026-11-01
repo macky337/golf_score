@@ -117,6 +117,24 @@ def test_results_save_never_rewrites_raw_scores():
     params = client.calls[0][1]
     assert 'p_scores' not in params
     assert {key for key in params['p_expected_scores'][0]} == {'member_id', *SCORE_FIELDS}
+    assert params['p_replacement_handicaps'] is None
+
+
+def test_handicap_replacement_is_sent_with_result_save():
+    client = FakeClient()
+    players = initialize_player_data(scores(), {})
+
+    save_calculation_atomic(client, 42, players, replacement_handicaps=[{
+        'player_1_id': 1, 'player_2_id': 2,
+        'player_1_to_2': 3, 'player_2_to_1': -3, 'total_only': True,
+        'id': 999,
+    }])
+
+    assert client.calls[0][0] == 'save_golf_round_atomic'
+    assert client.calls[0][1]['p_replacement_handicaps'] == [{
+        'player_1_id': 1, 'player_2_id': 2,
+        'player_1_to_2': 3, 'player_2_to_1': -3, 'total_only': True,
+    }]
 
 
 def test_recalculation_read_error_stops_before_saving(monkeypatch):
@@ -134,3 +152,38 @@ def test_finalization_is_part_of_same_rpc():
     recalculate_round(client, 42, finalize=True)
     assert len(client.calls) == 1
     assert client.calls[0][1]['p_finalize'] is True
+
+
+def test_recalculation_replaces_handicaps_in_the_same_rpc():
+    from modules.round_calculation import recalculate_round
+    client = FakeClient()
+    before = []
+    replacement = [{
+        'player_1_id': 1, 'player_2_id': 2,
+        'player_1_to_2': 2, 'player_2_to_1': -2, 'total_only': False,
+    }]
+
+    recalculate_round(
+        client, 42, expected_handicaps=before, replacement_handicaps=replacement
+    )
+
+    assert len(client.calls) == 1
+    assert client.calls[0][0] == 'save_golf_round_atomic'
+    assert client.calls[0][1]['p_expected_handicaps'] == before
+    assert client.calls[0][1]['p_replacement_handicaps'] == replacement
+
+
+def test_score_changes_and_results_are_saved_in_the_same_rpc():
+    from modules.round_calculation import save_score_changes_and_recalculate
+    client = FakeClient()
+    before = scores()
+
+    save_score_changes_and_recalculate(
+        client, 42, [{'member_id': 1, 'front_score': 44, 'front_putt': 14}], before
+    )
+
+    assert len(client.calls) == 1
+    params = client.calls[0][1]
+    assert params['p_expected_scores'][0]['front_score'] == 41
+    assert params['p_replacement_scores'][0]['front_score'] == 44
+    assert params['p_replacement_scores'][0]['front_putt'] == 14

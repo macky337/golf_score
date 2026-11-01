@@ -19,8 +19,8 @@ from dotenv import load_dotenv
 from modules.input_helpers import close_sidebar_on_mobile
 from modules.backup_restore import restore_backup_atomic, save_backup_atomic
 from modules.auth import require_admin, require_login
-from modules.round_calculation import recalculate_round
-from modules.round_persistence import delete_round_atomic, save_score_updates_atomic
+from modules.round_calculation import recalculate_round, save_score_changes_and_recalculate
+from modules.round_persistence import delete_round_atomic
 from modules.round_validation import validate_round
 from modules.competition_rules import get_default_rules, save_default_rules
 
@@ -192,16 +192,14 @@ def recalculate_single_round(round_id):
     except Exception as e:
         raise Exception(f"ラウンド{round_id}の再計算に失敗: {str(e)}")
 
-def recalculate_after_handicap_change(supabase, round_id):
-    """ハンデ変更後に結果を再計算し、確定済みなら整合性も確認する。"""
-    recalculate_round(supabase, round_id)
-    round_response = (
-        supabase.table("rounds").select("finalized").eq("round_id", round_id).execute()
+def recalculate_after_handicap_change(supabase, round_id, expected_handicaps, replacement_handicaps):
+    """ハンデの全置換と結果再計算を、1回の原子的な保存で完了する。"""
+    recalculate_round(
+        supabase,
+        round_id,
+        expected_handicaps=expected_handicaps,
+        replacement_handicaps=replacement_handicaps,
     )
-    if round_response.data and round_response.data[0].get("finalized"):
-        errors = validate_round(supabase, round_id, require_results=True)
-        if errors:
-            raise ValueError("／".join(errors))
 
 def show_handicap_editor():
     st.subheader("ハンディキャップ修正")
@@ -235,6 +233,12 @@ def show_handicap_editor():
             '*, player1:member!player_1_id(name), player2:member!player_2_id(name)'
         ).eq('round_id', round_id).execute()
         handicaps = handicaps_result.data
+        # 画面に表示した時点の値を比較用スナップショットにする。別途読み直すと、
+        # 他の管理者の変更を気付かずに上書きする可能性がある。
+        handicap_snapshot = [
+            {key: value for key, value in handicap.items() if key not in ('player1', 'player2')}
+            for handicap in handicaps
+        ]
 
         # メンバーデータの取得
         members_result = supabase.table('member').select('*').order('name').execute()
@@ -255,9 +259,11 @@ def show_handicap_editor():
                                 to_delete.append(h['id'])
                             else:
                                 seen_pairs.add(pair)
-                        for handicap_id in to_delete:
-                            supabase.table('handicap_match').delete().eq('id', handicap_id).execute()
-                        st.success("重複データを削除しました")
+                        replacement_handicaps = [h for h in handicaps if h['id'] not in to_delete]
+                        recalculate_after_handicap_change(
+                            supabase, round_id, handicap_snapshot, replacement_handicaps
+                        )
+                        st.success("重複データを整理し、結果を再計算しました")
                         st.rerun()
                     except Exception as e:
                         st.error(f"クリーンアップ中にエラーが発生しました: {str(e)}")
@@ -296,38 +302,36 @@ def show_handicap_editor():
                         with col_update:
                             if st.form_submit_button("更新", type="primary", use_container_width=True):
                                 try:
-                                    supabase.table('handicap_match').update({
-                                        'player_1_to_2': new_p1_to_2,
-                                        'player_2_to_1': new_p2_to_1,
-                                        'total_only': new_total_only
-                                    }).eq('id', h['id']).execute()
-                                    try:
-                                        recalculate_after_handicap_change(supabase, round_id)
-                                        st.success("ハンディキャップを更新し、結果を再計算しました")
-                                        st.rerun()
-                                    except Exception as recalculation_error:
-                                        logger.exception("ハンディキャップ更新後の再計算に失敗しました")
-                                        st.warning(
-                                            "ハンディキャップは更新しましたが、結果を再計算できませんでした。"
-                                            f"結果確認画面で再試行してください: {recalculation_error}"
-                                        )
+                                    replacement_handicaps = [
+                                        {
+                                            **current,
+                                            **({
+                                                'player_1_to_2': new_p1_to_2,
+                                                'player_2_to_1': new_p2_to_1,
+                                                'total_only': new_total_only,
+                                            } if current['id'] == h['id'] else {}),
+                                        }
+                                        for current in handicaps
+                                    ]
+                                    recalculate_after_handicap_change(
+                                        supabase, round_id, handicap_snapshot, replacement_handicaps
+                                    )
+                                    st.success("ハンディキャップを更新し、結果を再計算しました")
+                                    st.rerun()
                                 except Exception as e:
                                     st.error(f"更新エラー: {str(e)}")
                         
                         with col_delete:
                             if st.form_submit_button("削除", use_container_width=True):
                                 try:
-                                    supabase.table('handicap_match').delete().eq('id', h['id']).execute()
-                                    try:
-                                        recalculate_after_handicap_change(supabase, round_id)
-                                        st.success("ハンディキャップを削除し、結果を再計算しました")
-                                        st.rerun()
-                                    except Exception as recalculation_error:
-                                        logger.exception("ハンディキャップ削除後の再計算に失敗しました")
-                                        st.warning(
-                                            "ハンディキャップは削除しましたが、結果を再計算できませんでした。"
-                                            f"結果確認画面で再試行してください: {recalculation_error}"
-                                        )
+                                    replacement_handicaps = [
+                                        current for current in handicaps if current['id'] != h['id']
+                                    ]
+                                    recalculate_after_handicap_change(
+                                        supabase, round_id, handicap_snapshot, replacement_handicaps
+                                    )
+                                    st.success("ハンディキャップを削除し、結果を再計算しました")
+                                    st.rerun()
                                 except Exception as e:
                                     st.error(f"削除エラー: {str(e)}")
         else:
@@ -363,25 +367,18 @@ def show_handicap_editor():
                         if any(frozenset((h['player_1_id'], h['player_2_id'])) == pair for h in handicaps):
                             st.warning("この組み合わせのハンディキャップ設定は既に存在します。既存の設定を編集してください。")
                         else:
-                            insert_data = {
-                                'round_id': round_id,
+                            replacement_handicaps = [*handicaps, {
                                 'player_1_id': player1[0],
                                 'player_2_id': player2[0],
                                 'player_1_to_2': p1_to_2,
                                 'player_2_to_1': p2_to_1,
                                 'total_only': total_only
-                            }
-                            result = supabase.table('handicap_match').insert(insert_data).execute()
-                            try:
-                                recalculate_after_handicap_change(supabase, round_id)
-                                st.success("ハンディキャップ設定を追加し、結果を再計算しました")
-                                st.rerun()
-                            except Exception as recalculation_error:
-                                logger.exception("ハンディキャップ追加後の再計算に失敗しました")
-                                st.warning(
-                                    "ハンディキャップは追加しましたが、結果を再計算できませんでした。"
-                                    f"結果確認画面で再試行してください: {recalculation_error}"
-                                )
+                            }]
+                            recalculate_after_handicap_change(
+                                supabase, round_id, handicap_snapshot, replacement_handicaps
+                            )
+                            st.success("ハンディキャップ設定を追加し、結果を再計算しました")
+                            st.rerun()
                     except Exception as e:
                         st.error(f"追加中にエラーが発生しました: {str(e)}")
                         # デバッグ情報を表示
@@ -899,23 +896,10 @@ def score_edit_tab():
                 update_records.append(update_data)
 
             try:
-                save_score_updates_atomic(
-                    supabase, round_id, "all", update_records, allow_finalized=True
+                save_score_changes_and_recalculate(
+                    supabase, round_id, update_records, scores, finalize=is_finalized
                 )
-                st.success(f"{len(update_records)}人のプレイヤーのスコアを更新しました。")
-                # 全員分の保存成功後だけ、共通ロジックで再計算する
-                try:
-                    recalculate_round(supabase, round_id)
-                    if is_finalized:
-                        validation_errors = validate_round(
-                            supabase, round_id, require_results=True
-                        )
-                        if validation_errors:
-                            raise ValueError("／".join(validation_errors))
-                    st.success("ラウンド結果の再計算と保存が完了しました。")
-                except Exception as e:
-                    logger.exception("ラウンド結果の再計算に失敗しました")
-                    st.error(f"ラウンド結果の再計算中にエラーが発生しました: {str(e)}")
+                st.success("スコアとラウンド結果を保存しました。")
             except Exception as e:
                 logger.exception("スコアの一括更新に失敗しました")
                 st.error(f"スコアを更新できませんでした。変更は反映されていません: {str(e)}")

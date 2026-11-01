@@ -69,29 +69,50 @@ def execute_read_with_retry(operation: Callable[[Client], T], attempts: int = 3)
     raise last_error
 
 # スコア関連の操作
+SCORE_UPDATE_FIELDS = (
+    "front_score", "front_putt", "front_game_pt",
+    "back_score", "back_putt", "back_game_pt",
+    "extra_score", "extra_putt", "extra_game_pt", "total_score",
+)
+
+
+def _save_score_changes_atomic(client, round_id, changes_by_member, *, allow_finalized=False):
+    """既存の全参加者行を含めて、スコア変更を1回のRPCで保存する。"""
+    from modules.round_persistence import save_score_updates_atomic
+
+    scores = client.table("score").select("*").eq("round_id", round_id).execute().data or []
+    if not scores:
+        raise ValueError("スコアデータを取得できません")
+
+    participant_ids = {int(score["member_id"]) for score in scores}
+    unknown_members = set(changes_by_member) - participant_ids
+    if unknown_members:
+        raise ValueError("このラウンドの参加者ではないメンバーが含まれています")
+
+    records = []
+    for score in scores:
+        member_id = int(score["member_id"])
+        record = {"member_id": member_id}
+        record.update({field: score.get(field) or 0 for field in SCORE_UPDATE_FIELDS})
+        record.update({
+            field: value for field, value in changes_by_member.get(member_id, {}).items()
+            if field in SCORE_UPDATE_FIELDS
+        })
+        if "front_score" in changes_by_member.get(member_id, {}) or "back_score" in changes_by_member.get(member_id, {}):
+            record["total_score"] = record["front_score"] + record["back_score"]
+        records.append(record)
+
+    return save_score_updates_atomic(
+        client, round_id, "all", records, allow_finalized=allow_finalized
+    )
+
+
 def save_score(round_id, member_id, score_data):
-    """メンバー単位のスコアデータを保存する。"""
+    """メンバー単位の変更も、参加者全員を含む原子的RPCで保存する。"""
     client = get_supabase_client()
     if client is None:
         return None
-
-    # 既存のスコアを確認
-    existing = client.table("score").select("*").eq("round_id", round_id) \
-                    .eq("member_id", member_id).execute()
-
-    if len(existing.data) > 0:
-        # 更新
-        return client.table("score").update(score_data) \
-                    .eq("round_id", round_id) \
-                    .eq("member_id", member_id).execute()
-    else:
-        # 新規作成
-        insert_data = dict(score_data)
-        insert_data.update({
-            "round_id": round_id,
-            "member_id": member_id,
-        })
-        return client.table("score").insert(insert_data).execute()
+    return _save_score_changes_atomic(client, round_id, {int(member_id): score_data})
 
 def get_player_scores(round_id, member_id):
     """メンバーのスコアを取得する。"""
@@ -104,16 +125,16 @@ def get_player_scores(round_id, member_id):
 
 # 新規追加: エラーハンドリング付きのデータ保存・取得関数
 def safe_update_score(round_id, member_id, update_data, retry_count=3):
-    """エラーハンドリングとリトライ機能を備えたスコア更新"""
+    """エラーハンドリングとリトライ機能を備えた原子的スコア更新。"""
     client = get_supabase_client()
     if client is None:
         return None
     
     for attempt in range(retry_count):
         try:
-            result = client.table("score").update(update_data) \
-                    .eq("round_id", round_id) \
-                    .eq("member_id", member_id).execute()
+            result = _save_score_changes_atomic(
+                client, round_id, {int(member_id): update_data}
+            )
             # 成功したら結果を返す
             return result
         except Exception as e:
@@ -183,40 +204,21 @@ def get_scores_with_fallback(round_id):
     return []
 
 def update_scores_batch(round_id, update_data):
-    """スコアバッチ更新 - 複数メンバーのスコアを一度に更新"""
+    """スコアバッチ更新を、参加者全員を含む1回のRPCで保存する。"""
     supabase = get_supabase_client()
-    success_count = 0
-    failed_updates = []
-    
-    # 許可されるフィールド (score テーブルに存在するフィールドのみ)
-    allowed_fields = [
-        'front_score', 'back_score', 'extra_score',
-        'front_putt', 'back_putt', 'extra_putt', 
-        'front_game_pt', 'back_game_pt', 'extra_game_pt',
-        'total_score'
-    ]
-    
+    if supabase is None:
+        return (False, 0, [{"error": "Supabase client not available"}])
     try:
-        for member_id, data in update_data.items():
-            # 不正なフィールドをフィルタリング
-            filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
-            
-            try:
-                if supabase is None:
-                    continue
-                result = supabase.table('score').update(filtered_data).eq('round_id', round_id).eq('member_id', member_id).execute()
-                success_count += 1
-            except Exception as e:
-                failed_updates.append({
-                    'member_id': member_id,
-                    'data': filtered_data,
-                    'error': str(e)
-                })
-        
-        return (len(failed_updates) == 0, success_count, failed_updates)
+        changes = {
+            int(member_id): {key: value for key, value in data.items() if key in SCORE_UPDATE_FIELDS}
+            for member_id, data in update_data.items()
+        }
+        _save_score_changes_atomic(supabase, round_id, changes)
+        return (True, len(changes), [])
     except Exception as e:
-        print(f"バッチ更新エラー: {e}")
-        return (False, success_count, failed_updates + [{'error': str(e)}])
+        logger = __import__("logging").getLogger(__name__)
+        logger.exception("スコアの一括更新に失敗しました")
+        return (False, 0, [{"error": str(e)}])
 
 
 def upsert_scores_batch(round_id, records, segment):
@@ -244,34 +246,15 @@ def update_score_total_pts():
                 'error': 'Supabase client is not available'
             }
         
-        # 確定済みのラウンドに紐づくround_resultsを全て取得
-        results_query = supabase.table('round_results').select(
-            'id, round_id, member_id, match_pt, putt_pt, total_game_pt, total_pt'
-        ).execute()
-        
-        results = results_query.data
-        updates_count = 0
-        
-        for result in results:
-            # Noneの場合は0として扱う
-            total_game_pt = result.get('total_game_pt', 0) or 0
-            match_pt = result.get('match_pt', 0) or 0
-            putt_pt = result.get('putt_pt', 0) or 0
-            
-            # 再計算したtotal_pt
-            calculated_total = total_game_pt + match_pt + putt_pt
-            
-            # 現在のtotal_ptと再計算した値を比較し、異なる場合のみ更新
-            if abs(calculated_total - (result.get('total_pt', 0) or 0)) > 0.01:
-                supabase.table('round_results').update({
-                    'total_pt': calculated_total
-                }).eq('id', result['id']).execute()
-                updates_count += 1
+        from modules.round_calculation import recalculate_round
+        rounds = supabase.table('rounds').select('round_id').execute().data or []
+        for round_data in rounds:
+            recalculate_round(supabase, round_data['round_id'])
         
         return {
             'success': True,
-            'updates_count': updates_count,
-            'total_results': len(results)
+            'updates_count': len(rounds),
+            'total_results': len(rounds)
         }
     except Exception as e:
         return {

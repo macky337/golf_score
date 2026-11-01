@@ -13,6 +13,9 @@ RESULT_FIELDS = {
     "match_extra": "Match Extra", "match_pt": "Match Pt", "putt_pt": "Putt Pt",
     "temp_game_pt": "temp_game_pt", "total_game_pt": "Game Pt",
 }
+HANDICAP_FIELDS = (
+    "player_1_id", "player_2_id", "player_1_to_2", "player_2_to_1", "total_only",
+)
 
 
 def score_snapshot(scores):
@@ -22,8 +25,26 @@ def score_snapshot(scores):
     )
 
 
+def handicap_replacement_snapshot(handicaps):
+    """置換保存用のハンディキャップを、DBに保存する列だけに正規化する。"""
+    normalized = []
+    for handicap in handicaps:
+        try:
+            normalized.append({
+                "player_1_id": int(handicap["player_1_id"]),
+                "player_2_id": int(handicap["player_2_id"]),
+                "player_1_to_2": int(handicap.get("player_1_to_2", 0) or 0),
+                "player_2_to_1": int(handicap.get("player_2_to_1", 0) or 0),
+                "total_only": bool(handicap.get("total_only", False)),
+            })
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("ハンディキャップ設定が正しくありません。") from exc
+    return sorted(normalized, key=lambda row: (row["player_1_id"], row["player_2_id"]))
+
+
 def save_calculation_atomic(client, round_id, player_data, *, expected_scores=None,
                             expected_round=None, expected_handicaps=None,
+                            replacement_handicaps=None, replacement_scores=None,
                             finalize=False):
     if not player_data:
         raise ValueError("保存する計算結果がありません。")
@@ -42,6 +63,13 @@ def save_calculation_atomic(client, round_id, player_data, *, expected_scores=No
         "p_round_id": int(round_id), "p_expected_scores": score_snapshot(expected_scores),
         "p_results": records,
         "p_expected_round": expected_round, "p_expected_handicaps": expected_handicaps,
+        "p_replacement_handicaps": (
+            handicap_replacement_snapshot(replacement_handicaps)
+            if replacement_handicaps is not None else None
+        ),
+        "p_replacement_scores": (
+            score_snapshot(replacement_scores) if replacement_scores is not None else None
+        ),
         "p_finalize": finalize,
     }).execute()
 

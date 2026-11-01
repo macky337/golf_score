@@ -23,7 +23,6 @@ from modules.supabase_client import (
     get_supabase_client,
     get_scores_with_fallback,
     execute_read_with_retry,
-    update_scores_batch,
 )
 from modules.input_helpers import close_sidebar_on_mobile
 from modules.pdf_generator import generate_pdf, set_font, get_pdf_filename

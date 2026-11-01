@@ -11,9 +11,6 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
     back_putt = {mid: player_data[mid].get("Back Putt", player_data[mid].get("Putt Back", 0)) for mid in player_data}
     extra_putt = {mid: player_data[mid].get("Extra Putt", player_data[mid].get("Putt Extra", 0)) for mid in player_data}
     
-    # 実際にExtra Puttのスコアがあるか確認
-    has_actual_extra = any(score > 0 for score in extra_putt.values())
-
     putt_front_points = calc_putt_points(front_putt, len(player_ids), rules)
     putt_back_points = calc_putt_points(back_putt, len(player_ids), rules)
     putt_extra_points = calc_putt_points(
@@ -21,14 +18,6 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
         len(player_ids),
         rules,
     )
-
-    # 計算結果をデバッグ出力
-    print("Front Putt:", front_putt)
-    print("Front Putt Points:", putt_front_points)
-    print("Back Putt:", back_putt)
-    print("Back Putt Points:", putt_back_points)
-    print("Extra Putt:", extra_putt)
-    print("Extra Putt Points:", putt_extra_points)
 
     for mid in player_data:
         data = player_data[mid]
@@ -97,8 +86,6 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
         temp_game_pts[mid] = fgp + bgp + egp
         player_data[mid]["temp_game_pt"] = temp_game_pts[mid]
 
-    print("Debug - Temp Game Points:", temp_game_pts)
-
     # 3人プレイでの特殊計算
     if len(player_ids) == 3:
         # 3人プレイ用の新しい計算
@@ -118,34 +105,16 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
             back_game_pt = back_gp * 2 - others_back_gp
             extra_game_pt = extra_gp * 2 - others_extra_gp
             
-            # 各セクションのポイント計算結果をデバッグ出力
-            print(f"Player {mid} - Front: {front_gp}*2-{others_front_gp}={front_game_pt}")
-            print(f"Player {mid} - Back: {back_gp}*2-{others_back_gp}={back_game_pt}")
-            if extra_gp != 0 or others_extra_gp != 0:
-                print(f"Player {mid} - Extra: {extra_gp}*2-{others_extra_gp}={extra_game_pt}")
-            
             # 合計ゲームポイント
             total_game_pt = front_game_pt + back_game_pt + extra_game_pt
             
-            # 元のキーを保存しながら新しい計算値を使用
-            if "total_game_pt" in player_data[mid]:
-                old_total = player_data[mid]["total_game_pt"]
-                print(f"Player {mid} - 元のtotal_game_pt: {old_total}, 新計算値: {total_game_pt}")
-                # 値が異なる場合は警告を表示
-                if abs(old_total - total_game_pt) > 0.1:  # 誤差を許容
-                    print(f"警告: Player {mid}のゲームポイントが異なります (旧:{old_total} vs 新:{total_game_pt})")
-            
             player_data[mid]["total_game_pt"] = total_game_pt
             player_data[mid]["Game Pt"] = total_game_pt
-            
-            print(f"Player {mid} - 最終Game Pt: {total_game_pt}")
     else:
         # 4人プレイは単純合計のまま
         for mid in player_ids:
             player_data[mid]["total_game_pt"] = temp_game_pts[mid]
             player_data[mid]["Game Pt"] = temp_game_pts[mid]
-
-    print("Debug - Final Game Points:", {mid: player_data[mid]["Game Pt"] for mid in player_ids})
 
     for mid in player_data:
         player_data[mid]["Match Front"] = 0
@@ -196,6 +165,5 @@ def calculate_match_points_for_section(data_i, data_j, pid_i, pid_j, handicaps, 
         rules=rules_for_round(active_round),
     )
     if points is not None:
-        print(f"Section: {section}, Player {pid_i} vs {pid_j}, Points: {points}")
         data_i["Match " + section] += points
         data_j["Match " + section] -= points

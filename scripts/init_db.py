@@ -5,12 +5,10 @@ import os
 # プロジェクトのルートディレクトリをパスに追加
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from modules.db import Base, engine
-from modules.models import Member, Round, Score, HandicapMatch
-
 def init_db():
-    # Alembic を使用してテーブルを管理するため、直接作成しない
-    print("データベースの初期化は Alembic を通じて行ってください。")
+    """現行スキーマの案内を表示する。"""
+    print("Supabase SQL Editorで init_supabase_tables.sql を実行してください。")
+    print("既存環境には初期化SQLではなく sql/ 配下の個別マイグレーションを使用してください。")
 
 if __name__ == "__main__":
     init_db()
