@@ -85,7 +85,7 @@ sql/add_competition_rules.sql
 - `main.py`：ホーム画面
 - `pages/`：ラウンド設定、スコア入力、結果、管理などの画面
 - `modules/`：認証、DB、集計、PDF、共通UI処理
-- `sql/`、`alembic/`：DB設定・移行用
+- `sql/`：SupabaseのDB設定・移行用
 - `tests/`：自動テスト
 
-DB修復・データ移行用の補助スクリプトは `scripts/` とプロジェクト直下に残しています。通常のアプリ運用では実行しません。
+`scripts/update_release_metadata.py` はコミット時のバージョン・変更履歴更新に使用します。`scripts/check_env.py` はローカル環境の設定確認用です。

@@ -1,8 +1,0 @@
--- 互換性のため残しているメンバー専用の初期化SQL。
--- アプリ全体を新規構築する場合は init_supabase_tables.sql を使用してください。
-CREATE TABLE IF NOT EXISTS public.member (
-    member_id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);

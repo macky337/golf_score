@@ -7,7 +7,6 @@ supabase==2.15.1
 python-dotenv==1.1.0
 requests==2.32.3
 Pillow>=10,<12
-sqlalchemy==2.0.36
 reportlab
 plotly
 # Railway standard build - timestamp: 2025-06-08 23:59
