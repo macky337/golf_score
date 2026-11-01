@@ -17,6 +17,7 @@ except ImportError:
 
 AUTHENTICATED_KEY = "app_authenticated"
 AUTH_USERNAME_KEY = "app_auth_username"
+ADMIN_AUTHENTICATED_KEY = "app_admin_authenticated"
 COOKIE_MANAGER_KEY = "_app_cookie_manager_instance"
 COOKIE_COMPONENT_KEY = "app_cookie_component"
 SESSION_COOKIE = "golf_score_session"
@@ -31,6 +32,9 @@ def _read_secret(name):
 
     try:
         value = st.secrets.get(name)
+        if value:
+            return value
+        value = st.secrets.get(name.lower())
         if value:
             return value
     except Exception:
@@ -59,6 +63,35 @@ def credentials_match(input_username, input_password, expected_username, expecte
     return hmac.compare_digest(str(input_username), str(expected_username)) and hmac.compare_digest(
         str(input_password), str(expected_password)
     )
+
+
+def admin_password_matches(input_password, expected_password):
+    """管理者パスワードをタイミング差が出にくい方法で比較する。"""
+    return bool(expected_password) and hmac.compare_digest(
+        str(input_password), str(expected_password)
+    )
+
+
+def require_admin():
+    """管理操作の前にADMIN_PASSWORDで認証する。"""
+    if st.session_state.get(ADMIN_AUTHENTICATED_KEY, False):
+        return True
+
+    expected_password = _read_secret("ADMIN_PASSWORD")
+    if not expected_password:
+        st.error("管理者パスワードが設定されていないため、管理機能は無効です。")
+        st.info("Railway Variables または Streamlit secrets に ADMIN_PASSWORD を設定してください。")
+        return False
+
+    with st.form("admin_password_form"):
+        password = st.text_input("管理者パスワード", type="password")
+        submitted = st.form_submit_button("管理画面を開く")
+    if submitted:
+        if admin_password_matches(password, expected_password):
+            st.session_state[ADMIN_AUTHENTICATED_KEY] = True
+            st.rerun()
+        st.error("パスワードが正しくありません")
+    return False
 
 
 def create_session_token(username, password, expires_at=None):

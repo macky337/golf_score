@@ -18,7 +18,7 @@ import logging
 from dotenv import load_dotenv
 from modules.input_helpers import close_sidebar_on_mobile
 from modules.backup_restore import restore_backup_atomic, save_backup_atomic
-from modules.auth import require_login
+from modules.auth import require_admin, require_login
 from modules.round_calculation import recalculate_round
 from modules.round_persistence import delete_round_atomic, save_score_updates_atomic
 from modules.round_validation import validate_round
@@ -63,48 +63,6 @@ except ImportError as e:
     
 # from modules.page_utils import switch_page  # 未使用のため削除
 
-# パスワード取得関数を完全にインライン化
-def get_admin_password():
-    """管理画面用のパスワードを取得する
-
-    環境変数 > Streamlit secrets の順で探索する。
-    未設定時は管理機能を無効化し、既定パスワードにはフォールバックしない。
-    """
-    # 1. 環境変数から取得
-    if 'ADMIN_PASSWORD' in os.environ:
-        return os.environ['ADMIN_PASSWORD']
-    
-    # 2. Streamlit secretsから取得
-    try:
-        if 'admin_password' in st.secrets:
-            return st.secrets['admin_password']
-    except Exception:
-        pass  # secretsがない場合は無視
-    
-    return None
-
-def check_password():
-    """パスワードチェック機能"""
-    if "password_correct" not in st.session_state:
-        st.session_state.password_correct = False
-
-    if not st.session_state.password_correct:
-        admin_password = get_admin_password()
-        if not admin_password:
-            st.error("管理者パスワードが設定されていないため、管理機能は無効です。")
-            st.info("Railway Variables または Streamlit secrets に ADMIN_PASSWORD を設定してください。")
-            return False
-
-        pwd = st.text_input("パスワードを入力してください", type="password")
-        if pwd:
-            if pwd == admin_password:
-                st.session_state.password_correct = True
-                st.rerun()
-            else:
-                st.error("パスワードが正しくありません")
-        return False
-    return True
-
 def run():
     require_login()
 
@@ -119,7 +77,7 @@ def run():
         if st.button("🏠 Home"):
             st.switch_page("main.py")
     
-    if not check_password():
+    if not require_admin():
         return
     
     st.caption("日常的な修正は「スコア・ハンディキャップ」、復元・削除・診断は「データ保守」から行えます。")

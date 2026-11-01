@@ -94,6 +94,9 @@ def get_course_by_id(course_id):
 def get_course_by_name(course_name):
     """名前でコースを検索する"""
     try:
+        course_name = str(course_name or '').strip()
+        if not course_name:
+            return None
         result = supabase.table('courses').select('*').ilike('name', course_name).execute()
         if result.data:
             return result.data[0]
@@ -105,6 +108,9 @@ def get_course_by_name(course_name):
 def create_course(course_name):
     """新しいコースを作成する"""
     try:
+        course_name = str(course_name or '').strip()
+        if not course_name:
+            return None
         # 既存のコースをチェック
         existing = get_course_by_name(course_name)
         if existing:

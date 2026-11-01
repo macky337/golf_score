@@ -47,6 +47,7 @@ def run():
         # データフレームをIDの昇順で表示することを明示
         member_df = member_df.sort_values("ID", ascending=True)
         st.dataframe(member_df)
+        st.caption("メンバーの編集・削除は管理画面から行えます。")
 
     # 新規メンバー追加フォーム
     with st.form("add_member_form"):
@@ -69,32 +70,6 @@ def run():
                     st.error(f"メンバーの追加に失敗しました: {str(e)}")
             else:
                 st.warning("名前を入力してください")
-
-    # --- ラウンド未参加メンバー削除機能 ---
-    st.write("### ラウンド未参加メンバーの一括削除")
-    if st.button("ラウンド未参加メンバーを削除", key="delete_unplayed_members"):
-        try:
-            # すべてのメンバーIDを取得
-            all_members = supabase.table('member').select('member_id', 'name').execute().data
-            # スコアテーブルに一度も出現しないmember_idを抽出
-            played_member_ids = set()
-            scores = supabase.table('score').select('member_id').execute().data
-            for s in scores:
-                played_member_ids.add(s['member_id'])
-            unplayed_members = [m for m in all_members if m['member_id'] not in played_member_ids]
-            if not unplayed_members:
-                st.info("すべてのメンバーがラウンドに参加しています。削除対象はありません。")
-            else:
-                member_ids = [member['member_id'] for member in unplayed_members]
-                result = supabase.table('member').delete().in_('member_id', member_ids).execute()
-                deleted_count = len(result.data or [])
-                if deleted_count != len(member_ids):
-                    raise RuntimeError("削除対象の一部を削除できませんでした")
-                st.success(f"{deleted_count}名の未参加メンバーを削除しました。")
-                st.rerun()
-        except Exception as e:
-            st.error(f"未参加メンバーの削除に失敗しました: {str(e)}")
-    # --- ここまで ---
 
 if __name__ == "__main__":
     run()

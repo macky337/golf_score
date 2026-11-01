@@ -1,6 +1,11 @@
 import datetime as dt
 
-from modules.auth import create_session_token, credentials_match, verify_session_token
+from modules.auth import (
+    admin_password_matches,
+    create_session_token,
+    credentials_match,
+    verify_session_token,
+)
 
 
 def test_credentials_match_accepts_exact_values():
@@ -17,6 +22,12 @@ def test_credentials_match_rejects_wrong_password():
 
 def test_credentials_match_fails_closed_when_not_configured():
     assert credentials_match("", "", None, None) is False
+
+
+def test_admin_password_matches_fails_closed_when_not_configured():
+    assert admin_password_matches("secret", None) is False
+    assert admin_password_matches("secret", "secret") is True
+    assert admin_password_matches("wrong", "secret") is False
 
 
 def test_session_token_is_valid_until_expiry():
