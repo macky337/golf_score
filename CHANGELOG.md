@@ -1,5 +1,11 @@
 # 変更履歴
 
+## [2026-11-01] v1.0.319
+
+### 更新
+
+- Restrict management operations and validate names
+
 ## [2026-11-01] v1.0.318
 
 ### 更新
