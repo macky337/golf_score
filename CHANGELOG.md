@@ -1,5 +1,11 @@
 # 変更履歴
 
+## [2026-11-01] v1.0.321
+
+### 更新
+
+- Remove legacy migration and maintenance code
+
 ## [2026-11-01] v1.0.320
 
 ### 更新
