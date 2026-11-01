@@ -22,6 +22,7 @@ COOKIE_MANAGER_KEY = "_app_cookie_manager_instance"
 COOKIE_COMPONENT_KEY = "app_cookie_component"
 SESSION_COOKIE = "golf_score_session"
 SESSION_TTL = dt.timedelta(days=7)
+SESSION_MAX_AGE_SECONDS = int(SESSION_TTL.total_seconds())
 
 
 def _read_secret(name):
@@ -134,13 +135,13 @@ def verify_session_token(token, expected_username, expected_password, now=None):
         return False
 
 
-def _cookie_manager():
+def _cookie_manager(key=COOKIE_COMPONENT_KEY):
     if stx is None:
         return None
 
     # コンポーネントの初期値をセッションに保持するとCookie取得結果が古い
     # ままになる。保存・削除時に、その実行のコンポーネントを描画する。
-    return stx.CookieManager(key=COOKIE_COMPONENT_KEY)
+    return stx.CookieManager(key=key)
 
 
 def _restore_cookie_session():
@@ -148,9 +149,14 @@ def _restore_cookie_session():
     if not expected_username or not expected_password:
         return False
 
-    # 再読み込み時の接続リクエストに含まれるCookieを同期的に読む。
-    # ブラウザコンポーネントの非同期読み込みを待つ必要がない。
+    # 通常は接続リクエストに含まれるCookieを同期的に読む。
+    # モバイルで再接続直後など、リクエストCookieがまだ同期されない場合は
+    # コンポーネント側のCookie値も復元候補にする。
     token = st.context.cookies.get(SESSION_COOKIE)
+    if not token:
+        manager = _cookie_manager(f"{COOKIE_COMPONENT_KEY}_restore")
+        if manager is not None:
+            token = manager.get(SESSION_COOKIE)
     if verify_session_token(token, expected_username, expected_password):
         st.session_state[AUTHENTICATED_KEY] = True
         st.session_state[AUTH_USERNAME_KEY] = expected_username
@@ -159,19 +165,29 @@ def _restore_cookie_session():
 
 
 def _save_cookie_session(username, password):
-    manager = _cookie_manager()
+    manager = _cookie_manager(f"{COOKIE_COMPONENT_KEY}_save")
     if manager is None:
         return
 
     manager.set(
         SESSION_COOKIE,
         create_session_token(username, password),
+        key="save_app_session",
         expires_at=dt.datetime.now() + SESSION_TTL,
+        max_age=SESSION_MAX_AGE_SECONDS,
+        same_site="lax",
     )
 
 
 def is_authenticated():
-    return st.session_state.get(AUTHENTICATED_KEY, False) is True or _restore_cookie_session()
+    if st.session_state.get(AUTHENTICATED_KEY, False) is True:
+        # 画面遷移やモバイルの接続復帰でもCookie保存を繰り返し、
+        # WebSocketのセッションだけに認証状態を依存させない。
+        username, password = get_login_credentials()
+        if username and password:
+            _save_cookie_session(username, password)
+        return True
+    return _restore_cookie_session()
 
 
 def _render_login():
@@ -233,7 +249,7 @@ def _render_login():
 
 def _logout():
     """Cookieとセッションを破棄してログアウトする。"""
-    manager = _cookie_manager()
+    manager = _cookie_manager(f"{COOKIE_COMPONENT_KEY}_logout")
     if manager is not None:
         manager.cookies.setdefault(SESSION_COOKIE, "")
         manager.delete(SESSION_COOKIE)
