@@ -43,3 +43,11 @@ def test_custom_putt_points_are_used():
     result = calc_putt_points({1: 14, 2: 16, 3: 17}, 3, rules)
 
     assert result == {1: 12, 2: -6, 3: -6}
+
+
+def test_two_player_putt_points_are_configurable():
+    result = calc_putt_points(
+        {1: 14, 2: 16}, 2, {"putt_2_winner": 10, "putt_2_loser": -10}
+    )
+
+    assert result == {1: 10, 2: -10}

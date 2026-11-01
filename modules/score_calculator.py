@@ -38,10 +38,12 @@ def calc_putt_points(putt_scores, n, rules=None):
     ルール:
     1. 各プレイヤーのパットスコア（例："Putt Front", "Putt Back", "Putt Extra" など）を収集し、参加者全体のスコアリストから最小値 (min_score) を特定する。
     2. 最小スコアを出したプレイヤー（winners）のリストを作成する。
-    3. 【3人の場合】
+    3. 【2人の場合】
+       - 勝者に +10pt、敗者に -10pt
+    4. 【3人の場合】
        - 勝者が1名の場合: 勝者に +20pt、残り2名に -10pt
        - 勝者が2名の場合: 両勝者に +5pt、残り1名に -10pt
-    4. 【4人の場合】
+    5. 【4人の場合】
        - 勝者が1名の場合: 勝者に +30pt、残り3名に -10pt
        - 勝者が2名の場合: 両勝者に +10pt、残り2名に -10pt
        - 勝者が3名の場合: 勝者に +5pt、残り1名に -15pt
@@ -63,7 +65,12 @@ def calc_putt_points(putt_scores, n, rules=None):
     if len(winners) == n:
         return points
     
-    if n == 3:
+    if n == 2:
+        points[winners[0]] = rules["putt_2_winner"]
+        for m_id in putt_scores:
+            if m_id not in winners:
+                points[m_id] = rules["putt_2_loser"]
+    elif n == 3:
         if len(winners) == 1:
             points[winners[0]] = rules["putt_3_solo_winner"]
             for m_id in putt_scores:

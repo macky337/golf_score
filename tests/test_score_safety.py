@@ -38,6 +38,22 @@ def test_three_player_game_points_are_zero_sum_and_recalculation_is_stable():
     assert calculate_player_points(deepcopy(calculated), [1, 2, 3], {}, set(), {}) == calculated
 
 
+def test_two_player_game_points_are_the_difference_of_accumulated_points():
+    raw = [
+        {"member_id": 1, "front_score": 40, "back_score": 42, "extra_score": 0,
+         "front_putt": 15, "back_putt": 16, "extra_putt": 0,
+         "front_game_pt": 10, "back_game_pt": 0, "extra_game_pt": 0},
+        {"member_id": 2, "front_score": 41, "back_score": 43, "extra_score": 0,
+         "front_putt": 16, "back_putt": 17, "extra_putt": 0,
+         "front_game_pt": -10, "back_game_pt": 0, "extra_game_pt": 0},
+    ]
+
+    calculated = calculate_player_points(initialize_player_data(raw, {}), [1, 2], {}, set(), {})
+
+    assert calculated[1]["Game Pt"] == 20
+    assert calculated[2]["Game Pt"] == -20
+
+
 @pytest.mark.parametrize('missing', [0, None, -1])
 def test_incomplete_putt_section_awards_nobody(missing):
     assert calc_putt_points({1: missing, 2: 16, 3: 18}, 3) == {1: 0, 2: 0, 3: 0}

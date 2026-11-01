@@ -86,8 +86,17 @@ def calculate_player_points(player_data, player_ids, handicaps, total_only_set, 
         temp_game_pts[mid] = fgp + bgp + egp
         player_data[mid]["temp_game_pt"] = temp_game_pts[mid]
 
+    # 2人プレイは各自の積み上げGPの差を最終ゲームポイントにする。
+    if len(player_ids) == 2:
+        first_id, second_id = player_ids
+        first_total = temp_game_pts[first_id]
+        second_total = temp_game_pts[second_id]
+        player_data[first_id]["total_game_pt"] = first_total - second_total
+        player_data[first_id]["Game Pt"] = first_total - second_total
+        player_data[second_id]["total_game_pt"] = second_total - first_total
+        player_data[second_id]["Game Pt"] = second_total - first_total
     # 3人プレイでの特殊計算
-    if len(player_ids) == 3:
+    elif len(player_ids) == 3:
         # 3人プレイ用の新しい計算
         for mid in player_ids:
             # フロント、バック、エクストラの個別ポイントを取得

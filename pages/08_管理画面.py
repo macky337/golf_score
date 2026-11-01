@@ -408,6 +408,10 @@ def show_competition_rule_settings():
             step=1,
         )
 
+        st.markdown("### パット戦（2人）")
+        putt_2_winner = st.number_input("勝者（2人）", value=rules["putt_2_winner"], step=1)
+        putt_2_loser = st.number_input("敗者（2人）", value=rules["putt_2_loser"], step=1)
+
         st.markdown("### パット戦（3人）")
         putt_3_solo_winner = st.number_input("単独勝者", value=rules["putt_3_solo_winner"], step=1)
         putt_3_solo_loser = st.number_input("単独勝者時・その他", value=rules["putt_3_solo_loser"], step=1)
@@ -431,6 +435,8 @@ def show_competition_rule_settings():
             updated = {
                 **rules,
                 "match_win_points": match_win_points,
+                "putt_2_winner": putt_2_winner,
+                "putt_2_loser": putt_2_loser,
                 "putt_3_solo_winner": putt_3_solo_winner,
                 "putt_3_solo_loser": putt_3_solo_loser,
                 "putt_3_two_winners": putt_3_two_winners,
@@ -443,6 +449,7 @@ def show_competition_rule_settings():
                 "putt_4_three_losers": putt_4_three_losers,
             }
             balance_checks = (
+                putt_2_winner + putt_2_loser,
                 putt_3_solo_winner + 2 * putt_3_solo_loser,
                 2 * putt_3_two_winners + putt_3_two_losers,
                 putt_4_solo_winner + 3 * putt_4_solo_loser,

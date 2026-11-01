@@ -8,6 +8,8 @@ SETTINGS_KEY = "competition_rules"
 DEFAULT_RULES = {
     "version": 1,
     "match_win_points": 10,
+    "putt_2_winner": 10,
+    "putt_2_loser": -10,
     "putt_3_solo_winner": 20,
     "putt_3_solo_loser": -10,
     "putt_3_two_winners": 5,
