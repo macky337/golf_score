@@ -1,0 +1,12 @@
+{
+  "name": "Golf Score App",
+  "short_name": "Golf Score",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#078719",
+  "theme_color": "#078719",
+  "icons": [
+    {"src": "/app/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/app/static/icon-512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}

@@ -11,7 +11,44 @@ def close_sidebar_on_mobile():
     """
     from modules.mobile_navigation import render_mobile_navigation
 
+    inject_app_icon_links()
     render_mobile_navigation()
+
+
+def inject_app_icon_links():
+    """Add installable app metadata to Streamlit's parent document."""
+    components.html("""
+    <script>
+    (function() {
+        try {
+            const doc = window.parent.document;
+            const links = [
+                ["icon", "/app/static/favicon.png", "image/png"],
+                ["apple-touch-icon", "/app/static/apple-touch-icon.png", "image/png"],
+                ["manifest", "/app/static/manifest.webmanifest", "application/manifest+json"]
+            ];
+            links.forEach(function(item) {
+                let link = doc.head.querySelector('link[rel="' + item[0] + '"]');
+                if (!link) {
+                    link = doc.createElement("link");
+                    link.rel = item[0];
+                    doc.head.appendChild(link);
+                }
+                link.href = item[1];
+                link.type = item[2];
+                if (item[0] === "apple-touch-icon") link.sizes = "180x180";
+            });
+            let theme = doc.head.querySelector('meta[name="theme-color"]');
+            if (!theme) {
+                theme = doc.createElement("meta");
+                theme.name = "theme-color";
+                doc.head.appendChild(theme);
+            }
+            theme.content = "#078719";
+        } catch (_) { /* Streamlit still uses page_icon when parent access is unavailable */ }
+    })();
+    </script>
+    """, height=0, width=0)
 
 
 def inject_numeric_keyboard_css():
