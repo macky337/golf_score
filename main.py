@@ -1,8 +1,13 @@
 import streamlit as st
+from pathlib import Path
+from PIL import Image
+
+
+APP_ICON = Image.open(Path(__file__).parent / "static" / "favicon.png")
 
 st.set_page_config(
     page_title="Golf Score App",
-    page_icon="static/favicon.png",
+    page_icon=APP_ICON,
     layout="wide",
 )
 
